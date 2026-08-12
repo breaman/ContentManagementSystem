@@ -1,0 +1,5 @@
+@inherits CmsFieldRendererBase
+
+@* The real pipeline is Markdig → sanitize (P1-18/P1-19). The spike only needs to prove that a field
+   renderer can emit pre-rendered markup under static SSR, so the conversion is deliberately trivial. *@
+<div class="rich-text">@((MarkupString)Html)</div>

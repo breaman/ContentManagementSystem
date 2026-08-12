@@ -1,0 +1,13 @@
+@attribute [CmsBlockType("hero-banner", "Hero banner")]
+@inherits CmsBlockBase
+
+<section class="hero">
+    <h1>@Text("headline")</h1>
+    @if (Property("image") is { } image)
+    {
+        @* A block hosting a field renderer: the composition nests one level deeper. *@
+        <DynamicComponent Type="typeof(MediaRenderer)"
+                          Parameters="@(new Dictionary<string, object?> { ["Value"] = image, ["ZoneKey"] = "hero.image" })" />
+    }
+    <p>@Text("body")</p>
+</section>

@@ -1,0 +1,16 @@
+@attribute [CmsTemplate("marketing-landing", "Marketing Landing Page")]
+@inherits CmsTemplateBase
+
+<article class="landing" data-page="@Context.PageId">
+    <header>
+        <CmsZone Name="hero" />
+    </header>
+    <div class="container">
+        <CmsZone Name="body" />
+        @* Declared but never authored on any page — proves an absent zone renders empty. *@
+        <CmsZone Name="aside" />
+    </div>
+    <footer>
+        <CmsZone Name="footer" />
+    </footer>
+</article>

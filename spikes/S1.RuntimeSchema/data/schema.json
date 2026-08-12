@@ -1,0 +1,278 @@
+{
+  "_comment": "Stands in for the Template/TemplateRevision/Zone/BlockType/BlockTypeRevision/BlockTypeProperty rows. Nothing here has a CLR counterpart - that is the point of S1.",
+  "templates": [
+    {
+      "templateKey": "marketing-landing",
+      "revisionNumber": 7,
+      "zones": [
+        {
+          "key": "hero",
+          "name": "Hero",
+          "fieldTypeKey": "blocks",
+          "isRequired": true,
+          "sortOrder": 1,
+          "configuration": {
+            "allowedBlockTypes": ["hero-banner", "text-columns", "quote"],
+            "min": 1,
+            "max": 8,
+            "allowNesting": false
+          }
+        },
+        {
+          "key": "body",
+          "name": "Body",
+          "fieldTypeKey": "richText",
+          "isRequired": true,
+          "sortOrder": 2,
+          "configuration": { "allowedFormat": "markdown" }
+        },
+        {
+          "key": "sidebar",
+          "name": "Sidebar",
+          "fieldTypeKey": "blocks",
+          "isRequired": false,
+          "sortOrder": 3,
+          "configuration": {
+            "allowedBlockTypes": ["text-columns", "quote"],
+            "max": 10,
+            "allowNesting": true
+          }
+        },
+        {
+          "key": "ctaLabel",
+          "name": "Call to action label",
+          "fieldTypeKey": "plainText",
+          "isRequired": false,
+          "sortOrder": 4,
+          "configuration": { "maxLength": 60 }
+        },
+        {
+          "key": "showBreadcrumbs",
+          "name": "Show breadcrumbs",
+          "fieldTypeKey": "boolean",
+          "isRequired": false,
+          "sortOrder": 5,
+          "configuration": null
+        },
+        {
+          "key": "theme",
+          "name": "Theme",
+          "fieldTypeKey": "choice",
+          "isRequired": false,
+          "sortOrder": 6,
+          "configuration": { "options": ["light", "dark", "brand"] }
+        },
+        {
+          "key": "readMore",
+          "name": "Read more",
+          "fieldTypeKey": "link",
+          "isRequired": false,
+          "sortOrder": 7,
+          "configuration": null
+        },
+        {
+          "key": "footer",
+          "name": "Footer",
+          "fieldTypeKey": "reusable",
+          "isRequired": false,
+          "sortOrder": 8,
+          "configuration": null
+        }
+      ]
+    },
+    {
+      "_comment": "Revision 8 removes 'sidebar' and adds a required 'announcement' - the evolution case from spec section 8.5.",
+      "templateKey": "marketing-landing",
+      "revisionNumber": 8,
+      "zones": [
+        {
+          "key": "hero",
+          "name": "Hero",
+          "fieldTypeKey": "blocks",
+          "isRequired": true,
+          "sortOrder": 1,
+          "configuration": {
+            "allowedBlockTypes": ["hero-banner", "text-columns", "quote"],
+            "min": 1,
+            "max": 8,
+            "allowNesting": false
+          }
+        },
+        {
+          "key": "body",
+          "name": "Body",
+          "fieldTypeKey": "richText",
+          "isRequired": true,
+          "sortOrder": 2,
+          "configuration": { "allowedFormat": "markdown" }
+        },
+        {
+          "key": "announcement",
+          "name": "Announcement",
+          "fieldTypeKey": "plainText",
+          "isRequired": true,
+          "sortOrder": 3,
+          "configuration": { "maxLength": 200 }
+        },
+        {
+          "key": "ctaLabel",
+          "name": "Call to action label",
+          "fieldTypeKey": "plainText",
+          "isRequired": false,
+          "sortOrder": 4,
+          "configuration": { "maxLength": 60 }
+        },
+        {
+          "key": "showBreadcrumbs",
+          "name": "Show breadcrumbs",
+          "fieldTypeKey": "boolean",
+          "isRequired": false,
+          "sortOrder": 5,
+          "configuration": null
+        },
+        {
+          "key": "theme",
+          "name": "Theme",
+          "fieldTypeKey": "choice",
+          "isRequired": false,
+          "sortOrder": 6,
+          "configuration": { "options": ["light", "dark", "brand"] }
+        },
+        {
+          "key": "readMore",
+          "name": "Read more",
+          "fieldTypeKey": "link",
+          "isRequired": false,
+          "sortOrder": 7,
+          "configuration": null
+        },
+        {
+          "key": "footer",
+          "name": "Footer",
+          "fieldTypeKey": "reusable",
+          "isRequired": false,
+          "sortOrder": 8,
+          "configuration": null
+        }
+      ]
+    },
+    {
+      "_comment": "Uncapped single-zone template used only by the performance harness.",
+      "templateKey": "perf-harness",
+      "revisionNumber": 1,
+      "zones": [
+        {
+          "key": "content",
+          "name": "Content",
+          "fieldTypeKey": "blocks",
+          "isRequired": true,
+          "sortOrder": 1,
+          "configuration": {
+            "allowedBlockTypes": ["hero-banner", "text-columns", "quote"],
+            "allowNesting": true
+          }
+        }
+      ]
+    }
+  ],
+  "blockTypes": [
+    {
+      "blockTypeKey": "hero-banner",
+      "revisionNumber": 3,
+      "properties": [
+        {
+          "key": "headline",
+          "name": "Headline",
+          "fieldTypeKey": "plainText",
+          "isRequired": true,
+          "sortOrder": 1,
+          "configuration": { "maxLength": 120 }
+        },
+        {
+          "key": "body",
+          "name": "Body",
+          "fieldTypeKey": "richText",
+          "isRequired": false,
+          "sortOrder": 2,
+          "configuration": null
+        },
+        {
+          "key": "image",
+          "name": "Image",
+          "fieldTypeKey": "media",
+          "isRequired": true,
+          "sortOrder": 3,
+          "configuration": { "allowedTypes": ["image"] }
+        },
+        {
+          "key": "cta",
+          "name": "Call to action",
+          "fieldTypeKey": "link",
+          "isRequired": false,
+          "sortOrder": 4,
+          "configuration": null
+        }
+      ]
+    },
+    {
+      "blockTypeKey": "text-columns",
+      "revisionNumber": 2,
+      "properties": [
+        {
+          "key": "heading",
+          "name": "Heading",
+          "fieldTypeKey": "plainText",
+          "isRequired": false,
+          "sortOrder": 1,
+          "configuration": { "maxLength": 80 }
+        },
+        {
+          "key": "columnCount",
+          "name": "Column count",
+          "fieldTypeKey": "number",
+          "isRequired": false,
+          "sortOrder": 2,
+          "configuration": { "min": 1, "max": 4 }
+        },
+        {
+          "key": "children",
+          "name": "Nested blocks",
+          "fieldTypeKey": "blocks",
+          "isRequired": false,
+          "sortOrder": 3,
+          "configuration": { "allowedBlockTypes": ["quote"], "max": 4, "allowNesting": false }
+        }
+      ]
+    },
+    {
+      "blockTypeKey": "quote",
+      "revisionNumber": 1,
+      "properties": [
+        {
+          "key": "quote",
+          "name": "Quote",
+          "fieldTypeKey": "plainText",
+          "isRequired": true,
+          "sortOrder": 1,
+          "configuration": { "maxLength": 400 }
+        },
+        {
+          "key": "attribution",
+          "name": "Attribution",
+          "fieldTypeKey": "plainText",
+          "isRequired": false,
+          "sortOrder": 2,
+          "configuration": { "maxLength": 120 }
+        },
+        {
+          "key": "portrait",
+          "name": "Portrait",
+          "fieldTypeKey": "media",
+          "isRequired": false,
+          "sortOrder": 3,
+          "configuration": null
+        }
+      ]
+    }
+  ]
+}

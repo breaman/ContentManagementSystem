@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "templateKey": "marketing-landing",
+  "templateRevision": 7,
+  "zones": {
+    "hero": {
+      "type": "blocks",
+      "items": [
+        {
+          "id": "0f6c1f2e-6f31-4b0a-9f6a-1b8a2c3d4e5f",
+          "blockTypeKey": "hero-banner",
+          "blockTypeRevision": 3,
+          "properties": {
+            "headline": { "type": "plainText", "value": "Ship faster" },
+            "body": { "type": "richText", "format": "markdown", "value": "We **help** teams ship." },
+            "image": {
+              "type": "media",
+              "mediaId": 812,
+              "altOverride": null,
+              "focalPoint": { "x": 0.5, "y": 0.33 },
+              "crop": { "x": 0, "y": 0.1, "w": 1, "h": 0.8 }
+            },
+            "cta": {
+              "type": "link",
+              "kind": "page",
+              "pageId": 44,
+              "text": "Get started",
+              "target": "_self",
+              "rel": null
+            }
+          }
+        },
+        {
+          "id": "b21d8f44-2a5c-4d1e-8f0b-77c2e9a10d33",
+          "blockTypeKey": "quote",
+          "blockTypeRevision": 1,
+          "properties": {
+            "quote": { "type": "plainText", "value": "It cut our publish cycle in half." },
+            "attribution": { "type": "plainText", "value": "Head of Content, Northwind" },
+            "portrait": { "type": "media", "mediaId": 913 }
+          }
+        }
+      ]
+    },
+    "body": {
+      "type": "richText",
+      "format": "markdown",
+      "value": "## Why teams choose us\n\nWe help teams **ship faster** with a content model that does not fight them."
+    },
+    "sidebar": {
+      "type": "blocks",
+      "items": [
+        {
+          "id": "c9f3a1b7-58e4-4c22-93aa-0e6f5d4c3b2a",
+          "blockTypeKey": "text-columns",
+          "blockTypeRevision": 2,
+          "properties": {
+            "heading": { "type": "plainText", "value": "In their words" },
+            "columnCount": { "type": "number", "value": 2 },
+            "children": {
+              "type": "blocks",
+              "items": [
+                {
+                  "id": "d4e5f6a7-b8c9-40d1-a2b3-c4d5e6f7a8b9",
+                  "blockTypeKey": "quote",
+                  "blockTypeRevision": 1,
+                  "properties": {
+                    "quote": { "type": "plainText", "value": "Editors stopped filing tickets." },
+                    "attribution": { "type": "plainText", "value": "Platform Lead, Contoso" },
+                    "portrait": { "type": "media", "mediaId": 977 }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "ctaLabel": { "type": "plainText", "value": null },
+    "showBreadcrumbs": { "type": "boolean", "value": true },
+    "readMore": {
+      "type": "link",
+      "kind": "page",
+      "pageId": 91,
+      "text": "Read the case study",
+      "target": "_self"
+    },
+    "footer": { "type": "reusable", "reusableContentId": 3, "pinnedVersionId": null },
+    "legacyBanner": {
+      "type": "plainText",
+      "value": "Authored against an older revision; the zone has since been removed."
+    }
+  }
+}

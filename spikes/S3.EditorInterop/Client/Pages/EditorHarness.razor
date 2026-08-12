@@ -1,0 +1,27 @@
+@* Every id here is an assertion target for the Playwright harness in the server project. *@
+<h1>S3 — editor interop harness</h1>
+
+<p>
+    <button id="toggle-editors" @onclick="ToggleEditors">@(EditorsMounted ? "Unmount" : "Mount") editors</button>
+    <button id="set-from-dotnet" @onclick="SetFromDotNet">Set both values from .NET</button>
+    <span id="mount-cycles">@MountCycles</span>
+</p>
+
+@if (EditorsMounted)
+{
+    <section>
+        <h2>Markdown source (CodeMirror 6)</h2>
+        <MarkdownEditor @bind-Value="MarkdownValue" Language="markdown" />
+    </section>
+
+    <section>
+        <h2>Rich text (Quill)</h2>
+        <RichTextEditor @bind-Value="RichTextValue" />
+    </section>
+}
+
+<h2>Bound .NET values</h2>
+<pre id="markdown-value">@MarkdownValue</pre>
+<pre id="richtext-value">@RichTextValue</pre>
+
+<div id="ready">ready</div>

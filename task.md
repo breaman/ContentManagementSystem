@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 scaffolding complete, spikes outstanding
+**Status:** In progress — Phase 0 complete (all three spikes returned go); Phase 1 next
 **Version:** 1.0
 **Last updated:** 2026-08-12
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -48,17 +48,17 @@ and record the date in the progress table.
 
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
-| [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 15 | 12.0 | In progress — spikes S1–S3 outstanding | — |
+| [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 0 | 28.0 | Not started | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 40 | 0 | 34.5 | Not started | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **280** | **15** | **203.5** | | |
+| **v1 total** | **281** | **19** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -114,19 +114,32 @@ blocked on setup. **12 ed** · Entry: `aspire run` starts the existing solution.
 Each spike produces a written finding in `docs/spikes/` with a go/no-go recommendation. **Spike code is
 thrown away** — nothing is promoted directly into the solution.
 
-- [ ] **P0-03** **S1 — Runtime-schema payload round trip.** Can a JSON payload be validated and
+- [x] **P0-03** **S1 — Runtime-schema payload round trip.** Can a JSON payload be validated and
   deserialized against a *runtime-defined* schema (zones/properties as data) with acceptable
   performance and clear errors? *Box: 2 ed. Fallback: code-defined content types, losing runtime zone
-  editing.* → `docs/spikes/s1-runtime-schema.md`
-- [ ] **P0-04** **S2 — Dynamic component rendering under static SSR.** Does `DynamicComponent` compose
+  editing.* → [`docs/spikes/s1-runtime-schema.md`](./docs/spikes/s1-runtime-schema.md)
+  *2026-08-12 — **GO**. 39/39 checks. Errors name the exact zone/block/property (the R2 trigger);
+  ~1.2 µs per block; absent-vs-null and orphaned zones survive the round trip. Raised a gap in
+  `P1-13` — see the note on that task.*
+- [x] **P0-04** **S2 — Dynamic component rendering under static SSR.** Does `DynamicComponent` compose
   template → zone → field renderer with no interactive render mode, and does an error boundary isolate
   a failing block? *Box: 2 ed. Fallback: source-generated static render switch per template.*
-  → `docs/spikes/s2-dynamic-ssr.md`
-- [ ] **P0-05** **S3 — Editor JS interop in Blazor WASM.** Do CodeMirror 6 and Quill integrate cleanly
+  → [`docs/spikes/s2-dynamic-ssr.md`](./docs/spikes/s2-dynamic-ssr.md)
+  *2026-08-12 — **GO**. 40/40 checks. Boundaries isolate a failing block in all three failure shapes
+  (lifecycle, mid-`BuildRenderTree`, post-await), the whole [§15.3] fallback matrix behaves, and
+  ~7 µs per block. Constraints recorded against `P3-08`, `P3-11`, `P3-13`, and `P3-27`.*
+- [x] **P0-05** **S3 — Editor JS interop in Blazor WASM.** Do CodeMirror 6 and Quill integrate cleanly
   (init, two-way bind, dispose without leaks) as local assets under a strict CSP? *Box: 2 ed. Fallback:
-  textarea-plus-preview editor for v1.* → `docs/spikes/s3-editor-interop.md`
-- [ ] **P0-06** Record an ADR for any spike that returned no-go, capturing the agreed fallback. *(Exit
+  textarea-plus-preview editor for v1.* → [`docs/spikes/s3-editor-interop.md`](./docs/spikes/s3-editor-interop.md)
+  *2026-08-12 — **GO**. 23/23 checks, driven through a real browser. No `unsafe-inline`, no
+  `unsafe-eval`; 22 editors created and 22 disposed across 11 mount/unmount cycles. **The backoffice
+  must expose a per-request style nonce** or CodeMirror renders silently unstyled — see `D13`.*
+- [x] **P0-06** Record an ADR for any spike that returned no-go, capturing the agreed fallback. *(Exit
   criterion: no no-go without a recorded fallback.)*
+  *2026-08-12 — all three spikes returned **go**, so no fallback ADR was required. Recorded
+  [`ADR-0013` (D13)](./docs/adr/0013-backoffice-editor-bundle-and-style-nonce.md) anyway for the
+  backoffice CSP nonce and local editor bundling, because S3 turned a spec assumption into a hard
+  constraint on how `/admin` is served.*
 
 ### 0.2 Scaffolding
 
@@ -178,7 +191,10 @@ thrown away** — nothing is promoted directly into the solution.
 
 ### Acceptance criteria — Phase 0
 
-- [ ] **P0 #1** All three spikes have a written finding with a go/no-go recommendation.
+- [x] **P0 #1** All three spikes have a written finding with a go/no-go recommendation.
+  *2026-08-12 — [S1](./docs/spikes/s1-runtime-schema.md), [S2](./docs/spikes/s2-dynamic-ssr.md),
+  [S3](./docs/spikes/s3-editor-interop.md). All three **go**; no architectural fallback is needed.
+  Spike code lives in [`spikes/`](./spikes), deliberately outside `ContentManagementSystem.slnx`.*
 - [x] **P0 #2** `dotnet build` succeeds with zero warnings across the expanded solution.
   *Verified 2026-08-12. Required suppressing `ASPIRE004` in the AppHost, narrowly and with a reason —
   the non-executable `Data` reference is deliberate, since `AddEFMigrations` needs its generated
@@ -190,7 +206,9 @@ thrown away** — nothing is promoted directly into the solution.
 - [x] **P0 #4** `aspire run` starts SQL Server, Azurite, and the server; `/health` reports healthy.
   *Verified 2026-08-12; see [`docs/phase-0-baseline.md`](./docs/phase-0-baseline.md).*
 
-**Exit gate:** no spike returned a no-go without an agreed fallback recorded as an ADR. — [ ] met on ____
+**Exit gate:** no spike returned a no-go without an agreed fallback recorded as an ADR. — [x] met on
+**2026-08-12** — all three returned go, so no fallback was needed. R1 and R2 close; R7 closes.
+*`P0 #3` remains open: the CI workflow has still not executed on a GitHub runner.*
 
 **Risks:** R1 (spike failure), R9 (Testcontainers in CI).
 
@@ -248,6 +266,10 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 - [ ] **P1-13** Contract test asserting **every registered field type returns references for a
   representative populated value** — the omission that silently produces stale content [§7.3].
   — included above
+  *Widened by [S1](./docs/spikes/s1-runtime-schema.md): the test as originally worded passes for a
+  `blocks` field type that reports only its top level and silently drops every reference nested
+  inside it. **Add a second case** — a container field type must return the references of a nested
+  populated value.*
 
 ### 1.3 Payload engine — 5 ed
 
@@ -255,6 +277,11 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   with explicit **absent-vs-null** semantics [§6.2]. — 1.5 ed
 - [ ] **P1-15** `ContentSchemaValidator` in `Core/Content/` — walks zone/block-property definitions,
   dispatches to field types, returns structured errors keyed by zone / block id / property. — 2 ed
+  *Four constraints proven by [S1](./docs/spikes/s1-runtime-schema.md): stay on
+  `JsonDocument`/`JsonElement` (no intermediate CLR model, or absent-vs-null is lost); build the
+  error path from a push/pop stack so nothing allocates on the happy path; give every diagnostic a
+  stable `code` alongside its message; make draft-vs-publish a validator parameter, not a filter
+  applied to the results.*
 - [ ] **P1-16** `ReferenceIndexer` in `Core/Content/` — extracts `ContentReference` rows via
   `IFieldType.ExtractReferences`. — 1 ed
 - [ ] **P1-17** Snapshot tests pinning the payload envelope format in `Core.Tests/Content/`. — 0.5 ed
@@ -450,17 +477,29 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 - [ ] **P3-08** `ContentManagementSystem.Rendering` infrastructure: `CmsTemplateBase`, `CmsZone`,
   `RenderContext` (with the accumulating `CacheTags` set), `[CmsTemplate]` and `[CmsBlockType]`
   attributes [§15.2]. — 2 ed
+  *From [S2](./docs/spikes/s2-dynamic-ssr.md): name the render-mode enum **`CmsRenderMode`** — the
+  spec's `RenderMode` collides with `Microsoft.AspNetCore.Components.Web.RenderMode` in every .razor
+  file. Keep `CacheTags` per render, never shared across requests. Markers and structural hints must
+  be elements or attributes: the Razor compiler strips HTML comments from .razor markup.*
 - [ ] **P3-09** Field renderer components in `Rendering/Fields/` for every Phase 1 field type. — 2 ed
 - [ ] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
   `Rendering/Blocks/`, between them exercising every field type. — 2 ed
 - [ ] **P3-11** Per-zone error boundaries and the full fallback matrix from [§15.3]: unknown template
   key, unknown field type, missing media, unpublished reusable content, renderer throwing. — 1 ed
+  *From [S2](./docs/spikes/s2-dynamic-ssr.md): derive from **`ErrorBoundaryBase`**, not the stock
+  `ErrorBoundary` — overriding `OnErrorAsync` is what gets page id, zone key, version id, and block
+  id into the log (`P3 #8`), and the stock fallback text is not acceptable on a public page. Put a
+  boundary at **both** levels, per zone and per block.*
 - [ ] **P3-12** `PublishedContentService` in `Core/Delivery/` — resolve → load → deserialize → render;
   read-only, cache-ready, filters on `PublishedVersionId` **at the data layer** so drafts cannot leak
   [§20.1]. — 2 ed
 - [ ] **P3-13** Delivery endpoint `app.MapGet("/{**slug}", …)` in `Server/Delivery/`, registered
   **after every other endpoint**; 404 page (itself a CMS page); `NotFoundLog` writing [§15.1, §10.6].
   — 1 ed
+  *From [S2](./docs/spikes/s2-dynamic-ssr.md): **render to a buffer, then set headers, then write.**
+  Cache tags accumulate during the render, so anything that streams sends headers before the tag set
+  is complete — producing a page that never invalidates. No public delivery component may opt into
+  streaming rendering.*
 - [ ] **P3-14** Scope interactive routing to `/admin` in `Server/Components/Routes.razor`; keep public
   pages static SSR — the decision that makes output caching possible [§5.3]. *(Existing-code change.)*
   — 0.5 ed
@@ -492,6 +531,11 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 - [ ] **P3-26** Integration: preview-token expiry, revocation, and non-recoverability from the database.
 - [ ] **P3-27** Performance benchmark harness for page render, with CI regression thresholds (starts
   here per the plan's cross-cutting performance workstream).
+  *Baselines from the spikes, both **excluding** database access — treat them as the floor, not a
+  projected latency: schema validation ~1.2 µs per block ([S1](./docs/spikes/s1-runtime-schema.md)),
+  component rendering ~7 µs per block ([S2](./docs/spikes/s2-dynamic-ssr.md)). Warm **every** input
+  size before measuring any of them; measuring sizes in sequence made a 200-block page look faster
+  per block than a 50-block one, purely tiered-JIT artifact.*
 - [ ] **P3-28** Telemetry: `cms.page.render.duration`, `cms.route.resolution.miss` [§24.1].
 - [ ] **P3-29** Visual regression baseline (Playwright screenshots) for the two reference templates.
 - [ ] **P3-30** Confirm Q8 (legacy URL preservation) is answered and its redirect import path tested.
@@ -742,6 +786,13 @@ daily — including the edit/preview experience the requirements call out explic
 - [ ] **P6-08** **Edit/Preview/Split rich-text editor** in `Client/Components/Admin/Fields/RichText/` —
   CodeMirror 6 source mode for Markdown, Quill for the constrained WYSIWYG surface, both as **local
   static assets** (no CDN, so the CSP stays strict) [§14.4]. — 2.5 ed
+  *Proven end to end by [S3](./docs/spikes/s3-editor-interop.md), with four requirements: the
+  backoffice host page must emit a **per-request style nonce** exposed as `<meta name="csp-nonce">`
+  and passed to `EditorView.cspNonce`, or CodeMirror renders silently unstyled ([`D13`](./docs/adr/0013-backoffice-editor-bundle-and-style-nonce.md));
+  one shared base class carries the interop plumbing (module import, `DotNetObjectReference`, echo
+  suppression, `IAsyncDisposable`); **Quill's toolbar must be removed explicitly** on teardown, since
+  Quill has no `destroy()` and appends the toolbar as a sibling; split the bundle per editor
+  (696 KB raw / 231 KB gzipped for both).*
 - [ ] **P6-09** Preview pane rendered through the **same Markdig → sanitize → site typography pipeline**
   the public site uses, so preview is accurate rather than approximate. — 1 ed
 - [ ] **P6-10** Split mode with synchronized scrolling. — 0.75 ed
@@ -794,6 +845,10 @@ daily — including the edit/preview experience the requirements call out explic
 
 - [ ] **P6-30** bUnit: block list editor add/reorder/duplicate/delete, keyboard paths.
 - [ ] **P6-31** bUnit: rich-text editor mode switching and preview parity.
+- [ ] **P6-31a** E2E: mount and unmount an editor ten times, asserting zero surviving editor DOM
+  nodes and created-equals-disposed; and assert CodeMirror's own styling is in effect (a computed
+  style differing from the browser default), since a missing CSP nonce fails **silently**
+  [[S3](./docs/spikes/s3-editor-interop.md), [`D13`](./docs/adr/0013-backoffice-editor-bundle-and-style-nonce.md)].
 - [ ] **P6-32** E2E: full editor journey — create → edit → preview → publish → verify anonymous → edit
   again → verify published unchanged → rollback.
 - [ ] **P6-33** E2E: autosave survives a simulated transient network failure without losing input.

@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "templateKey": "marketing-landing",
+  "templateRevision": 7,
+  "zones": {
+    "hero": {
+      "type": "blocks",
+      "items": [
+        {
+          "id": "0f6c1f2e-6f31-4b0a-9f6a-1b8a2c3d4e5f",
+          "blockTypeKey": "hero-banner",
+          "blockTypeRevision": 3,
+          "properties": {
+            "headline": {
+              "type": "plainText",
+              "value": "This headline is deliberately far longer than the hundred and twenty character limit configured for the hero banner headline property, so it must be rejected."
+            },
+            "cta": { "type": "link", "kind": "page", "text": "Get started" },
+            "subtitle": { "type": "plainText", "value": "Property that no longer exists on revision 3." }
+          }
+        },
+        {
+          "id": "0f6c1f2e-6f31-4b0a-9f6a-1b8a2c3d4e5f",
+          "blockTypeKey": "quote",
+          "blockTypeRevision": 1,
+          "properties": {
+            "quote": { "type": "richText", "format": "markdown", "value": "Wrong field type for this property." }
+          }
+        },
+        {
+          "blockTypeKey": "carousel",
+          "blockTypeRevision": 1,
+          "properties": {}
+        },
+        {
+          "id": "e1e2e3e4-e5e6-47e8-a9ea-ebecedeeeff0",
+          "blockTypeKey": "quote",
+          "blockTypeRevision": 99,
+          "properties": {}
+        }
+      ]
+    },
+    "body": {
+      "type": "richText",
+      "format": "html",
+      "value": "<p>The zone is configured for markdown only.</p>"
+    },
+    "sidebar": {
+      "type": "blocks",
+      "items": [
+        {
+          "id": "c9f3a1b7-58e4-4c22-93aa-0e6f5d4c3b2a",
+          "blockTypeKey": "text-columns",
+          "blockTypeRevision": 2,
+          "properties": {
+            "columnCount": { "type": "number", "value": 9 }
+          }
+        }
+      ]
+    },
+    "ctaLabel": { "type": "plainText", "value": 42 },
+    "theme": { "type": "choice", "value": "neon" },
+    "readMore": { "type": "link", "kind": "external", "url": "javascript:alert(1)" },
+    "footer": { "type": "media", "mediaId": 3 }
+  }
+}

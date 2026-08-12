@@ -1,0 +1,13 @@
+@* Spec §8.2: the template declares placement only. Everything else is looked up at render time. *@
+@if (RendererType is not null)
+{
+    <CmsErrorBoundary ZoneKey="@Name" Kind="zone">
+        <ChildContent>
+            <DynamicComponent Type="RendererType" Parameters="RendererParameters" />
+        </ChildContent>
+        @* Markers are elements, not HTML comments: the Razor compiler strips comments from markup. *@
+        <ErrorContent Context="_">
+            <span data-cms-zone-failed="@Name"></span>
+        </ErrorContent>
+    </CmsErrorBoundary>
+}

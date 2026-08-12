@@ -1,0 +1,18 @@
+@inherits CmsFieldRendererBase
+
+@* The third level of the composition: template → zone → field renderer → block component.
+   Every block gets its own boundary, so one failing block cannot take its siblings with it. *@
+<div class="blocks" data-zone="@ZoneKey">
+    @foreach (var block in ResolveBlocks())
+    {
+        <CmsErrorBoundary ZoneKey="@ZoneKey" Kind="block" BlockId="@block.Id" @key="block.Id">
+            <ChildContent>
+                <DynamicComponent Type="block.Component" Parameters="block.Parameters" />
+            </ChildContent>
+            @* Markers are elements, not HTML comments: the Razor compiler strips comments from markup. *@
+            <ErrorContent Context="_">
+                <span data-cms-block-failed="@block.Id"></span>
+            </ErrorContent>
+        </CmsErrorBoundary>
+    }
+</div>

@@ -1,0 +1,11 @@
+@inherits CmsFieldRendererBase
+
+@if (Item is not null)
+{
+    <img src="@Item.Url" alt="@Item.AltText" width="@Item.Width" height="@Item.Height" loading="lazy" />
+}
+else if (MissingId is { } missing)
+{
+    @* Spec §15.3: referenced media missing → placeholder carrying the alt text, and a log entry. *@
+    <span class="media-missing" role="img" aria-label="@AltOverride">[image unavailable: @missing]</span>
+}

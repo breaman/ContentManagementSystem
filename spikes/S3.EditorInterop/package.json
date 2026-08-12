@@ -1,0 +1,20 @@
+{
+  "name": "s3.editorinterop",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "esbuild src/editors.js --bundle --format=esm --minify --outfile=Server/wwwroot/js/editors.js && cp node_modules/quill/dist/quill.snow.css Server/wwwroot/css/quill.snow.css"
+  },
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@codemirror/commands": "^6.10.4",
+    "@codemirror/lang-html": "^6.4.12",
+    "@codemirror/lang-markdown": "^6.5.2",
+    "@codemirror/state": "^6.7.1",
+    "@codemirror/view": "^6.43.8",
+    "codemirror": "^6.0.2",
+    "esbuild": "^0.28.2",
+    "quill": "^2.0.3"
+  },
+  "private": true
+}

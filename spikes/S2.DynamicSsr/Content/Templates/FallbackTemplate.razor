@@ -1,0 +1,12 @@
+@inherits CmsTemplateBase
+
+@* Spec §15.3, unknown templateKey: a minimal layout carrying the page's text content, rather than a
+   stack trace or a blank page. Deliberately has no [CmsTemplate] attribute — it is not selectable. *@
+@* Markers are attributes, not HTML comments: the Razor compiler strips comments from .razor markup. *@
+<article class="fallback" data-cms-fallback="template"
+         data-page="@Context.PageId" data-template-missing="@Context.TemplateKey">
+    @foreach (var text in Context.TextContent())
+    {
+        <p>@text</p>
+    }
+</article>

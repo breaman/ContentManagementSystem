@@ -8,7 +8,8 @@ holds, without reading `spec.md` end to end.
 
 - One decision per file, named `NNNN-kebab-title.md`.
 - `D1`–`D12` carry the identifiers used in [`spec.md` §29.1](../../spec.md) and the task list, so a
-  reference like "D6" resolves to exactly one file here.
+  reference like "D6" resolves to exactly one file here. `D13` onwards are decisions taken after the
+  spec was written; each names its source.
 - Status is one of **Accepted**, **Superseded by `NNNN`**, or **Proposed**. Records are never
   deleted or edited into something else — a reversal is a new record that supersedes the old one.
 - A spike that returns no-go must produce a record capturing the agreed fallback (task P0-06).
@@ -29,3 +30,4 @@ holds, without reading `spec.md` end to end.
 | [0010](0010-shared-rendering-rcl.md) | D10 — Shared rendering RCL between delivery and preview | Accepted |
 | [0011](0011-skiasharp-image-processing-no-avif.md) | D11 — SkiaSharp behind `IImageProcessor`; AVIF dropped from v1 | Accepted |
 | [0012](0012-advisory-locks-never-block.md) | D12 — Advisory locks never block; `rowversion` is authoritative | Accepted |
+| [0013](0013-backoffice-editor-bundle-and-style-nonce.md) | D13 — Locally bundled editors; per-request style nonce for the backoffice | Accepted |

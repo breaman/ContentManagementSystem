@@ -1,0 +1,8 @@
+@inherits JsEditorComponentBase
+
+@* CodeMirror 6 mounts into this element. Blazor renders nothing inside it, so its diffing never
+   fights the editor over the DOM beneath. *@
+<div class="editor-host cm-host"
+     id="@ElementId"
+     data-language="@Language"
+     @ref="Host"></div>

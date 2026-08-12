@@ -1,0 +1,7 @@
+@attribute [CmsTemplate("article", "Article")]
+@inherits CmsTemplateBase
+
+<article class="article" data-page="@Context.PageId">
+    <CmsZone Name="title" />
+    <CmsZone Name="body" />
+</article>

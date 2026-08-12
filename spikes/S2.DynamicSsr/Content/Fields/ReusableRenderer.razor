@@ -1,0 +1,8 @@
+@inherits CmsFieldRendererBase
+
+@* Deliberately asynchronous: this is the case that proves an await inside a component still works
+   with no interactive render mode, since the reusable resolver hits the database (P4-06). *@
+@if (Body is not null)
+{
+    <aside class="reusable">@Body</aside>
+}
