@@ -1,0 +1,22 @@
+<Solution>
+  <Folder Name="/aspire/">
+    <Project Path="aspire/ContentManagementSystem.AppHost/ContentManagementSystem.AppHost.csproj" />
+    <Project Path="aspire/ContentManagementSystem.ServiceDefaults/ContentManagementSystem.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path=".config\dotnet-tools.json" />
+    <File Path=".editorconfig" />
+    <File Path=".gitignore" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Build.targets" />
+    <File Path="Directory.Packages.props" />
+    <File Path="global.json" />
+    <File Path="README.md" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/ContentManagementSystem.Client/ContentManagementSystem.Client.csproj" />
+    <Project Path="src/ContentManagementSystem.Data/ContentManagementSystem.Data.csproj" />
+    <Project Path="src/ContentManagementSystem.Server/ContentManagementSystem.Server.csproj" />
+    <Project Path="src/ContentManagementSystem.Shared/ContentManagementSystem.Shared.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,14 @@
+﻿@inherits LayoutComponentBase
+@using ContentManagementSystem.Client.Components
+
+<NavMenu />
+<main class="mt-2 container">
+    @Body
+    <ToastContainer @rendermode="InteractiveWebAssembly" />
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">X</span>
+</div>

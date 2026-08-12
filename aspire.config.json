@@ -1,0 +1,8 @@
+{
+  "appHost": {
+    "path": "aspire/ContentManagementSystem.AppHost/ContentManagementSystem.AppHost.csproj"
+  },
+  "features": {
+    "defaultWatchEnabled": "true"
+  }
+}

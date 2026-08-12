@@ -1,0 +1,18 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.EntityFrameworkCore" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Data\ContentManagementSystem.Data.csproj" />
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Server\ContentManagementSystem.Server.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.ServiceDefaults\ContentManagementSystem.ServiceDefaults.csproj" IsAspireProjectResource="false" />
+  </ItemGroup>
+
+</Project>

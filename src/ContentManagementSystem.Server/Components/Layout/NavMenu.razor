@@ -1,0 +1,57 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">ContentManagementSystem</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item">
+                    <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                        <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                    </NavLink>
+                </li>
+            </ul>
+            <ul class="navbar-nav ms-auto">
+                <AuthorizeView>
+                    <Authorized>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <span class="bi bi-person-circle" aria-hidden="true"></span> Welcome, @FirstName
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                                <li>
+                                    <NavLink class="dropdown-item" href="/Account/Manage">
+                                        <span class="bi bi-gear" aria-hidden="true"></span> Manage Account
+                                    </NavLink>
+                                </li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li>
+                                    <form action="/Account/Logout" method="post" class="m-0">
+                                        <AntiforgeryToken />
+                                        <input type="hidden" name="returnUrl" value="" />
+                                        <button type="submit" class="dropdown-item">
+                                            <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Log out
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </li>
+                    </Authorized>
+                    <NotAuthorized>
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="/Account/Register">
+                                <span class="bi bi-person-plus" aria-hidden="true"></span> Register
+                            </NavLink>
+                        </li>
+                        <li class="nav-item">
+                            <NavLink class="nav-link" href="/Account/Login">
+                                <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Log in
+                            </NavLink>
+                        </li>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </ul>
+        </div>
+    </div>
+</nav>
