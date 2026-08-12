@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Data\ContentManagementSystem.Data.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.TestSupport\ContentManagementSystem.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- EF behaviour that matters here — filtered unique indexes, rowversion conflicts, query
+         filters — is provider-specific, so these tests run against a real SQL Server container
+         rather than the in-memory provider. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+</Project>

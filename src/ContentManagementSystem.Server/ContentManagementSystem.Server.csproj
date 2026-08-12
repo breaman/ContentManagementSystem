@@ -4,6 +4,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Blobs" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
@@ -18,13 +19,13 @@
   <ItemGroup>
     <ProjectReference Include="..\..\aspire\ContentManagementSystem.ServiceDefaults\ContentManagementSystem.ServiceDefaults.csproj" />
     <ProjectReference Include="..\ContentManagementSystem.Client\ContentManagementSystem.Client.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.Core\ContentManagementSystem.Core.csproj" />
     <ProjectReference Include="..\ContentManagementSystem.Data\ContentManagementSystem.Data.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.Rendering\ContentManagementSystem.Rendering.csproj" />
   </ItemGroup>
 
   <Target Name="CopyBootstrapJs" BeforeTargets="Build">
     <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\js" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\node_modules\bootstrap\dist\js\bootstrap.bundle.min.js"
-          DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\js"
-          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\node_modules\bootstrap\dist\js\bootstrap.bundle.min.js" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\js" SkipUnchangedFiles="true" />
   </Target>
 </Project>

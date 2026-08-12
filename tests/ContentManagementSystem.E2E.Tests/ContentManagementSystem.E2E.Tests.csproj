@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- axe-core runs inside the Playwright page, so accessibility assertions live alongside the
+         browser journeys rather than in a suite of their own (task P0-11, P1-31). -->
+    <PackageReference Include="Deque.AxeCore.Playwright" />
+    <PackageReference Include="Microsoft.Playwright" />
+  </ItemGroup>
+
+</Project>

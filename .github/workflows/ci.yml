@@ -1,0 +1,189 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/ContentManagementSystem.Server/package-lock.json
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore ContentManagementSystem.slnx
+
+      # site.css is generated from SCSS and is not committed, so the published output would be
+      # missing its stylesheet without this step.
+      - name: Build stylesheets
+        working-directory: src/ContentManagementSystem.Server
+        run: |
+          npm ci
+          npm run sass-prod
+
+      # TreatWarningsAsErrors is on solution-wide, so a new warning fails here (criterion P0 #2).
+      - name: Build
+        run: dotnet build ContentManagementSystem.slnx --no-restore --configuration Release
+
+      - name: Publish server
+        run: >-
+          dotnet publish src/ContentManagementSystem.Server/ContentManagementSystem.Server.csproj
+          --no-build --configuration Release --output ${{ runner.temp }}/publish
+
+      - name: Upload published server
+        uses: actions/upload-artifact@v4
+        with:
+          name: server
+          path: ${{ runner.temp }}/publish
+          retention-days: 7
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Test
+        run: >-
+          dotnet test tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=core.trx"
+          --results-directory ${{ runner.temp }}/test-results
+          --collect "XPlat Code Coverage"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
+
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Testcontainers starts SQL Server itself; the runner only has to provide a Docker daemon,
+      # which ubuntu-latest already does. The image is pinned in SqlServerImage rather than
+      # floating on a tag, so a new upstream build cannot change behaviour under a green run.
+      - name: Data integration tests
+        run: >-
+          dotnet test tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=data.trx"
+          --results-directory ${{ runner.temp }}/test-results
+
+      - name: API and delivery integration tests
+        run: >-
+          dotnet test tests/ContentManagementSystem.Server.Tests/ContentManagementSystem.Server.Tests.csproj
+          --configuration Release
+          --logger "trx;LogFileName=server.trx"
+          --results-directory ${{ runner.temp }}/test-results
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
+
+  migrations:
+    name: Migrations apply from empty
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Deliberately separate from the integration job. "Do the migrations apply to an empty
+      # database, and do they revert?" is the one failure that blocks every deployment, so it gets
+      # its own signal instead of being one red test among many.
+      - name: Apply and revert every migration
+        run: >-
+          dotnet test tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~MigrationsApplyFromEmptyTests"
+
+  e2e-tests:
+    name: E2E and accessibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/ContentManagementSystem.Server/package-lock.json
+
+      - name: Build stylesheets
+        working-directory: src/ContentManagementSystem.Server
+        run: |
+          npm ci
+          npm run sass-prod
+
+      # Browsers install themselves on first use (see PlaywrightBrowsers), so no PowerShell step.
+      # axe-core assertions run inside these same browser journeys — the accessibility gate starts
+      # in Phase 1 against the structure screens, not at the end of the project.
+      - name: Test
+        run: >-
+          dotnet test tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
+          --configuration Release
+          --logger "trx"
+          --results-directory ${{ runner.temp }}/test-results
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: |
+            ${{ runner.temp }}/test-results
+            tests/ContentManagementSystem.E2E.Tests/**/playwright-traces/**
+          retention-days: 7
+          if-no-files-found: ignore

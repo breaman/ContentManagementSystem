@@ -2,10 +2,20 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <!--
+      ASPIRE004 fires because ContentManagementSystem.Data is a class library rather than an
+      executable resource. The reference is deliberate: AddEFMigrations needs the generated
+      Projects.ContentManagementSystem_Data metadata to locate the migrations assembly, which
+      IsAspireProjectResource="false" would suppress. The build runs warnings-as-errors, so the
+      warning is silenced here rather than left to fail every build.
+      -->
+    <NoWarn>$(NoWarn);ASPIRE004</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
     <PackageReference Include="Aspire.Hosting.EntityFrameworkCore" />
+    <PackageReference Include="Aspire.Hosting.Redis" />
     <PackageReference Include="Aspire.Hosting.SqlServer" />
   </ItemGroup>
 

@@ -15,8 +15,17 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/ContentManagementSystem.Client/ContentManagementSystem.Client.csproj" />
+    <Project Path="src/ContentManagementSystem.Core/ContentManagementSystem.Core.csproj" />
     <Project Path="src/ContentManagementSystem.Data/ContentManagementSystem.Data.csproj" />
+    <Project Path="src/ContentManagementSystem.Rendering/ContentManagementSystem.Rendering.csproj" />
     <Project Path="src/ContentManagementSystem.Server/ContentManagementSystem.Server.csproj" />
     <Project Path="src/ContentManagementSystem.Shared/ContentManagementSystem.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj" />
+    <Project Path="tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj" />
+    <Project Path="tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj" />
+    <Project Path="tests/ContentManagementSystem.Server.Tests/ContentManagementSystem.Server.Tests.csproj" />
+    <Project Path="tests/ContentManagementSystem.TestSupport/ContentManagementSystem.TestSupport.csproj" />
   </Folder>
 </Solution>

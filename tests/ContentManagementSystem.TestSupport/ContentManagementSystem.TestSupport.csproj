@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Data\ContentManagementSystem.Data.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="xunit.v3.extensibility.core" />
+  </ItemGroup>
+
+</Project>

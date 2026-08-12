@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Server\ContentManagementSystem.Server.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.TestSupport\ContentManagementSystem.TestSupport.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+</Project>

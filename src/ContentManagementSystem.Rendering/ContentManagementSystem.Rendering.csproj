@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <!-- Rendering components run on the server for public delivery and inside the WASM
+         backoffice for preview, so the browser platform must stay supported. -->
+    <AddRazorSupportForMvc>false</AddRazorSupportForMvc>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <SupportedPlatform Include="browser" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ContentManagementSystem.Core\ContentManagementSystem.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" />
+  </ItemGroup>
+
+</Project>

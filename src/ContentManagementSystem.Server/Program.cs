@@ -1,6 +1,7 @@
 using System.Diagnostics;
 
 using ContentManagementSystem.Client.Services;
+using ContentManagementSystem.Data.Common;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Server.Components;
@@ -58,6 +59,15 @@ try
     builder.EnrichSqlServerDbContext<ApplicationDbContext>();
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+    // The media blob store is provisioned by Aspire (Azurite in development). Registration is
+    // conditional so hosts that never touch media — notably the API integration test harness —
+    // do not fail their health check on a storage account they were never given.
+    if (!string.IsNullOrWhiteSpace(
+            builder.Configuration.GetConnectionString(Constants.MediaBlobConnectionString)))
+    {
+        builder.AddAzureBlobServiceClient(Constants.MediaBlobConnectionString);
+    }
+
     builder.Services.AddIdentityCore<User>(options =>
         {
             options.Password.RequireDigit = false;
@@ -69,7 +79,7 @@ try
             // options.SignIn.RequireConfirmedEmail = true;
             options.SignIn.RequireConfirmedAccount = true;
 
-            options.Stores.SchemaVersion = IdentitySchemaVersions.Version3;
+            options.Stores.SchemaVersion = IdentitySchema.Version;
         })
         // AddRoles isn't added from the AddIdentityCore, so if you want to use roles, this must be explicitly added
         .AddRoles<Role>()
@@ -134,3 +144,13 @@ finally
     Log.Information("Shut down complete");
     Log.CloseAndFlush();
 }
+
+/// <summary>
+/// Entry point for the server host.
+/// </summary>
+/// <remarks>
+/// Top-level statements generate an internal <c>Program</c> class. Declaring it public here lets
+/// <c>WebApplicationFactory&lt;Program&gt;</c> in the integration test suite boot the real
+/// application rather than a hand-assembled approximation of it.
+/// </remarks>
+public partial class Program;

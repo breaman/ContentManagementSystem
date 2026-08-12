@@ -1,0 +1,41 @@
+<!--
+  Shared settings for every test project. Imports the repository-root props first so tests inherit
+  the same target framework, nullable, and warnings-as-errors settings as production code.
+-->
+<Project>
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!-- Test assemblies are not consumed as libraries, so public XML docs are not required. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Everything under tests/ named *.Tests is a runnable suite; anything else (TestSupport)
+         is a plain helper library that must not be discovered by the test runner. -->
+    <IsTestProject Condition="$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTestProject>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
+    <!-- xUnit v3 test projects are self-hosting executables. -->
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <PackageReference Include="coverlet.collector">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <Using Include="FluentAssertions" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

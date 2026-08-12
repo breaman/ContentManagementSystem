@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** Not started
+**Status:** In progress — Phase 0 scaffolding complete, spikes outstanding
 **Version:** 1.0
 **Last updated:** 2026-08-12
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -48,7 +48,7 @@ and record the date in the progress table.
 
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
-| [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 0 | 12.0 | Not started | — |
+| [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 15 | 12.0 | In progress — spikes S1–S3 outstanding | — |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 0 | 28.0 | Not started | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **280** | **0** | **203.5** | | |
+| **v1 total** | **280** | **15** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -99,11 +99,15 @@ blocked on setup. **12 ed** · Entry: `aspire run` starts the existing solution.
 
 ### Pre-work
 
-- [ ] **P0-01** Create the `InitialDatabase` migration (per `README.md`, never run on this repo yet):
+- [x] **P0-01** Create the `InitialDatabase` migration (per `README.md`, never run on this repo yet):
   `dotnet ef migrations add InitialDatabase -p ../ContentManagementSystem.Data`. Verify it applies via
   the Aspire `ef-migrations` resource. — 0.25 ed
-- [ ] **P0-02** Confirm `aspire run` starts SQL Server + server and `/health` reports healthy; record
+  *2026-08-12 — created; `Up` and `Down` both verified, and asserted continuously by
+  `MigrationsApplyFromEmptyTests`. Applied by the Aspire `ef-migrations` resource on startup.*
+- [x] **P0-02** Confirm `aspire run` starts SQL Server + server and `/health` reports healthy; record
   the baseline in `docs/`. — 0.25 ed
+  *2026-08-12 — SQL Server, Azurite, and the server all start; `/health` and `/alive` return
+  `Healthy`. Baseline recorded in [`docs/phase-0-baseline.md`](./docs/phase-0-baseline.md).*
 
 ### 0.1 Spikes — timeboxed, do these first
 
@@ -126,43 +130,76 @@ thrown away** — nothing is promoted directly into the solution.
 
 ### 0.2 Scaffolding
 
-- [ ] **P0-07** Create `ContentManagementSystem.Core` (class library) and
+- [x] **P0-07** Create `ContentManagementSystem.Core` (class library) and
   `ContentManagementSystem.Rendering` (Razor Class Library); wire into `ContentManagementSystem.slnx`,
   `Directory.Packages.props`, and project references per [§5.2]. — 1 ed
-- [ ] **P0-08** Create `tests/ContentManagementSystem.Core.Tests` (unit, xUnit + FluentAssertions +
+  *2026-08-12 — both created with assembly-marker types for the reflection-based discovery that
+  `TemplateReconciler` and the field-type registry will need. `Server` references both.*
+- [x] **P0-08** Create `tests/ContentManagementSystem.Core.Tests` (unit, xUnit + FluentAssertions +
   NSubstitute). — 0.4 ed
-- [ ] **P0-09** Create `tests/ContentManagementSystem.Data.Tests` (EF integration, Testcontainers SQL
+- [x] **P0-09** Create `tests/ContentManagementSystem.Data.Tests` (EF integration, Testcontainers SQL
   Server). — 0.4 ed
-- [ ] **P0-10** Create `tests/ContentManagementSystem.Server.Tests` (API/delivery integration,
+- [x] **P0-10** Create `tests/ContentManagementSystem.Server.Tests` (API/delivery integration,
   `WebApplicationFactory`). — 0.4 ed
-- [ ] **P0-11** Create `tests/ContentManagementSystem.E2E.Tests` (Playwright + axe-core). — 0.3 ed
-- [ ] **P0-12** Add bUnit to the rendering test path; register all test packages in central package
+  *2026-08-12 — `CmsApplicationFactory` boots the real `Program` against a throwaway migrated
+  database. Required making `Program` public.*
+- [x] **P0-11** Create `tests/ContentManagementSystem.E2E.Tests` (Playwright + axe-core). — 0.3 ed
+  *2026-08-12 — browsers self-install on first run via `PlaywrightBrowsers`, so neither a developer
+  machine nor a CI agent needs PowerShell.*
+- [x] **P0-12** Add bUnit to the rendering test path; register all test packages in central package
   management. — 0.3 ed
-- [ ] **P0-13** Add Azurite (blob) to `aspire/ContentManagementSystem.AppHost/AppHost.cs` as the dev
+  *2026-08-12 — bUnit sits in `Core.Tests` alongside the field-type and payload tests. All test
+  packages are declared in `Directory.Packages.props`; shared settings live in
+  `tests/Directory.Build.props`. **FluentAssertions is pinned to 7.2.2** — 8.x is commercially
+  licensed.*
+- [x] **P0-13** Add Azurite (blob) to `aspire/ContentManagementSystem.AppHost/AppHost.cs` as the dev
   media store; wire the connection into the server. — 0.6 ed
-- [ ] **P0-14** Add Redis to `AppHost.cs` behind a feature flag / configuration switch (unused until
+  *2026-08-12 — the server registers the blob client only when the connection string is present, so
+  the API test harness does not fail its health check on storage it was never given.*
+- [x] **P0-14** Add Redis to `AppHost.cs` behind a feature flag / configuration switch (unused until
   P8). — 0.4 ed
-- [ ] **P0-15** CI pipeline in `.github/workflows`: restore → build (warnings-as-errors, already on) →
+  *2026-08-12 — provisioned only when `Cms:UseRedisOutputCache` is true.*
+- [x] **P0-15** CI pipeline in `.github/workflows`: restore → build (warnings-as-errors, already on) →
   unit → integration (Testcontainers) → E2E → axe → publish artifacts. — 1.2 ed
-- [ ] **P0-16** Add a CI job that applies existing migrations against a Testcontainers SQL Server
+  *2026-08-12 — `.github/workflows/ci.yml`, five jobs. **Not yet executed on a runner** — it needs a
+  push to validate.*
+- [x] **P0-16** Add a CI job that applies existing migrations against a Testcontainers SQL Server
   instance, proving the migration path works from empty. — 0.4 ed
-- [ ] **P0-17** Pin Testcontainers images; add the `azure-sql-edge` fallback path already used by
+  *2026-08-12 — its own `migrations` job, kept separate from the integration suite so the one
+  failure that blocks every deployment gets its own signal.*
+- [x] **P0-17** Pin Testcontainers images; add the `azure-sql-edge` fallback path already used by
   `AppHost` for ARM64 CI agents *(mitigates R9)*. — 0.4 ed
-- [ ] **P0-18** `CONTRIBUTING.md` with the conventions from [§23] (entity base classes, `ColumnTypes`,
+  *2026-08-12 — `SqlServerImage` pins SQL Server 2022 CU20, falls back to Azure SQL Edge on arm64,
+  and honours a `CMS_TEST_SQL_IMAGE` override. Note Edge has no full-text search, which Phase 8
+  needs — see the open question below.*
+- [x] **P0-18** `CONTRIBUTING.md` with the conventions from [§23] (entity base classes, `ColumnTypes`,
   `FieldLengths`, migration review rules). — 0.25 ed
-- [ ] **P0-19** Seed `docs/adr/` with D1–D12 from [§29.1], one file per decision. — 0.25 ed
+- [x] **P0-19** Seed `docs/adr/` with D1–D12 from [§29.1], one file per decision. — 0.25 ed
 
 ### Acceptance criteria — Phase 0
 
 - [ ] **P0 #1** All three spikes have a written finding with a go/no-go recommendation.
-- [ ] **P0 #2** `dotnet build` succeeds with zero warnings across the expanded solution.
-- [ ] **P0 #3** CI runs green on an empty test suite, including a Testcontainers SQL Server integration
+- [x] **P0 #2** `dotnet build` succeeds with zero warnings across the expanded solution.
+  *Verified 2026-08-12. Required suppressing `ASPIRE004` in the AppHost, narrowly and with a reason —
+  the non-executable `Data` reference is deliberate, since `AddEFMigrations` needs its generated
+  `Projects.*` metadata.*
+- [~] **P0 #3** CI runs green on an empty test suite, including a Testcontainers SQL Server integration
   test that applies the existing migrations.
-- [ ] **P0 #4** `aspire run` starts SQL Server, Azurite, and the server; `/health` reports healthy.
+  *All 8 tests pass locally across the four suites; the migration test applies and reverts from
+  empty. **The workflow itself has not run on a GitHub runner yet.***
+- [x] **P0 #4** `aspire run` starts SQL Server, Azurite, and the server; `/health` reports healthy.
+  *Verified 2026-08-12; see [`docs/phase-0-baseline.md`](./docs/phase-0-baseline.md).*
 
 **Exit gate:** no spike returned a no-go without an agreed fallback recorded as an ADR. — [ ] met on ____
 
 **Risks:** R1 (spike failure), R9 (Testcontainers in CI).
+
+**Raised during Phase 0 — needs a decision by Phase 8:** the arm64 test fallback runs **Azure SQL
+Edge**, which has no full-text search. `P8-18` builds `SearchIndexService` on a SQL Server full-text
+index, so those tests cannot run on an arm64 developer machine under the current fallback. Either the
+full-text tests get gated to amd64/CI, or arm64 developers run SQL Server under emulation (verified
+working on Apple Silicon via Docker Desktop), or the search backend changes. Recording it now because
+it is cheap to plan for and expensive to discover in Phase 8.
 
 ---
 
