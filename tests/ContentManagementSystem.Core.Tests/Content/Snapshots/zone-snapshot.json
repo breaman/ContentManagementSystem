@@ -1,0 +1,22 @@
+[
+  {
+    "key": "hero",
+    "name": "Hero",
+    "fieldTypeKey": "blocks",
+    "isRequired": true,
+    "sortOrder": 0,
+    "configuration": {
+      "allowedBlockTypes": [
+        "hero-banner"
+      ],
+      "max": 3
+    }
+  },
+  {
+    "key": "body",
+    "name": "Body",
+    "fieldTypeKey": "richText",
+    "isRequired": false,
+    "sortOrder": 1
+  }
+]

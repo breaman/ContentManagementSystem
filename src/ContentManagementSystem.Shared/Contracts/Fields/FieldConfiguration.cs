@@ -95,6 +95,35 @@ public class FieldConfiguration
         return new FieldConfiguration(document.RootElement.Clone(), isRequired);
     }
 
+    /// <summary>
+    /// Builds a configuration over an already-parsed object.
+    /// </summary>
+    /// <param name="configuration">
+    /// The configuration object. Anything that is not an object — including an undefined element —
+    /// yields an empty configuration, which is what a property declaring none looks like.
+    /// </param>
+    /// <param name="isRequired">
+    /// The <c>IsRequired</c> column value of the zone or block-type property being validated.
+    /// </param>
+    /// <returns>A cacheable configuration.</returns>
+    /// <remarks>
+    /// The counterpart to <see cref="Parse(string?, bool)"/> for callers whose configuration arrives
+    /// embedded in a larger document rather than as its own column — a template revision's zone
+    /// snapshot, for instance. Re-serialising it just to parse it again would be the only
+    /// alternative.
+    /// </remarks>
+    public static FieldConfiguration FromElement(JsonElement configuration, bool isRequired = false)
+    {
+        if (configuration.ValueKind is not JsonValueKind.Object)
+        {
+            return isRequired ? new FieldConfiguration(default, true) : Empty;
+        }
+
+        // Cloned for the same reason Parse clones: the instance is cached per schema row and must
+        // not pin the document it was read out of.
+        return new FieldConfiguration(configuration.Clone(), isRequired);
+    }
+
     /// <summary>Looks up a configuration property by name.</summary>
     /// <param name="name">Property name, case-sensitive.</param>
     /// <param name="value">The property value when present.</param>

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "templateKey": "marketing-landing",
+  "templateRevision": 7,
+  "zones": {
+    "hero": {
+      "type": "blocks",
+      "items": [
+        {
+          "id": "0f6c8b1e-3a4d-4f2b-9c7e-1d2a3b4c5d6e",
+          "blockTypeKey": "hero-banner",
+          "blockTypeRevision": 3,
+          "properties": {
+            "headline": {
+              "type": "plainText",
+              "value": "Ship faster"
+            },
+            "body": {
+              "type": "richText",
+              "format": "markdown",
+              "value": "We **help** teams\u2026"
+            },
+            "image": {
+              "type": "media",
+              "mediaId": 812,
+              "altOverride": null,
+              "focalPoint": {
+                "x": 0.5,
+                "y": 0.33
+              },
+              "crop": {
+                "x": 0,
+                "y": 0.1,
+                "w": 1,
+                "h": 0.8
+              }
+            },
+            "cta": {
+              "type": "link",
+              "kind": "page",
+              "pageId": 44,
+              "text": "Get started",
+              "target": "_self",
+              "rel": null
+            }
+          }
+        }
+      ]
+    },
+    "body": {
+      "type": "richText",
+      "format": "html",
+      "value": "\u003Cp\u003E\u2026\u003C/p\u003E"
+    },
+    "footer": {
+      "type": "reusable",
+      "reusableContentId": 3,
+      "pinnedVersionId": null
+    },
+    "subtitle": null
+  }
+}

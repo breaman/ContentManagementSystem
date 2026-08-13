@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1 and 1.2 done, 1.3 next (`P1-14`)
+**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.3 done, 1.4 next (`P1-18`)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 13 | 28.0 | In progress — 1.1 and 1.2 complete; payload engine (1.3) next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 17 | 28.0 | In progress — 1.1 to 1.3 complete; sanitization (1.4) next | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **32** | **203.5** | | |
+| **v1 total** | **281** | **36** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -398,18 +398,67 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 
 ### 1.3 Payload engine — 5 ed
 
-- [ ] **P1-14** `ContentPayload` model + envelope + `System.Text.Json` converters in `Shared/Content/`,
+- [x] **P1-14** `ContentPayload` model + envelope + `System.Text.Json` converters in `Shared/Content/`,
   with explicit **absent-vs-null** semantics [§6.2]. — 1.5 ed
-- [ ] **P1-15** `ContentSchemaValidator` in `Core/Content/` — walks zone/block-property definitions,
+  *2026-08-13 — a reader over the envelope, not a deserializer: every accessor hands back a
+  `JsonElement`, and `ContentValueState` makes **Absent / Cleared / Present** a value callers cannot
+  collapse by accident. **`ContentPayload` is deliberately not `IDisposable`** — it holds a detached
+  clone rather than owning a `JsonDocument`, because [§16.1] caches deserialized content for fifteen
+  minutes and a disposable in that cache is a use-after-free with a very long fuse. The cost is one
+  copy of the bytes at parse time. **Nothing here rejects a malformed envelope**; a payload with no
+  `zones` still parses, because `P1-15` needs a readable object to report that against. Writes go
+  through `ContentPayloadBuilder`, which preserves zone order (a zone that moves to the end of the
+  object reads to the `P2-14` diff as a removal plus an addition) and copies through envelope
+  members this build does not recognise. `ContentPayloadJsonConverter` is attribute-applied, so a
+  payload survives an API round trip as the document that went in.*
+- [x] **P1-15** `ContentSchemaValidator` in `Core/Content/` — walks zone/block-property definitions,
   dispatches to field types, returns structured errors keyed by zone / block id / property. — 2 ed
   *Four constraints proven by [S1](./docs/spikes/s1-runtime-schema.md): stay on
   `JsonDocument`/`JsonElement` (no intermediate CLR model, or absent-vs-null is lost); build the
   error path from a push/pop stack so nothing allocates on the happy path; give every diagnostic a
   stable `code` alongside its message; make draft-vs-publish a validator parameter, not a filter
   applied to the results.*
-- [ ] **P1-16** `ReferenceIndexer` in `Core/Content/` — extracts `ContentReference` rows via
+  *2026-08-13 — all four honoured; `ContentPath` is the push/pop stack. **The schema needed a model
+  and a storage format, and both landed here**: `Core/Content/Schema/` holds `ContentSchema` /
+  `BlockTypeSchema` / `ContentPropertySchema` (a zone and a block property are the same thing at
+  validation time) behind `IContentSchemaCatalog`, keyed by **key and revision** because that is how
+  content addresses its schema [§8.5]. `ContentSchemaSnapshot` defines what
+  `TemplateRevision.ZoneSnapshotJson` and `BlockTypeRevision.PropertySnapshotJson` actually contain —
+  those columns existed with no format, and leaving it for `P1-21` risked two. Configuration is
+  embedded as an object, not an escaped string, and parsed once per revision (S1 consequence 4).*
+  *The division of labour with the field types is the thing to know. **The walk does not re-check
+  what a field type already checks** — required-and-empty, the `type` discriminator disagreeing with
+  the schema, block ids, `allowedBlockTypes`, list counts are all `P1-10`/`P1-11` code, reached by
+  dispatching every value including absent ones. What the walk adds is what only it can see: the
+  envelope, the captured revision, the keys the schema cannot account for, and the absolute path. It
+  also skips anything the `blocks` field type has already reported on — a non-object block, a block
+  with no type key — so one defect never produces two diagnostics.*
+  *Severity follows one rule: **content that outlived its structure is a warning, everything else is
+  an error.** Orphaned zone, orphaned block property, unknown block type revision, and a field type
+  no longer registered are all warnings ([§8.5], [§15.3]) — erroring would strand the page and leave
+  an editor no way to fix it. An unknown *template* revision is an error, because nothing below it
+  can be checked at all. `ContentValidationDiagnostic` carries `ZoneKey`, `BlockId`, and
+  `PropertyKey` beside the path: the backoffice addresses a block by GUID, not by index, which makes
+  `P1 #2` a literal assertion.*
+- [x] **P1-16** `ReferenceIndexer` in `Core/Content/` — extracts `ContentReference` rows via
   `IFieldType.ExtractReferences`. — 1 ed
-- [ ] **P1-17** Snapshot tests pinning the payload envelope format in `Core.Tests/Content/`. — 0.5 ed
+  *2026-08-13 — **driven by the payload, not by the schema**, and dispatching on each zone's stored
+  `type` discriminator. Two cases decided it, both of which make a schema-driven walk return nothing
+  and erase a page's reference rows on its next save: a template revision that is no longer known
+  (deleted template, environment promoted out of order), and a zone removed from the template whose
+  retained content still points at real media. Both directions of error are not equal — an extra row
+  makes a delete guard cautious, a missing one makes a page go stale [§7.3] — so this over-reports
+  by design. It needs no catalog and no schema at all as a result. Occurrences are returned, not
+  distinct targets; collapsing them is the projection's business in `P2-02`.*
+- [x] **P1-17** Snapshot tests pinning the payload envelope format in `Core.Tests/Content/`. — 0.5 ed
+  *2026-08-13 — `Content/Snapshots/*.json`, compared canonicalised, regenerated only under
+  `CMS_UPDATE_SNAPSHOTS=1` so a snapshot can never silently rewrite itself. Three are pinned: the
+  envelope a page starts life with, the [§6.2] example with a cleared zone beside it, and the schema
+  snapshot format `P1-15` introduced. One decision is visible in them — **the default JSON encoder is
+  kept, so `<` and non-ASCII are escaped**. A relaxed encoder would store authored HTML more
+  compactly; the reason not to is that a payload reaches the editor as an API response and could
+  reach a page as embedded JSON, and escaping that is safe everywhere beats escaping that is safe
+  until someone inlines it into a `<script>` block. 67 tests across 1.3, 397 green in `Core.Tests`.*
 
 ### 1.4 Sanitization — ships now, before any HTML can be stored — 3.5 ed
 
@@ -482,6 +531,15 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 — [ ] met on ____
 
 **Risks:** R2 (runtime-schema complexity), R3 (sanitizer over-stripping).
+
+**Raised during Phase 1 — build infrastructure:** `SSH.NET 2025.1.0`, pulled in transitively by
+Testcontainers, picked up [GHSA-q939-rpr3-3284](https://github.com/advisories/GHSA-q939-rpr3-3284)
+and, under warnings-as-errors, failed every build of the three test projects that use Testcontainers
+— nothing to do with any task here. Pinned to `2026.0.0` in `Directory.Packages.props` via transitive
+pinning; the Testcontainers suites were re-run against real SQL Server to confirm the bump is
+harmless. Remove the pin when Testcontainers resolves a patched version itself. **A NuGet advisory
+published against any transitive dependency will break the build the same way** — worth knowing
+before it happens on a Friday.
 
 ---
 
