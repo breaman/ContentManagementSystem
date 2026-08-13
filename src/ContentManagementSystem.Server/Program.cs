@@ -1,9 +1,15 @@
 using System.Diagnostics;
 
 using ContentManagementSystem.Client.Services;
+using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Security;
+using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Data.Common;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
+using ContentManagementSystem.Server.Api.Cms;
+using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
 using ContentManagementSystem.Server.Components.Email;
@@ -88,6 +94,25 @@ try
         .AddDefaultTokenProviders()
         .AddClaimsPrincipalFactory<CustomUserClaimsPrincipalFactory>();
 
+    // The CMS spine (task P1-30). Order is immaterial, but the dependencies are not: the field
+    // types resolve an IContentSanitizer, so a deployment that registered them without
+    // AddCmsSanitization would fail to build the registry rather than quietly store raw markup.
+    builder.Services.AddCmsSanitization();
+    builder.Services.AddCmsFieldTypes();
+    builder.Services.AddCmsStructure();
+    builder.Services.AddCmsAuthorization();
+
+    // AddCmsContent() is deliberately not called yet. The payload validator it registers needs an
+    // IContentSchemaCatalog, and the only honest implementation is the cached, database-backed one
+    // that arrives with the endpoints that validate payloads in Phase 2. Registering an empty
+    // catalog to make startup succeed would produce a deployment that validates every payload
+    // against nothing, which is worse than not validating at all — it reports success.
+
+    // The management API is cookie-authenticated, so every write carries an antiforgery token in a
+    // header. Naming the header here is what lets the JSON endpoints validate one at all — the
+    // default configuration only reads the token from a form field.
+    builder.Services.AddAntiforgery(options => options.HeaderName = CmsAntiforgeryDefaults.HeaderName);
+
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
     builder.Services.AddScoped<IToastService, ToastService>();
@@ -118,7 +143,14 @@ try
         app.UseHsts();
     }
 
-    app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+    // Status-code pages give the public site an HTML error experience by re-executing the request
+    // against a Razor page. The API is excluded: a 403 from the authorization middleware carries no
+    // body, so it qualifies for re-execution, and re-running a JSON POST through a component
+    // endpoint replaced it with an unrelated 400 about the content type. An API client must see the
+    // status its request actually produced.
+    app.UseWhen(
+        context => !context.Request.Path.StartsWithSegments(CmsApiEndpoints.ApiPathPrefix),
+        branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
     app.UseHttpsRedirection();
     app.UseAuthentication();
@@ -131,6 +163,7 @@ try
         .AddAdditionalAssemblies(typeof(ContentManagementSystem.Client._Imports).Assembly);
 
     app.MapAdditionalIdentityEndpoints();
+    app.MapCmsApi();
 
     app.Run();
 }

@@ -300,7 +300,7 @@ namespace ContentManagementSystem.Data.Migrations
             migrationBuilder.InsertData(
                 table: "BlockTypeRevisions",
                 columns: new[] { "Id", "BlockTypeId", "CreatedBy", "CreatedOn", "ModifiedBy", "ModifiedOn", "Notes", "PropertySnapshotJson", "RevisionNumber" },
-                values: new object[] { 1, 1, 0, null, 0, null, "Initial built-in definition.", "{\"properties\":[{\"key\":\"content\",\"name\":\"HTML\",\"fieldTypeKey\":\"html\",\"isRequired\":true,\"sortOrder\":0}]}", 1 });
+                values: new object[] { 1, 1, 0, null, 0, null, "Initial built-in definition.", "[{\"key\":\"content\",\"name\":\"HTML\",\"fieldTypeKey\":\"html\",\"isRequired\":true,\"sortOrder\":0}]", 1 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_BlockTypeCompositions_BlockTypeId_CompositionId",

@@ -83,9 +83,13 @@ public static class CmsSeedData
         Id = 1,
         BlockTypeId = RawHtmlBlockTypeId,
         RevisionNumber = 1,
+        // The shape is defined by ContentSchemaSnapshot (P1-15): a bare array of slot definitions,
+        // identical for zones and block-type properties. This row predates that type and originally
+        // wrapped the array in a "properties" member, which the reader refuses — the built-in block
+        // type would have been the one block type whose captured schema could not be loaded.
         PropertySnapshotJson =
             """
-            {"properties":[{"key":"content","name":"HTML","fieldTypeKey":"html","isRequired":true,"sortOrder":0}]}
+            [{"key":"content","name":"HTML","fieldTypeKey":"html","isRequired":true,"sortOrder":0}]
             """,
         Notes = "Initial built-in definition.",
     };

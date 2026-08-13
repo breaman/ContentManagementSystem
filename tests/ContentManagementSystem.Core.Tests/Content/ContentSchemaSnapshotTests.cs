@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Data.Models.Cms;
+using ContentManagementSystem.Data.Seeding;
 using ContentManagementSystem.Shared.Contracts.Fields;
 
 namespace ContentManagementSystem.Core.Tests.Content;
@@ -161,5 +162,25 @@ public class ContentSchemaSnapshotTests
 
         catalog.TryGetBlockType("quote", 99, out _).Should().BeFalse();
         catalog.TryGetBlockType("missing", null, out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheSeededBuiltInBlockTypeCarriesAReadableSnapshot()
+    {
+        var revision = CmsSeedData.RawHtmlBlockTypeRevision;
+
+        var schema = ContentSchemaSnapshot.ReadBlockType(
+            CmsSeedData.RawHtmlBlockTypeKey,
+            revision.RevisionNumber,
+            revision.PropertySnapshotJson);
+
+        // The seed row was written before this format existed and wrapped the array in an object,
+        // which reads as malformed — the one block type every deployment ships with would have been
+        // the one whose captured schema could not be loaded. Nothing read the column until now, so
+        // nothing caught it; this is that check.
+        var slot = schema.Properties.Should().ContainSingle().Subject;
+        slot.Key.Should().Be(CmsSeedData.RawHtmlContentPropertyKey);
+        slot.FieldTypeKey.Should().Be(FieldTypeKeys.Html);
+        slot.IsRequired.Should().BeTrue();
     }
 }

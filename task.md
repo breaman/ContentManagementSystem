@@ -1,6 +1,7 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.4 done, 1.5 next (`P1-21`)
+**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.4 done, 1.5 started (`P1-21` done,
+`P1-22` next)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +50,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 20 | 28.0 | In progress — 1.1 to 1.4 complete; structure admin (1.5) next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 21 | 28.0 | In progress — 1.1 to 1.4 complete; structure admin (1.5) under way | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +59,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **39** | **203.5** | | |
+| **v1 total** | **281** | **40** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -276,6 +277,14 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   asserts no row is duplicated. Singleton-ness of `SiteSettings` is a check constraint, not a
   convention. `RawHtml` ships with its `content` property and revision 1, so content authored
   against it has a captured schema from the start.*
+  ***Corrected 2026-08-13 while building `P1-21`.*** The seeded `PropertySnapshotJson` was written
+  before `P1-15` defined the snapshot format and wrapped its array in a `{"properties": …}` object,
+  which `ContentSchemaSnapshot.Read` refuses — the one block type every deployment ships with would
+  have been the only one whose captured schema could not be loaded. Nothing read the column yet, so
+  nothing caught it. Fixed in `CmsSeedData` and in the `HasData` values inside migration #2, which
+  has never been applied anywhere but a developer machine; `dotnet ef migrations
+  has-pending-model-changes` confirms the model snapshot still matches. Now asserted by
+  `Content/ContentSchemaSnapshotTests` through the real reader.*
 
 ### 1.2 Field type framework — the extensibility spine — 7 ed
 
@@ -543,8 +552,41 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 
 ### 1.5 Structure admin (functional, unstyled UI) — 6 ed
 
-- [ ] **P1-21** Management API `/api/cms/v1/templates` in `Server/Api/Cms/Structure/` — list, create,
+- [x] **P1-21** Management API `/api/cms/v1/templates` in `Server/Api/Cms/Structure/` — list, create,
   read, update, revisions. — 0.5 ed
+  *2026-08-13 — six endpoints (list, read, create, update, revision list, revision read) over an
+  `ITemplateService` in `Core/Structure/`. **No delete**: [§8.5] blocks deleting a template while a
+  non-deleted page references it, and there is no `Page` table to ask until `P2-01`; shipping the
+  verb now would mean shipping the guard later. It lands with the rest of `P1-32`.*
+  ***Three things this task had to settle before it could be built, none of them template-specific.***
+  **Authorization**: `CONTRIBUTING.md` requires it in the service layer, and `Core` cannot reference
+  ASP.NET Core. `ICmsAuthorization` in `Shared/Contracts/Security/` is that seam — implemented by
+  `HttpCmsAuthorization` over the cookie principal, backed by `CmsPermissionMap`, the [§21.1] table
+  transcribed once and read by both the endpoint policies and the service checks so the two cannot
+  disagree. Reads need `Content.Read`, writes `Structure.Edit`. `P2-21` extends this rather than
+  starting it; section ACLs join at the same seam in P7.
+  **Antiforgery**: the API is cookie-authenticated, which makes every write forgeable from any page
+  a signed-in developer visits. `CmsAntiforgeryFilter` closes that now rather than in `P2-20`,
+  because the alternative is a phase of writes with no CSRF defence. It is an endpoint filter, not
+  the middleware already in the pipeline — that one only validates endpoints binding **form** data,
+  and a JSON body is not covered by it. Token pair from `GET /api/cms/v1/antiforgery-token`.
+  **The error contract**: `CmsProblems` maps every service outcome to one status and emits the
+  [§22.2] shape with `errors` and `warnings` arrays always present. Diagnostics reuse
+  `ValidationResult`, so a structural refusal and a field-type refusal reach the client as the same
+  shape. 422 for a broken content-model rule, 409 for a taken key, 404, 403.*
+  ***A pipeline bug this turned up, which would have hit every API endpoint.***
+  `UseStatusCodePagesWithReExecute` re-executes any body-less error response against `/not-found` —
+  so a 403 from the authorization middleware came back to the client as a **400 about the content
+  type**, having been re-run through a Razor component endpoint as a JSON POST. Now branched with
+  `UseWhen` so nothing under `/api` gets the site's HTML error experience. Caught by the one test
+  that asserted a `Viewer` is refused; without it the whole authorization surface would have
+  reported the wrong status.*
+  *Two smaller decisions. `ContentKeys` holds the key shape for every content-model key, not just
+  templates — a key is immutable, so the rules only ever run once and every key admitted is admitted
+  forever. And a template created here is `IsOrphaned` from the start: no deployed component claims
+  its key yet, which is what the flag means, and `P1-25`'s reconciler clears it when one does.
+  17 API integration tests plus `Structure/ContentKeysTests`; the list endpoint is deliberately
+  unpaged, since templates are written one per page shape.*
 - [ ] **P1-22** `/api/cms/v1/templates/{id}/zones` — CRUD with key immutability enforced [§8.5]. — 0.5 ed
   *`P1-12` built `IFieldConfigurationValidator` and registered it; this is the call site [§7.2].
   Block-type property writes in `P1-23` and the schema sync in `P1-26` are the other two.*
@@ -563,8 +605,16 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 - [ ] **P1-28** CLI verbs in `Server/Cli/`: `cms schema export | diff | apply` [§27.1]. — 0.25 ed
 - [ ] **P1-29** Plain admin screens under `/admin/structure` in `Client/Components/Admin/Structure/`:
   template list, create, edit zone, edit block type. — 2 ed
-- [ ] **P1-30** Register CMS services and the field type registry in `Server/Program.cs`.
+- [~] **P1-30** Register CMS services and the field type registry in `Server/Program.cs`.
   *(Existing-code change.)* — 0.25 ed
+  *2026-08-13 — sanitization, the field types and their registry, the structure services, the
+  authorization policies, and the antiforgery header name are registered; `P1-21`'s endpoints are
+  mapped. **`AddCmsContent()` is deliberately still not called.** It registers
+  `ContentSchemaValidator`, which needs an `IContentSchemaCatalog`, and the only honest
+  implementation is the cached database-backed one that arrives with the payload-validating
+  endpoints in Phase 2 — an empty catalog would make a deployment start up validating every payload
+  against nothing and reporting success. Finish this task there. The markdown renderer rides on the
+  same call, so nothing resolves `IMarkdownRenderer` until then either.*
 - [ ] **P1-31** Wire axe-core accessibility checks into CI against the structure screens — the
   continuous a11y gate starts here, not in P9. — 0.25 ed
 - [ ] **P1-32** Template evolution rules enforced in the service layer [§8.5]: add zone free; remove

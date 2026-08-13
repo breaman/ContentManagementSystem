@@ -309,7 +309,7 @@ namespace ContentManagementSystem.Data.Migrations
                             CreatedBy = 0,
                             ModifiedBy = 0,
                             Notes = "Initial built-in definition.",
-                            PropertySnapshotJson = "{\"properties\":[{\"key\":\"content\",\"name\":\"HTML\",\"fieldTypeKey\":\"html\",\"isRequired\":true,\"sortOrder\":0}]}",
+                            PropertySnapshotJson = "[{\"key\":\"content\",\"name\":\"HTML\",\"fieldTypeKey\":\"html\",\"isRequired\":true,\"sortOrder\":0}]",
                             RevisionNumber = 1
                         });
                 });
