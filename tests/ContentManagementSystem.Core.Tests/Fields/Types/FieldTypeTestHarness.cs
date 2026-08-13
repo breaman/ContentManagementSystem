@@ -115,9 +115,11 @@ internal static class FieldTypeTestHarness
 /// transformation a test needs.
 /// </summary>
 /// <remarks>
-/// The real implementation lands in P1-18. What matters here is the field type's half of the
-/// contract: which profile it selects, whether it calls the sanitizer at all, and what it does with
-/// the answer.
+/// A double rather than the real <c>SanitizationService</c> on purpose, even though that now exists:
+/// what these tests assert is the field type's half of the contract — which profile it selects,
+/// whether it calls the sanitizer at all, and what it does with the answer — and pinning them to a
+/// real allowlist would make a profile change fail tests that are not about profiles.
+/// <c>Security/SanitizationServiceTests</c> owns the other half.
 /// </remarks>
 internal sealed class RecordingSanitizer : IContentSanitizer
 {
@@ -134,4 +136,8 @@ internal sealed class RecordingSanitizer : IContentSanitizer
 
         return Transform(html);
     }
+
+    /// <inheritdoc />
+    public SanitizationResult SanitizeWithReport(string? html, SanitizationProfile profile) =>
+        SanitizationResult.Unchanged(Sanitize(html, profile));
 }

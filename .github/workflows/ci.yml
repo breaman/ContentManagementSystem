@@ -60,6 +60,41 @@ jobs:
           path: ${{ runner.temp }}/publish
           retention-days: 7
 
+  xss-corpus:
+    name: XSS corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Its own job, and its own required check, for the same reason the migrations job is separate
+      # from the integration suite: "can stored content execute in a visitor's browser" is the one
+      # failure nobody should have to find among two hundred other red tests. Gap #11 is the
+      # highest-severity item in the specification (task P1-20, acceptance criterion P1 #6).
+      #
+      # The suite writes what each profile stripped from each payload to the test log, because
+      # over-stripping is the other failure mode (risk R3) and it has no attacker to catch it.
+      - name: Sanitization and XSS corpus
+        run: >-
+          dotnet test tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~ContentManagementSystem.Core.Tests.Security|FullyQualifiedName~ContentManagementSystem.Core.Tests.Content.Markdown"
+          --logger "trx;LogFileName=xss-corpus.trx"
+          --results-directory ${{ runner.temp }}/test-results
+          -- xunit.showLiveOutput=true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xss-corpus-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
+
   unit-tests:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -98,6 +133,13 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/ContentManagementSystem.Server/package-lock.json
+
       # Testcontainers starts SQL Server itself; the runner only has to provide a Docker daemon,
       # which ubuntu-latest already does. The image is pinned in SqlServerImage rather than
       # floating on a tag, so a new upstream build cannot change behaviour under a green run.
@@ -107,6 +149,12 @@ jobs:
           --configuration Release
           --logger "trx;LogFileName=data.trx"
           --results-directory ${{ runner.temp }}/test-results
+
+      # need to install the node dependencies so that the bootstrap.js file exists for the integration tests build
+      - name: Install node dependencies
+        working-directory: src/ContentManagementSystem.Server
+        run: |
+          npm ci
 
       - name: API and delivery integration tests
         run: >-

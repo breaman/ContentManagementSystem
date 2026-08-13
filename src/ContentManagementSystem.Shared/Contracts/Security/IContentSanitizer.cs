@@ -31,4 +31,24 @@ public interface IContentSanitizer
     /// signal.
     /// </returns>
     string Sanitize(string? html, SanitizationProfile profile);
+
+    /// <summary>
+    /// Sanitizes the markup and also reports everything the profile took out of it.
+    /// </summary>
+    /// <param name="html">Author-supplied markup. Null or empty reports nothing.</param>
+    /// <param name="profile">Which allowlist to apply.</param>
+    /// <returns>The same markup <see cref="Sanitize"/> would return, plus the account of removals.</returns>
+    /// <remarks>
+    /// Two callers need the account rather than only the result. The HTML editor warns an author
+    /// what the active profile <em>will</em> strip before they save it, because silent stripping is
+    /// the most common "the CMS ate my content" support ticket (spec section 14.4). And the XSS
+    /// corpus suite asserts on what was stripped, because over-stripping is the other failure mode
+    /// and a service that only returns clean markup cannot be checked for it (risk R3).
+    /// <para>
+    /// Collecting the account costs allocations that <see cref="Sanitize"/> does not pay, so the
+    /// save and render paths keep using that one. This is for the paths where a human is waiting to
+    /// read the answer.
+    /// </para>
+    /// </remarks>
+    SanitizationResult SanitizeWithReport(string? html, SanitizationProfile profile);
 }

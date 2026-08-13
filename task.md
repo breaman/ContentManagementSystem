@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.3 done, 1.4 next (`P1-18`)
+**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.4 done, 1.5 next (`P1-21`)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 17 | 28.0 | In progress — 1.1 to 1.3 complete; sanitization (1.4) next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 20 | 28.0 | In progress — 1.1 to 1.4 complete; structure admin (1.5) next | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **36** | **203.5** | | |
+| **v1 total** | **281** | **39** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -462,7 +462,7 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 
 ### 1.4 Sanitization — ships now, before any HTML can be stored — 3.5 ed
 
-- [ ] **P1-18** `SanitizationService` in `Core/Security/` over HtmlSanitizer with the `Basic` /
+- [x] **P1-18** `SanitizationService` in `Core/Security/` over HtmlSanitizer with the `Basic` /
   `Extended` / `Developer` profiles [§20.2], including the cross-profile rules (no `<script>`, no
   `<style>`, no `on*`, scheme allowlist, forced `rel="noopener noreferrer"`, CSS allowlist). — 1.5 ed
   *Its contract already exists: `P1-10` added `IContentSanitizer` and `SanitizationProfile` to
@@ -471,7 +471,28 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   rather than beside the implementation on purpose: field types sanitize on write, renderers on
   read, and the editor preview has to run the identical pipeline, and those three layers do not
   reference each other.*
-- [ ] **P1-19** Markdig pipeline in `Core/Content/Markdown/`: markdown → HTML → sanitize, **identical
+  *2026-08-13 — `SanitizationService` over `HtmlSanitizer 9.2.995` (MIT), with the allowlists split
+  into a **public `SanitizationPolicy`**: [§14.4] wants a banner showing which tags the active
+  profile permits, so the boundary has to be readable from outside the sanitizer, and the corpus
+  suite can then assert against the list rather than restate it. `AddCmsSanitization()` is the
+  registration; `AddCmsFieldTypes()` still fails to resolve without it, as intended.*
+  *Four rules the library has no opinion about, which is what this class actually adds. **`data:`
+  is a scheme but not a permission** — it is on the allowlist so the image case is reachable, and a
+  URI then has to be on an `img`/`source`, base64, an allowlisted raster media type (never
+  `image/svg+xml`), and within a 256 KB cap. Size is measured from the base64 length, not decoded;
+  the point of a cap is to not hold the payload. **An `iframe` whose `src` fails the host allowlist
+  is removed entirely**, not just stripped of its `src`, because a frame with no source frames the
+  embedding origin in some browsers. Hosts match in full — a suffix match accepts
+  `www.youtube.com.evil.test`. **`rel="noopener noreferrer"` is merged, not assigned**, so an
+  author's `nofollow` survives. And **an empty class allowlist means no `class` attribute at all**;
+  HtmlSanitizer reads an empty `AllowedClasses` as "all classes", which would let an author hang any
+  of the site's own styles off arbitrary content.*
+  *The one decision worth arguing about: **unknown elements are unwrapped, code-bearing ones are
+  deleted with their contents.** A `<section>` a paste dragged in loses its tag and keeps its
+  paragraphs (deleting the subtree is risk R3 arriving as a support ticket), but unwrapping is wrong
+  for an element whose children are code — `<script>alert(1)</script>` would unwrap to the visible
+  text `alert(1)`. `DeletedOutright` is that list.*
+- [x] **P1-19** Markdig pipeline in `Core/Content/Markdown/`: markdown → HTML → sanitize, **identical
   between editor preview and delivery**. — 1 ed
   *Note what `P1-10` deliberately did not do: `richText` in markdown format is stored **exactly as
   authored**, un-sanitized, because the raw HTML markdown permits cannot be cleaned without parsing
@@ -479,8 +500,46 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   lose the author's formatting on every save. That makes this task the only thing standing between
   stored markdown and the page — the conversion output must go through the sanitizer on **both**
   paths, with no shortcut for preview.*
-- [ ] **P1-20** XSS corpus suite in `Core.Tests/Security/` (OWASP payloads + polyglots) asserting
+  *2026-08-13 — `MarkdownRenderer` over Markdig 1.3.2, behind `IMarkdownRenderer` in
+  `Shared/Contracts/Content/` (the backoffice runs in WebAssembly, cannot reference `Core`, and must
+  not carry a second copy of the pipeline into the browser). The conversion is a **private** method
+  returning a string nothing outside the class sees, so "render markdown without sanitizing" is not
+  an available call. Registered once by `AddCmsContent()`, which is what makes `P1 #7` structural.*
+  ***`UseAdvancedExtensions()` is deliberately not called** — recorded as
+  [`ADR-0016` (D16)](./docs/adr/0016-markdown-extensions-bounded-by-the-sanitization-allowlist.md).
+  Most of Markdig's extensions emit markup (`del`, `mark`, `abbr`, `dl`, footnote sections,
+  `input type=checkbox`) that no profile in [§20.2] carries, so the syntax would appear to work and
+  silently render to nothing — the ADR-0008 failure arriving through the front door. Only
+  `PipeTables` and `AutoLinks` are on; an extension and the profile widening that carries it are one
+  decision. Raw HTML parsing stays **enabled**, because disabling it escapes an author's paste into
+  visible angle brackets rather than cleaning it.*
+  *One consequence to know before someone reports it as a bug: `Basic` has no `h1`, so `# Title` in
+  a markdown zone is unwrapped to its text. Pinned by a test rather than left to be rediscovered.*
+- [x] **P1-20** XSS corpus suite in `Core.Tests/Security/` (OWASP payloads + polyglots) asserting
   neutralization per profile and reporting what was stripped. Wire into CI as a merge gate. — 1 ed
+  *2026-08-13 — 52 payloads in eight groups (script elements, event handlers, URL schemes, embedded
+  content, CSS, malformed markup, mutation XSS, polyglots), each run against all three profiles. The
+  assertion **re-parses the sanitized output and inspects the DOM** rather than grepping for
+  substrings: a substring check passes for output containing no literal `<script>` that a browser
+  re-parses into one, which is exactly what the mXSS payloads do. Its own CI job, separate from the
+  unit suite for the same reason `migrations` is separate — gap #11 should not be one red test among
+  two hundred.*
+  ***The first version of this suite was a tautology and a mutation test caught it.*** Every
+  invariant was "the output conforms to the profile", which passes for any output once someone
+  widens the profile: adding `script` to the `Basic` tag list left the whole corpus green. The suite
+  now also asserts a hard-coded set of elements and attributes **no profile may ever permit**, and
+  `SanitizationPolicyTests` asserts the same against the allowlists themselves — the difference
+  between "did this payload survive" and "could a payload of this shape survive". Re-run under four
+  mutations (widened tag list, iframe host check disabled, `rel` forcing removed, code-bearing
+  elements unwrapped): 43, 5, 2, and 2 failures respectively.*
+  ***Reporting what was stripped needed a contract change.*** `IContentSanitizer` gained
+  `SanitizeWithReport`, returning `SanitizationResult` (`Html` plus `SanitizationRemoval` rows with
+  a kind, a name, the element, and a truncated excerpt). A service that only returns clean markup can
+  be verified safe but not verified *non-destructive*, which is risk R3 with no attacker to catch
+  it. The corpus job writes every removal to the test log, and `P6-13`'s pre-save warning is the
+  other consumer. The reporting path builds its own sanitizer per call — the library's removal
+  events carry no per-call context, so a handler on the shared instance would hand one request
+  another request's removals; a test asserts both paths produce identical HTML.*
 
 ### 1.5 Structure admin (functional, unstyled UI) — 6 ed
 
@@ -523,9 +582,18 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 - [ ] **P1 #4** Removing a zone leaves existing payload data intact and reachable as orphaned content.
 - [ ] **P1 #5** A template defined in code but absent from the database is created at startup; a
   database template with no code component is marked orphaned and degrades `cms-templates`.
-- [ ] **P1 #6** Every payload in the XSS corpus is neutralized under each sanitization profile, with the
+- [x] **P1 #6** Every payload in the XSS corpus is neutralized under each sanitization profile, with the
   stripped content reported.
-- [ ] **P1 #7** Markdown rendered by the editor-preview path is byte-identical to the delivery path.
+  *2026-08-13 — `Security/XssCorpusTests`, 52 payloads × 3 profiles, green, running as its own CI
+  job. Removals are written to the test log per payload per profile. Also asserted: sanitizing twice
+  changes nothing further, which both matches the on-write-and-on-render path (ADR 0008) and is the
+  shape a mutation bypass takes.*
+- [x] **P1 #7** Markdown rendered by the editor-preview path is byte-identical to the delivery path.
+  *2026-08-13 — structural rather than incidental: one `IMarkdownRenderer` registration, one
+  conversion method, and the conversion itself is private. What the test actually guards is the
+  remaining risk — the preview reads `ToHtmlWithReport` for its strip warning while delivery reads
+  `ToHtml`, and those run through separately constructed sanitizers. Asserted equal across the whole
+  corpus under all three profiles.*
 
 **Exit gate:** structure can be defined and a payload validated against it; XSS corpus green in CI.
 — [ ] met on ____

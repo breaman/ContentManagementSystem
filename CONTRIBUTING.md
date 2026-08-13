@@ -128,6 +128,13 @@ saying why — rather than widening `NoWarn` at the root.
 These are the ones where a reasonable-looking shortcut causes a real incident:
 
 - HTML is sanitized on write **and** on render ([ADR 0008](docs/adr/0008-sanitize-on-write-and-on-render.md)).
+- **Widening a sanitization profile is a security change.** The allowlists live in one file,
+  `Core/Security/SanitizationPolicy.cs`. `SanitizationPolicyTests` refuses anything executable, and
+  the `XSS corpus` CI job is a required check — it asserts against a set of elements and attributes
+  no profile may ever permit, deliberately restated there rather than derived from the policy, so a
+  widening cannot make the suite agree with itself.
+- Adding markdown syntax means widening a profile to carry what it emits, so Markdig extensions are
+  enabled one at a time and only alongside that change ([ADR 0016](docs/adr/0016-markdown-extensions-bounded-by-the-sanitization-allowlist.md)).
 - Internal links are stored as `pageId`, never as URL text ([ADR 0006](docs/adr/0006-internal-links-stored-as-page-id.md)).
 - Delivery filters on `PublishedVersionId` **at the data layer**, so an unpublished draft cannot leak
   through a missing check higher up.

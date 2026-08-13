@@ -2,6 +2,7 @@ using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Fields.Types;
+using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -20,8 +21,10 @@ internal static class ContentEngineHarness
 {
     /// <summary>The field types the payload engine tests dispatch to.</summary>
     /// <remarks>
-    /// A hand-picked set rather than the whole built-in catalogue: <c>richText</c> and <c>html</c>
-    /// need a sanitizer that does not exist until P1-18, and nothing here is about them.
+    /// Built by hand rather than by the assembly scan so a walk test can say exactly which field
+    /// types exist — including none, which is how the unknown-key cases are reached. It does now
+    /// cover every built-in one: <c>richText</c> and <c>html</c> were absent while they had no
+    /// sanitizer to construct against, and P1-18 supplied it.
     /// </remarks>
     public static IFieldTypeRegistry Registry { get; } = BuildRegistry();
 
@@ -115,11 +118,14 @@ internal static class ContentEngineHarness
     {
         var registry = null as IFieldTypeRegistry;
         var deferred = new Lazy<IFieldTypeRegistry>(() => registry!);
+        var sanitizer = new SanitizationService();
 
         registry = new FieldTypeRegistry(
             [
                 new PlainTextFieldType(),
                 new MultilineTextFieldType(),
+                new RichTextFieldType(sanitizer),
+                new HtmlFieldType(sanitizer),
                 new NumberFieldType(),
                 new BooleanFieldType(),
                 new ChoiceFieldType(),
