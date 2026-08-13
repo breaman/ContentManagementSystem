@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 started (`P1-10` next)
+**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 in progress (`P1-11` next)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 9 | 28.0 | In progress — 1.1 complete; 1.2 field-type contracts and registry done | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 10 | 28.0 | In progress — 1.1 complete; 1.2 value field types done, `P1-11` next | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **28** | **203.5** | | |
+| **v1 total** | **281** | **29** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -300,9 +300,24 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   discovery scans **public** types only — a field type key ends up in stored payloads, so
   registering an assembly's private implementations behind the author's back is wrong, and the
   first version of the scan took a private test double down with it.*
-- [ ] **P1-10** Implement value field types in `Core/Fields/Types/` per [§7.1]: `plainText`,
+- [x] **P1-10** Implement value field types in `Core/Fields/Types/` per [§7.1]: `plainText`,
   `multilineText`, `richText`, `html`, `number`, `boolean`, `date`, `dateTime`, `choice`, `color`,
   `json`. — 3 ed
+  *2026-08-13 — all eleven, on a `FieldTypeBase` that holds the four rules they share: the payload's
+  `type` discriminator must agree with the schema, the property must be an object, an empty value is
+  only an error when **publishing** a `required` property, and everything else is the subclass's.
+  Two things the spec left implicit and this had to settle. **`IFieldType.EditorComponent` and
+  `RendererComponent` are now `Type?`** — `Core` sits below `Rendering` and `Client` in the
+  reference graph and cannot name a component in either, so the hosting layer maps them to keys
+  instead; recorded as [`ADR-0014` (D14)](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md),
+  with consequences landing on `P3-09` and `P6`. And **`IContentSanitizer` / `SanitizationProfile`
+  now exist in `Shared/Contracts/Security/`**, injected into `richText` and `html`; `P1-18`
+  implements them. `AddCmsFieldTypes()` therefore produces a container that fails to resolve until a
+  sanitizer is registered, which is the intended reading — the alternative is a deployment that
+  quietly stores unsanitized markup. Also worth knowing: a configured `pattern` is untrusted input
+  on a hot path, so matches run under a 100 ms timeout with a bounded compiled cache, and an
+  unusable pattern is a **warning**, not an error — the author of the page cannot fix the template's
+  regex, and failing the save would strand every page on that template. 146 tests green.*
 - [ ] **P1-11** Stub reference-bearing field types to their contract, completed in later phases:
   `media` (P5), `link`/`pageReference` (P3), `reusable` (P4), `tags` (P8); implement `blocks` fully
   here. — 1 ed
@@ -336,8 +351,20 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 - [ ] **P1-18** `SanitizationService` in `Core/Security/` over HtmlSanitizer with the `Basic` /
   `Extended` / `Developer` profiles [§20.2], including the cross-profile rules (no `<script>`, no
   `<style>`, no `on*`, scheme allowlist, forced `rel="noopener noreferrer"`, CSS allowlist). — 1.5 ed
+  *Its contract already exists: `P1-10` added `IContentSanitizer` and `SanitizationProfile` to
+  `Shared/Contracts/Security/` because `richText` and `html` had to depend on something. Implement
+  against it and register it — nothing resolves the field type registry until you do. `Shared`
+  rather than beside the implementation on purpose: field types sanitize on write, renderers on
+  read, and the editor preview has to run the identical pipeline, and those three layers do not
+  reference each other.*
 - [ ] **P1-19** Markdig pipeline in `Core/Content/Markdown/`: markdown → HTML → sanitize, **identical
   between editor preview and delivery**. — 1 ed
+  *Note what `P1-10` deliberately did not do: `richText` in markdown format is stored **exactly as
+  authored**, un-sanitized, because the raw HTML markdown permits cannot be cleaned without parsing
+  the markdown around it, and rewriting the source to whatever a Markdig round trip produces would
+  lose the author's formatting on every save. That makes this task the only thing standing between
+  stored markdown and the page — the conversion output must go through the sanitizer on **both**
+  paths, with no shortcut for preview.*
 - [ ] **P1-20** XSS corpus suite in `Core.Tests/Security/` (OWASP payloads + polyglots) asserting
   neutralization per profile and reporting what was stripped. Wire into CI as a merge gate. — 1 ed
 
@@ -527,6 +554,12 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   file. Keep `CacheTags` per render, never shared across requests. Markers and structural hints must
   be elements or attributes: the Razor compiler strips HTML comments from .razor markup.*
 - [ ] **P3-09** Field renderer components in `Rendering/Fields/` for every Phase 1 field type. — 2 ed
+  *Carries the renderer half of [`ADR-0014`](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md):
+  built-in field types answer null for `RendererComponent`, so this task builds the catalog that maps
+  a field type key to its renderer, plus the **startup check that every registered field type
+  resolves to one**. Without that check a forgotten registration is invisible until someone looks at
+  the page — delivery treats a missing renderer the same way it treats an unknown field type key,
+  rendering nothing and logging [§15.3]. Editors are the mirror image in `P6`.*
 - [ ] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
   `Rendering/Blocks/`, between them exercising every field type. — 2 ed
 - [ ] **P3-11** Per-zone error boundaries and the full fallback matrix from [§15.3]: unknown template
@@ -822,6 +855,12 @@ daily — including the edit/preview experience the requirements call out explic
   grouped by `Zone.Group`, per-zone validation state, sticky action bar. — 3 ed
 
 ### Field editors — 14.5 ed
+
+> Built-in field types answer null for `IFieldType.EditorComponent` — `Core` cannot name a component
+> in `Client` ([`ADR-0014`](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md)).
+> The editors below are mapped to field type keys through the same catalog `P3-09` builds for
+> renderers, and the backoffice needs the equivalent startup check: a field type with no editor
+> leaves an author with no way to fill a property the schema requires.
 
 - [ ] **P6-06** Block list editor in `Client/Components/Admin/Fields/BlockList/`: add constrained to
   `allowedBlockTypes`, reorder, collapse with a configurable summary line, duplicate, delete-with-undo,

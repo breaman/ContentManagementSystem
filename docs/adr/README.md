@@ -31,3 +31,4 @@ holds, without reading `spec.md` end to end.
 | [0011](0011-skiasharp-image-processing-no-avif.md) | D11 — SkiaSharp behind `IImageProcessor`; AVIF dropped from v1 | Accepted |
 | [0012](0012-advisory-locks-never-block.md) | D12 — Advisory locks never block; `rowversion` is authoritative | Accepted |
 | [0013](0013-backoffice-editor-bundle-and-style-nonce.md) | D13 — Locally bundled editors; per-request style nonce for the backoffice | Accepted |
+| [0014](0014-field-type-components-resolved-by-the-hosting-layer.md) | D14 — Field type components resolved by the hosting layer, not declared by the field type | Accepted |

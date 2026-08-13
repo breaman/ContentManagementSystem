@@ -81,6 +81,12 @@ public static class FieldTypeServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection, for chaining.</returns>
+    /// <remarks>
+    /// The <c>richText</c> and <c>html</c> field types take an
+    /// <see cref="Shared.Contracts.Security.IContentSanitizer"/>, so a container registering these
+    /// without one fails to resolve the registry. That is deliberate: the alternative to failing at
+    /// startup is a deployment that quietly stores unsanitized markup.
+    /// </remarks>
     public static IServiceCollection AddCmsFieldTypes(this IServiceCollection services) =>
         services.AddCmsFieldTypesFrom(CoreAssemblyMarker.Assembly);
 

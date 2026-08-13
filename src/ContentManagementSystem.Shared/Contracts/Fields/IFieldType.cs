@@ -31,11 +31,31 @@ public interface IFieldType
     /// <summary>Editor-facing name shown when a developer picks a field type for a zone.</summary>
     string DisplayName { get; }
 
-    /// <summary>Blazor component rendered in the backoffice to author a value.</summary>
-    Type EditorComponent { get; }
+    /// <summary>
+    /// Blazor component rendered in the backoffice to author a value, or null when the component is
+    /// supplied by the hosting layer.
+    /// </summary>
+    /// <remarks>
+    /// Null is the normal answer for a field type that lives below the Blazor projects in the
+    /// reference graph, as every built-in one does: <c>Core</c> cannot name a type in
+    /// <c>Rendering</c> or <c>Client</c>, because both reference it and not the other way round. The
+    /// component for those is registered against the key in the field component catalog instead.
+    /// A field type shipped in an assembly that does reference the component projects can answer
+    /// here directly, which is the simpler path for an extension author (ADR 0014).
+    /// </remarks>
+    Type? EditorComponent { get; }
 
-    /// <summary>Blazor component rendered on the public site, under static server rendering.</summary>
-    Type RendererComponent { get; }
+    /// <summary>
+    /// Blazor component rendered on the public site under static server rendering, or null when the
+    /// component is supplied by the hosting layer.
+    /// </summary>
+    /// <remarks>
+    /// See <see cref="EditorComponent"/> for why null is the normal answer. A field type with no
+    /// renderer from either source renders nothing and logs a warning, exactly as an unknown field
+    /// type key does (spec section 15.3) — a missing component is never an exception on the public
+    /// surface.
+    /// </remarks>
+    Type? RendererComponent { get; }
 
     /// <summary>What this field type can do, so the surrounding engine need not special-case its key.</summary>
     FieldTypeCapabilities Capabilities { get; }
