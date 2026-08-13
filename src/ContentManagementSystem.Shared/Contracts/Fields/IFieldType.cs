@@ -109,8 +109,10 @@ public interface IFieldType
     /// content and it is hard to trace back (spec section 7.3).
     /// <para>
     /// A field type holding values of other field types — anything flagged
-    /// <see cref="FieldTypeCapabilities.Container"/> — must delegate back into the schema walk
-    /// rather than reading its contents itself, or every reference nested inside it is dropped.
+    /// <see cref="FieldTypeCapabilities.Container"/> — must walk its contents and dispatch each
+    /// nested value back through this method on the field type that wrote it, rather than
+    /// interpreting those values itself. Reporting only its own level drops every reference nested
+    /// inside it, which is the same stale-content failure one level further down.
     /// </para>
     /// </remarks>
     IEnumerable<ContentReference> ExtractReferences(JsonElement value);

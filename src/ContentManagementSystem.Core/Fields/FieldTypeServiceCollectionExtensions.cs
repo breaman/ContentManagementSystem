@@ -90,6 +90,21 @@ public static class FieldTypeServiceCollectionExtensions
     public static IServiceCollection AddCmsFieldTypes(this IServiceCollection services) =>
         services.AddCmsFieldTypesFrom(CoreAssemblyMarker.Assembly);
 
-    private static void AddFieldTypeRegistry(this IServiceCollection services) =>
+    /// <summary>
+    /// Registers the registry, and the deferred handle a container field type resolves it through.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <remarks>
+    /// A field type holding values of other field types has to dispatch to them, so it depends on
+    /// the registry that is in turn built from it. The <see cref="Lazy{T}"/> is what makes that
+    /// legal: nothing resolves during construction, and by the time a payload is walked the
+    /// registry is a constructed singleton. A field type asking for
+    /// <see cref="IFieldTypeRegistry"/> directly would deadlock the container instead.
+    /// </remarks>
+    private static void AddFieldTypeRegistry(this IServiceCollection services)
+    {
         services.TryAddSingleton<IFieldTypeRegistry, FieldTypeRegistry>();
+        services.TryAddSingleton(provider =>
+            new Lazy<IFieldTypeRegistry>(provider.GetRequiredService<IFieldTypeRegistry>));
+    }
 }

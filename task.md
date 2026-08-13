@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 in progress (`P1-11` next)
+**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 in progress (`P1-12` next)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 10 | 28.0 | In progress — 1.1 complete; 1.2 value field types done, `P1-11` next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 12 | 28.0 | In progress — 1.1 complete; 1.2 field type catalog complete, `P1-12` next | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **29** | **203.5** | | |
+| **v1 total** | **281** | **31** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -318,18 +318,55 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   on a hot path, so matches run under a 100 ms timeout with a bounded compiled cache, and an
   unusable pattern is a **warning**, not an error — the author of the page cannot fix the template's
   regex, and failing the save would strand every page on that template. 146 tests green.*
-- [ ] **P1-11** Stub reference-bearing field types to their contract, completed in later phases:
+- [x] **P1-11** Stub reference-bearing field types to their contract, completed in later phases:
   `media` (P5), `link`/`pageReference` (P3), `reusable` (P4), `tags` (P8); implement `blocks` fully
   here. — 1 ed
+  *2026-08-13 — seven, not five: `mediaList` was in [§7.1] and in `FieldTypeKeys` but not in this
+  task's list, and it ships with `media`. **What is deliberately not stubbed is `ExtractReferences`.**
+  Every one of these implements it fully now. Deferring it would leave every page saved before the
+  owning phase with no `ContentReference` row and nothing to go back and add them — where-used would
+  under-report and invalidation would miss those pages, which is precisely the [§7.3] failure. What
+  each type actually defers is only what needs another phase's tables: existence and
+  `allowedTypes`/`minWidth`/`aspectRatio` (P5), URL resolution and `allowedTemplates` (P3),
+  resolution and cycle guards (P4), the tag projection (P8). Each class says so in its own remarks.
+  `tags` is **not** reference-bearing — a tag names a concept, not an entity, and has no
+  `ContentReferenceTargetType`.*
+  *Four decisions the spec left open. **Stored shapes**: `pageReference` follows `choice` and stores
+  one id or an array under `value` rather than inventing a second member for the multiple case;
+  `mediaList` and `blocks` both use `items`, as [§6.2] already does for `blocks`. **A configured
+  `min` now also fails an empty list at publish** — previously `min: 1` was the one count rule an
+  unfilled property slipped past, since the base class short-circuits empties to the required check.
+  **`FieldTypeBase` gained a virtual `PayloadMember`**, so a structured type says its payload lives
+  under `mediaId` / `kind` / `items` and inherits all four shared rules unchanged. **`blocks` takes
+  `Lazy<IFieldTypeRegistry>`**: a container must dispatch to the field types of its nested values, so
+  it depends on the registry that is built from it, and the deferred handle is what makes that legal
+  rather than a container cycle. `AddFieldTypeRegistry` registers it.*
+  *Two contract docs were refined by what this task forced. `IFieldType.ExtractReferences` said a
+  container should "delegate back into the schema walk"; there is no callback for that, and what it
+  must actually do is walk its contents and dispatch each nested value through the same method on
+  the field type that wrote it — **by the stored `type` discriminator, not the schema**, because a
+  value has to be read by whatever wrote it. And `ContentReference.Path` said field types always
+  leave it null; a list or a container reports a path **relative to its own value** (`items[1]`,
+  `items[0].properties.image`) and the walk prefixes the rest. 110 new tests, 256 green in
+  `Core.Tests`.*
 - [ ] **P1-12** Per-field-type configuration JSON Schema + validation on zone save, in
   `Core/Fields/Configuration/` [§7.2]. — 1 ed
-- [ ] **P1-13** Contract test asserting **every registered field type returns references for a
+- [x] **P1-13** Contract test asserting **every registered field type returns references for a
   representative populated value** — the omission that silently produces stale content [§7.3].
   — included above
   *Widened by [S1](./docs/spikes/s1-runtime-schema.md): the test as originally worded passes for a
   `blocks` field type that reports only its top level and silently drops every reference nested
   inside it. **Add a second case** — a container field type must return the references of a nested
   populated value.*
+  *2026-08-13 — `Fields/ReferenceExtractionContractTests`, driven off the registry a real
+  deployment builds, so a field type registered by the assembly scan is covered whether or not
+  anyone remembers this file. The S1 second case is in: a `Container` must return the reference of a
+  value nested a level below where the flat case puts it, which is the gap the flat case cannot see.
+  The friction is intentional — a new reference-bearing field type with no sample here fails by
+  name rather than passing vacuously. Two rules beyond the task's wording: an extracted row must
+  carry a positive `TargetId` (a row pointing at 0 is a foreign key that fails on the publish path),
+  and a field type that does **not** claim `ReferenceBearing` must report nothing, since the
+  capability is what the engine dispatches on.*
 
 ### 1.3 Payload engine — 5 ed
 

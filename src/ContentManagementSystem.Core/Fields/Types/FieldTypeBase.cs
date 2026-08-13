@@ -16,6 +16,11 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// value is only an error when publishing a required property, and a value that is present is the
 /// subclass's business.
 /// <para>
+/// The structured field types store their data under a different member — <c>media</c> under
+/// <c>mediaId</c>, <c>blocks</c> under <c>items</c> — and say so by overriding
+/// <see cref="PayloadMember"/>. All four rules then apply to them unchanged.
+/// </para>
+/// <para>
 /// Subclasses override <see cref="ValidateValue"/> and are never called for an empty value, so they
 /// do not each have to re-derive what "empty" means.
 /// </para>
@@ -27,6 +32,18 @@ public abstract class FieldTypeBase : IFieldType
 
     /// <summary>The member carrying the field type key a stored value was written by.</summary>
     protected const string TypeMember = "type";
+
+    /// <summary>
+    /// The member this field type stores its payload under.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ValueMember"/> for the scalar field types. A structured field type overrides it
+    /// with the member that decides whether anything was authored at all — <c>mediaId</c> for
+    /// <c>media</c>, <c>kind</c> for <c>link</c>, <c>items</c> for <c>blocks</c> — so that "unfilled"
+    /// means the same thing for them as for a plain text property, and the required rule needs no
+    /// special case per shape.
+    /// </remarks>
+    protected virtual string PayloadMember => ValueMember;
 
     /// <inheritdoc />
     public abstract string Key { get; }
@@ -113,12 +130,25 @@ public abstract class FieldTypeBase : IFieldType
         value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null;
 
     /// <summary>
-    /// Reads the <c>value</c> member of a stored property.
+    /// Reads the <see cref="PayloadMember"/> of a stored property.
     /// </summary>
     /// <param name="property">The stored property object.</param>
     /// <returns>The member, or an undefined element when the property or the member is absent.</returns>
-    protected static JsonElement GetValue(JsonElement property) =>
-        property.ValueKind is JsonValueKind.Object && property.TryGetProperty(ValueMember, out var value)
+    protected JsonElement GetValue(JsonElement property) => GetMember(property, PayloadMember);
+
+    /// <summary>
+    /// Reads a named member of a stored property.
+    /// </summary>
+    /// <param name="property">The stored property object.</param>
+    /// <param name="member">The member name.</param>
+    /// <returns>The member, or an undefined element when the property or the member is absent.</returns>
+    /// <remarks>
+    /// The structured field types are qualified by several members at once — a link's <c>text</c>
+    /// and <c>target</c> sit beside its <c>kind</c> — so they read siblings through this rather than
+    /// through <see cref="GetValue"/>.
+    /// </remarks>
+    protected static JsonElement GetMember(JsonElement property, string member) =>
+        property.ValueKind is JsonValueKind.Object && property.TryGetProperty(member, out var value)
             ? value
             : default;
 
@@ -132,7 +162,7 @@ public abstract class FieldTypeBase : IFieldType
     /// The list is deferred so the common case allocates nothing at all.
     /// </remarks>
     protected static void Add(ref List<ValidationDiagnostic>? diagnostics, ValidationDiagnostic diagnostic) =>
-        (diagnostics ??= []).Add(diagnostic);
+        Diagnostics.Add(ref diagnostics, diagnostic);
 
     /// <summary>
     /// Turns collected diagnostics into a result.
@@ -140,15 +170,38 @@ public abstract class FieldTypeBase : IFieldType
     /// <param name="diagnostics">Diagnostics found, or null when there were none.</param>
     /// <returns>The result to return from <see cref="ValidateValue"/>.</returns>
     protected static ValidationResult Result(List<ValidationDiagnostic>? diagnostics) =>
-        diagnostics is null ? ValidationResult.Success : ValidationResult.From(diagnostics);
+        Diagnostics.Result(diagnostics);
 
     /// <summary>
-    /// Reads the <c>value</c> member of a stored property as text.
+    /// Reads the <see cref="PayloadMember"/> of a stored property as text.
     /// </summary>
     /// <param name="property">The stored property object.</param>
     /// <returns>The text, or null when the value is absent, cleared, or not a string.</returns>
-    protected static string? GetStringValue(JsonElement property) =>
+    protected string? GetStringValue(JsonElement property) =>
         GetValue(property) is { ValueKind: JsonValueKind.String } value ? value.GetString() : null;
+
+    /// <summary>
+    /// Checks a property with nothing authored in it.
+    /// </summary>
+    /// <param name="configuration">Parsed configuration for the property being validated.</param>
+    /// <param name="mode">Whether a draft is being saved or content is being published.</param>
+    /// <returns>Diagnostics found.</returns>
+    /// <remarks>
+    /// An editor must always be able to save half-finished work, so a required value is only
+    /// enforced at the point of publishing (spec section 8.3). List-shaped field types widen this:
+    /// a configured minimum count says the same thing as <c>required</c>, and enforcing counts only
+    /// on non-empty lists would leave <c>"min": 1</c> as the one count rule an empty zone slips
+    /// past.
+    /// </remarks>
+    protected virtual ValidationResult ValidateEmpty(FieldConfiguration configuration, ValidationMode mode)
+    {
+        if (mode is ValidationMode.Publish && configuration.GetBoolean("required"))
+        {
+            return ValidationResult.Error(FieldValidationCodes.Required, "This field is required.");
+        }
+
+        return ValidationResult.Success;
+    }
 
     private ValidationResult Validate(
         JsonElement property,
@@ -187,17 +240,5 @@ public abstract class FieldTypeBase : IFieldType
         return IsEmpty(value)
             ? ValidateEmpty(configuration, mode)
             : ValidateValue(property, value, configuration, mode);
-    }
-
-    private static ValidationResult ValidateEmpty(FieldConfiguration configuration, ValidationMode mode)
-    {
-        // An editor must always be able to save half-finished work, so a required value is only
-        // enforced at the point of publishing (spec section 8.3).
-        if (mode is ValidationMode.Publish && configuration.GetBoolean("required"))
-        {
-            return ValidationResult.Error(FieldValidationCodes.Required, "This field is required.");
-        }
-
-        return ValidationResult.Success;
     }
 }

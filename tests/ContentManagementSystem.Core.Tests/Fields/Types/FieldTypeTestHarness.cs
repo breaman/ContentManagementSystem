@@ -1,5 +1,7 @@
 using System.Text.Json;
 
+using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Fields.Types;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
 
@@ -76,6 +78,32 @@ internal static class FieldTypeTestHarness
     /// <param name="result">The validation result.</param>
     public static IEnumerable<string> Codes(this ValidationResult result) =>
         result.Diagnostics.Select(diagnostic => diagnostic.Code);
+
+    /// <summary>The paths reported, relative to the value that was validated.</summary>
+    /// <param name="result">The validation result.</param>
+    public static IEnumerable<string?> Paths(this ValidationResult result) =>
+        result.Diagnostics.Select(diagnostic => diagnostic.RelativePath);
+
+    /// <summary>Extracts references from a stored property written as JSON text.</summary>
+    /// <param name="fieldType">The field type under test.</param>
+    /// <param name="propertyJson">The stored property object.</param>
+    public static IReadOnlyList<ContentReference> ExtractReferences(
+        this IFieldType fieldType,
+        string propertyJson) =>
+        [.. fieldType.ExtractReferences(Element(propertyJson))];
+
+    /// <summary>
+    /// Builds a <c>blocks</c> field type over a registry of the field types its blocks may contain.
+    /// </summary>
+    /// <param name="nested">The field types nested values will be dispatched to.</param>
+    /// <remarks>
+    /// The container resolves the registry lazily to break the cycle it would otherwise form with
+    /// it (see the constructor). Tests build it by hand rather than through the container so a
+    /// blocks test can pin exactly which nested field types exist — including none, which is how
+    /// the unknown-key case is reached.
+    /// </remarks>
+    public static BlocksFieldType Blocks(params IFieldType[] nested) =>
+        new(new Lazy<IFieldTypeRegistry>(() => new FieldTypeRegistry(nested)));
 }
 
 /// <summary>

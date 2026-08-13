@@ -83,4 +83,53 @@ public static class FieldValidationCodes
 
     /// <summary>A <c>json</c> value serializes to more bytes than the configured <c>maxBytes</c>.</summary>
     public const string JsonMaxBytes = "field.json.maxBytes";
+
+    /// <summary>
+    /// An id member does not name an entity: absent where the shape requires it, not a number, or
+    /// not positive.
+    /// </summary>
+    /// <remarks>
+    /// One code across every reference-bearing field type rather than one each. Whether the id was
+    /// meant to be a page, an image, or a reusable item is already carried by the property's field
+    /// type and by the diagnostic's path; a second discriminator in the code adds nothing a client
+    /// switches on. It says nothing about whether the target <em>exists</em> — that check needs the
+    /// database and belongs to the schema walk.
+    /// </remarks>
+    public const string ReferenceId = "field.reference.id";
+
+    /// <summary>A <c>media</c> focal point is not a point inside the image.</summary>
+    public const string MediaFocalPoint = "field.media.focalPoint";
+
+    /// <summary>A <c>media</c> crop is not a rectangle inside the image.</summary>
+    public const string MediaCrop = "field.media.crop";
+
+    /// <summary>A <c>link</c> declares no kind, or one outside the v1 set.</summary>
+    public const string LinkKind = "field.link.kind";
+
+    /// <summary>A <c>link</c> names a browsing context that is not a valid link target.</summary>
+    public const string LinkTarget = "field.link.target";
+
+    /// <summary>An external <c>link</c> is not an absolute <c>http</c> or <c>https</c> URL.</summary>
+    public const string LinkUrl = "field.link.url";
+
+    /// <summary>An email <c>link</c> does not carry a usable mailbox address.</summary>
+    public const string LinkEmail = "field.link.email";
+
+    /// <summary>An anchor <c>link</c> names no fragment to jump to.</summary>
+    public const string LinkAnchor = "field.link.anchor";
+
+    /// <summary>A block instance carries no stable GUID, or a value that is not one.</summary>
+    public const string BlockId = "field.blocks.id";
+
+    /// <summary>A block instance names no block type.</summary>
+    public const string BlockTypeKey = "field.blocks.blockTypeKey";
+
+    /// <summary>A block's type is not among the property's <c>allowedBlockTypes</c>.</summary>
+    public const string BlockNotAllowed = "field.blocks.notAllowed";
+
+    /// <summary>A block instance's captured schema revision is not a revision number.</summary>
+    public const string BlockRevision = "field.blocks.revision";
+
+    /// <summary>Blocks are nested where the property forbids it, or deeper than v1 supports.</summary>
+    public const string BlockNesting = "field.blocks.nesting";
 }

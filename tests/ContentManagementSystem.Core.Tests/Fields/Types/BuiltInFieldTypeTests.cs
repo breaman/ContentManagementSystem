@@ -12,11 +12,12 @@ namespace ContentManagementSystem.Core.Tests.Fields.Types;
 public class BuiltInFieldTypeTests
 {
     /// <summary>
-    /// The value field types Phase 1 ships. The reference-bearing keys —<c>media</c>, <c>link</c>,
-    /// <c>pageReference</c>, <c>reusable</c>, <c>blocks</c>, <c>tags</c> — arrive in P1-11.
+    /// Every field type in the v1 catalog (spec section 7.1), in the order the registry returns
+    /// them.
     /// </summary>
     private static readonly string[] ExpectedKeys =
     [
+        FieldTypeKeys.Blocks,
         FieldTypeKeys.Boolean,
         FieldTypeKeys.Choice,
         FieldTypeKeys.Color,
@@ -24,14 +25,20 @@ public class BuiltInFieldTypeTests
         FieldTypeKeys.DateTime,
         FieldTypeKeys.Html,
         FieldTypeKeys.Json,
+        FieldTypeKeys.Link,
+        FieldTypeKeys.Media,
+        FieldTypeKeys.MediaList,
         FieldTypeKeys.MultilineText,
         FieldTypeKeys.Number,
+        FieldTypeKeys.PageReference,
         FieldTypeKeys.PlainText,
+        FieldTypeKeys.Reusable,
         FieldTypeKeys.RichText,
+        FieldTypeKeys.Tags,
     ];
 
     [Fact]
-    public void EveryBuiltInValueFieldTypeIsRegisteredByTheScan()
+    public void EveryBuiltInFieldTypeIsRegisteredByTheScan()
     {
         using var provider = BuildProvider();
 
@@ -66,18 +73,41 @@ public class BuiltInFieldTypeTests
     }
 
     [Fact]
-    public void NoValueFieldTypeClaimsToBearReferences()
+    public void OnlyTheFieldTypesThatPointAtSomethingClaimToBearReferences()
     {
         using var provider = BuildProvider();
 
         var registry = provider.GetRequiredService<IFieldTypeRegistry>();
 
-        // The contract test that matters runs the other way round — every ReferenceBearing field
-        // type must return references for a populated value (P1-13). This is its complement: a
-        // field type that cannot point at anything must not claim it can, or where-used starts
-        // asking it questions it will always answer emptily.
-        registry.All.Should().OnlyContain(fieldType =>
-            !fieldType.Capabilities.HasFlag(FieldTypeCapabilities.ReferenceBearing));
+        // The complement of the P1-13 contract test, which runs the other way round. A field type
+        // that cannot point at anything must not claim it can, or where-used and cache
+        // invalidation keep asking it a question it will always answer emptily. Note tags is
+        // absent: a tag names a concept, not an entity, and has no target type.
+        registry.All
+            .Where(fieldType => fieldType.Capabilities.HasFlag(FieldTypeCapabilities.ReferenceBearing))
+            .Select(fieldType => fieldType.Key)
+            .Should().BeEquivalentTo(
+                FieldTypeKeys.Blocks,
+                FieldTypeKeys.Link,
+                FieldTypeKeys.Media,
+                FieldTypeKeys.MediaList,
+                FieldTypeKeys.PageReference,
+                FieldTypeKeys.Reusable);
+    }
+
+    [Fact]
+    public void OnlyBlocksIsAContainer()
+    {
+        using var provider = BuildProvider();
+
+        var registry = provider.GetRequiredService<IFieldTypeRegistry>();
+
+        // Container is load-bearing rather than descriptive: it is how the P1-13 contract test
+        // knows which field types have to be exercised with a nested value as well as a flat one.
+        registry.All
+            .Where(fieldType => fieldType.Capabilities.HasFlag(FieldTypeCapabilities.Container))
+            .Select(fieldType => fieldType.Key)
+            .Should().BeEquivalentTo(FieldTypeKeys.Blocks);
     }
 
     [Fact]

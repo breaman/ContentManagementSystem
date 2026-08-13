@@ -21,9 +21,10 @@ public enum ContentReferenceTargetType
 /// <param name="TargetType">Kind of entity referenced.</param>
 /// <param name="TargetId">Identity of the referenced entity.</param>
 /// <param name="Path">
-/// Payload path the reference was found at, such as
-/// <c>zones.hero[0].properties.image</c>. Field types leave this null — they cannot know where in
-/// the document they sit — and the schema walk fills it in as the value is visited.
+/// Payload path the reference was found at, such as <c>zones.hero[0].properties.image</c>, built up
+/// as the value is visited. A field type reports a path relative to its own value — null when the
+/// value as a whole is the reference, <c>items[2]</c> for the third image of a gallery — because it
+/// cannot know where in the document it sits, and the schema walk prefixes the rest.
 /// </param>
 /// <remarks>
 /// These edges are projected into relational rows on every save and publish, which is what makes
