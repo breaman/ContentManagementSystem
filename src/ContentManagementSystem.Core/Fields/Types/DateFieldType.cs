@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -10,7 +9,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </summary>
 /// <remarks>
 /// Stored as <c>{ "type": "date", "value": "2026-08-12" }</c>, in the ISO-8601 calendar form and
-/// nothing else. Configuration keys: <c>required</c>, <c>min</c>, <c>max</c>, both written the same
+/// nothing else. Configuration keys: <c>min</c> and <c>max</c>, both written the same
 /// way.
 /// <para>
 /// A date is not an instant and is deliberately not stored as one. "The 12th" means the 12th
@@ -20,9 +19,6 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </remarks>
 public sealed class DateFieldType : FieldTypeBase
 {
-    /// <summary>The one accepted form. Exact parsing, so <c>08/12/2026</c> is refused rather than guessed at.</summary>
-    private const string IsoDateFormat = "yyyy-MM-dd";
-
     /// <inheritdoc />
     public override string Key => FieldTypeKeys.Date;
 
@@ -31,6 +27,20 @@ public sealed class DateFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Text(
+                "min",
+                "Earliest date an editor may choose.",
+                FieldSettingFormat.Date),
+            FieldConfigurationSetting.Text(
+                "max",
+                "Latest date an editor may choose.",
+                FieldSettingFormat.Date),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
 
     /// <inheritdoc />
     protected override ValidationResult ValidateValue(
@@ -71,7 +81,7 @@ public sealed class DateFieldType : FieldTypeBase
     }
 
     private static bool TryParse(string? value, out DateOnly date) =>
-        DateOnly.TryParseExact(value, IsoDateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out date);
+        ValueFormats.TryParseDate(value, out date);
 
-    private static string Format(DateOnly date) => date.ToString(IsoDateFormat, CultureInfo.InvariantCulture);
+    private static string Format(DateOnly date) => ValueFormats.FormatDate(date);
 }

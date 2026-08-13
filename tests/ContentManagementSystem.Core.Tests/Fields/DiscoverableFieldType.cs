@@ -26,6 +26,9 @@ public sealed class DiscoverableFieldType : IFieldType
     public FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
 
     /// <inheritdoc />
+    public FieldConfigurationSchema ConfigurationSchema => FieldConfigurationSchema.Empty;
+
+    /// <inheritdoc />
     public ValueTask<ValidationResult> ValidateAsync(
         JsonElement value,
         FieldConfiguration configuration,

@@ -14,8 +14,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// written: a property switched from markdown to HTML must still be able to read what is already
 /// stored.
 /// <para>
-/// Configuration keys: <c>required</c>, <c>maxLength</c>, <c>profile</c> (<c>basic</c> or
-/// <c>extended</c>, spec section 20.2).
+/// Configuration keys: <c>maxLength</c> and <c>profile</c> (<c>basic</c> or <c>extended</c>,
+/// spec section 20.2).
 /// </para>
 /// </remarks>
 public sealed class RichTextFieldType : FieldTypeBase
@@ -49,6 +49,19 @@ public sealed class RichTextFieldType : FieldTypeBase
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities =>
         FieldTypeCapabilities.Searchable | FieldTypeCapabilities.Sanitizable;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Integer(
+                "maxLength",
+                "Most characters the authored source may contain, markup included.",
+                minimum: 1),
+            FieldConfigurationSetting.Text(
+                "profile",
+                "How permissive the HTML allowlist is for this property (spec section 20.2).",
+                allowedValues: ["basic", "extended"]),
+        ]);
+
 
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>

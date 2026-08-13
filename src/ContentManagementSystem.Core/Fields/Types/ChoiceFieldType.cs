@@ -14,8 +14,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// when the property is configured for multiple selection. One member name either way: a renderer
 /// that has to look in two places for the same thing eventually looks in only one.
 /// <para>
-/// Configuration keys: <c>required</c>, <c>options</c> (the allowed values), <c>multiple</c>,
-/// and <c>min</c> / <c>max</c> counts when <c>multiple</c> is set.
+/// Configuration keys: <c>options</c> (the allowed values), <c>multiple</c>, and <c>min</c> /
+/// <c>max</c> counts when <c>multiple</c> is set.
 /// </para>
 /// <para>
 /// Stored values are option <em>keys</em>, never the labels shown to an author. Labels are display
@@ -33,6 +33,26 @@ public sealed class ChoiceFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.TextList(
+                "options",
+                "The values an editor may choose from. An empty list accepts any value."),
+            FieldConfigurationSetting.Boolean(
+                "multiple",
+                "Whether several options may be chosen, storing an array rather than one value."),
+            FieldConfigurationSetting.Integer(
+                "min",
+                "Fewest options that must be chosen. Only applies when multiple is set.",
+                minimum: 0),
+            FieldConfigurationSetting.Integer(
+                "max",
+                "Most options that may be chosen. Only applies when multiple is set.",
+                minimum: 0),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
 
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>

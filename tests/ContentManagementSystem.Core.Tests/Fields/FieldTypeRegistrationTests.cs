@@ -97,6 +97,8 @@ public class FieldTypeRegistrationTests
 
         public FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
 
+        public FieldConfigurationSchema ConfigurationSchema => FieldConfigurationSchema.Empty;
+
         public ValueTask<ValidationResult> ValidateAsync(
             JsonElement value,
             FieldConfiguration configuration,

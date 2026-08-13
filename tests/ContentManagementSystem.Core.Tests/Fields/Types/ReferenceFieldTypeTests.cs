@@ -128,11 +128,11 @@ public class ReferenceFieldTypeTests
     [Fact]
     public async Task APlacementWithNothingPickedIsUnfilledRatherThanMalformed()
     {
-        var draft = await _reusable.ValidateAsync("""{ "type": "reusable" }""", """{ "required": true }""");
+        var draft = await _reusable.ValidateAsync("""{ "type": "reusable" }""", isRequired: true);
         var publish = await _reusable.ValidateAsync(
             """{ "type": "reusable" }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         draft.IsValid.Should().BeTrue();
         publish.Codes().Should().Equal(FieldValidationCodes.Required);

@@ -24,6 +24,29 @@ public abstract class ListFieldTypeBase : FieldTypeBase
     /// <summary>What the items are, for the messages an editor reads: "blocks", "images", "tags".</summary>
     protected abstract string ItemNoun { get; }
 
+    /// <summary>
+    /// The count settings every list-shaped field type accepts.
+    /// </summary>
+    /// <remarks>
+    /// Held as a static so a subclass can <see cref="FieldConfigurationSchema.Extend"/> it from its
+    /// own field initialiser, which cannot reach an instance property on this class.
+    /// </remarks>
+    protected static FieldConfigurationSchema ListConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Integer(
+                "min",
+                "Fewest items the list must contain. Enforced when publishing, including against an empty list.",
+                minimum: 0),
+            FieldConfigurationSetting.Integer(
+                "max",
+                "Most items the list may contain.",
+                minimum: 0),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema => ListConfigurationSchema;
+
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>
         base.IsEmpty(value) ||

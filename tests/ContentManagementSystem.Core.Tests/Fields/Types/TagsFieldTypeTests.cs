@@ -72,11 +72,11 @@ public class TagsFieldTypeTests
     {
         var draft = await _fieldType.ValidateAsync(
             """{ "type": "tags", "value": [] }""",
-            """{ "required": true }""");
+            isRequired: true);
         var publish = await _fieldType.ValidateAsync(
             """{ "type": "tags", "value": [] }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         draft.IsValid.Should().BeTrue();
         publish.Codes().Should().Equal(FieldValidationCodes.Required);

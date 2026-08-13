@@ -12,7 +12,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// Stored as <c>{ "type": "number", "value": 12.5 }</c>, as a JSON number rather than a string, so
 /// the payload stays comparable and a diff can tell 10 from "10".
 /// <para>
-/// Configuration keys: <c>required</c>, <c>min</c>, <c>max</c>, <c>step</c>.
+/// Configuration keys: <c>min</c>, <c>max</c>, <c>step</c>.
 /// </para>
 /// <para>
 /// Values are read as <see cref="decimal"/>. Binary floating point would make a step of <c>0.1</c>
@@ -29,6 +29,19 @@ public sealed class NumberFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Number("min", "Smallest value an editor may enter."),
+            FieldConfigurationSetting.Number("max", "Largest value an editor may enter."),
+            FieldConfigurationSetting.Number(
+                "step",
+                "Increment values must be a multiple of, such as 0.5.",
+                minimum: 0,
+                minimumExclusive: true),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
 
     /// <inheritdoc />
     protected override ValidationResult ValidateValue(

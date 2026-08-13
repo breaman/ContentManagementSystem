@@ -34,11 +34,11 @@ public class LinkFieldTypeTests
     [Fact]
     public async Task ALinkWithNoKindIsUnfilledRatherThanMalformed()
     {
-        var draft = await _fieldType.ValidateAsync("""{ "type": "link" }""", """{ "required": true }""");
+        var draft = await _fieldType.ValidateAsync("""{ "type": "link" }""", isRequired: true);
         var publish = await _fieldType.ValidateAsync(
             """{ "type": "link" }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         draft.IsValid.Should().BeTrue();
         publish.Codes().Should().Equal(FieldValidationCodes.Required);

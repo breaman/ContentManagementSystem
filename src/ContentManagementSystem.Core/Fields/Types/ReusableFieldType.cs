@@ -17,7 +17,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// placement to a specific version, so that page alone stops following the item.
 /// </para>
 /// <para>
-/// Configuration keys: <c>required</c>, and the P4 addition <c>allowedTypes</c>.
+/// Configuration key: the P4 addition <c>allowedTypes</c>.
 /// </para>
 /// <para>
 /// <strong>Completed in P4</strong>: the picker, the resolver that turns an id into the published
@@ -43,6 +43,15 @@ public sealed class ReusableFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.ReferenceBearing;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.TextList(
+                "allowedTypes",
+                "Keys of the reusable content types this property may reference. An empty list allows any of them.",
+                notEnforcedUntil: "P4"),
+        ]);
+
 
     /// <inheritdoc />
     protected override string PayloadMember => ReusableContentIdMember;

@@ -34,7 +34,7 @@ public class FieldTypeBaseTests
     {
         var result = await _fieldType.ValidateAsync(
             """{ "type": "plainText", "value": "" }""",
-            """{ "required": true }""");
+            isRequired: true);
 
         // An editor must be able to save half-finished work (spec section 8.3).
         result.IsValid.Should().BeTrue();
@@ -45,8 +45,8 @@ public class FieldTypeBaseTests
     {
         var result = await _fieldType.ValidateAsync(
             """{ "type": "plainText", "value": "" }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         result.Codes().Should().Equal(FieldValidationCodes.Required);
         result.HasErrors.Should().BeTrue();
@@ -57,8 +57,8 @@ public class FieldTypeBaseTests
     {
         var result = await _fieldType.ValidateAsync(
             FieldTypeTestHarness.Absent,
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         result.Codes().Should().Equal(FieldValidationCodes.Required);
     }
@@ -68,8 +68,8 @@ public class FieldTypeBaseTests
     {
         var result = await _fieldType.ValidateAsync(
             """{ "type": "plainText", "value": "   " }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         // Otherwise a required heading is satisfied by a space and the page publishes with an empty
         // element.

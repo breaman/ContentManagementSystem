@@ -83,8 +83,8 @@ public class ScalarFieldTypeTests
     {
         var result = await _boolean.ValidateAsync(
             """{ "type": "boolean", "value": false }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         // Treating false as unfilled would make a required boolean impossible to publish once an
         // author deliberately turned it off.
@@ -163,8 +163,8 @@ public class ScalarFieldTypeTests
     {
         var result = await _json.ValidateAsync(
             """{ "type": "json", "value": {} }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         result.IsValid.Should().BeTrue();
     }

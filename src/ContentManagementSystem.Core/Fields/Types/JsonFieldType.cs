@@ -11,7 +11,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </summary>
 /// <remarks>
 /// Stored as <c>{ "type": "json", "value": … }</c>, where the value is any JSON at all.
-/// Configuration keys: <c>required</c>, <c>maxBytes</c>.
+/// Configuration key: <c>maxBytes</c>.
 /// <para>
 /// Flagged <see cref="FieldTypeCapabilities.DeveloperOnly"/>. It is an escape hatch by design and
 /// therefore the field type with the fewest guarantees: nothing here contributes to search, and
@@ -32,6 +32,15 @@ public sealed class JsonFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.DeveloperOnly;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Integer(
+                "maxBytes",
+                "Most bytes the value may serialize to.",
+                minimum: 1),
+        ]);
+
 
     /// <inheritdoc />
     protected override ValidationResult ValidateValue(

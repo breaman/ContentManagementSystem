@@ -19,7 +19,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// place after the target moves twice. A stored URL would be a copy that nothing updates.
 /// </para>
 /// <para>
-/// Configuration keys: <c>required</c>, and the P3 addition <c>allowedKinds</c>.
+/// Configuration key: the P3 addition <c>allowedKinds</c>.
 /// </para>
 /// <para>
 /// <strong>Completed in P3</strong> with the routing layer: the picker, resolution of a
@@ -67,6 +67,16 @@ public sealed class LinkFieldType : FieldTypeBase
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities =>
         FieldTypeCapabilities.ReferenceBearing | FieldTypeCapabilities.Searchable;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.TextList(
+                "allowedKinds",
+                "The link kinds an editor may pick. An empty list allows all of them.",
+                allowedValues: [PageKind, ExternalKind, MediaKind, AnchorKind, EmailKind],
+                notEnforcedUntil: "P3"),
+        ]);
+
 
     /// <inheritdoc />
     protected override string PayloadMember => KindMember;

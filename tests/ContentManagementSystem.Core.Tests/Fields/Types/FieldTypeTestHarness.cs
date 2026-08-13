@@ -34,14 +34,16 @@ internal static class FieldTypeTestHarness
     /// <param name="propertyJson">The stored property object.</param>
     /// <param name="configurationJson">The property's configuration, if any.</param>
     /// <param name="mode">Draft or publish.</param>
+    /// <param name="isRequired">The zone or block property's IsRequired column.</param>
     public static ValueTask<ValidationResult> ValidateAsync(
         this IFieldType fieldType,
         string propertyJson,
         string? configurationJson = null,
-        ValidationMode mode = ValidationMode.Draft) =>
+        ValidationMode mode = ValidationMode.Draft,
+        bool isRequired = false) =>
         fieldType.ValidateAsync(
             Element(propertyJson),
-            FieldConfiguration.Parse(configurationJson),
+            FieldConfiguration.Parse(configurationJson, isRequired),
             mode,
             TestContext.Current.CancellationToken);
 
@@ -50,14 +52,16 @@ internal static class FieldTypeTestHarness
     /// <param name="property">The stored property.</param>
     /// <param name="configurationJson">The property's configuration, if any.</param>
     /// <param name="mode">Draft or publish.</param>
+    /// <param name="isRequired">The zone or block property's IsRequired column.</param>
     public static ValueTask<ValidationResult> ValidateAsync(
         this IFieldType fieldType,
         JsonElement property,
         string? configurationJson = null,
-        ValidationMode mode = ValidationMode.Draft) =>
+        ValidationMode mode = ValidationMode.Draft,
+        bool isRequired = false) =>
         fieldType.ValidateAsync(
             property,
-            FieldConfiguration.Parse(configurationJson),
+            FieldConfiguration.Parse(configurationJson, isRequired),
             mode,
             TestContext.Current.CancellationToken);
 

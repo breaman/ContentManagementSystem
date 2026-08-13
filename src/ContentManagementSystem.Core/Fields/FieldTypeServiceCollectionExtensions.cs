@@ -1,5 +1,7 @@
 using System.Reflection;
 
+using ContentManagementSystem.Core.Fields.Configuration;
+
 using ContentManagementSystem.Shared.Contracts.Fields;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -104,6 +106,10 @@ public static class FieldTypeServiceCollectionExtensions
     private static void AddFieldTypeRegistry(this IServiceCollection services)
     {
         services.TryAddSingleton<IFieldTypeRegistry, FieldTypeRegistry>();
+        // Configuration validation is part of the same spine: a container with field types but no
+        // way to check a zone's configuration against them would let the structure admin endpoints
+        // store settings no field type reads.
+        services.TryAddSingleton<IFieldConfigurationValidator, FieldConfigurationValidator>();
         services.TryAddSingleton(provider =>
             new Lazy<IFieldTypeRegistry>(provider.GetRequiredService<IFieldTypeRegistry>));
     }

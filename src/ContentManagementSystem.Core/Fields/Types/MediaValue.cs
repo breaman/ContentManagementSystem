@@ -34,6 +34,33 @@ internal static class MediaValue
     public const string CropMember = "crop";
 
     /// <summary>
+    /// The settings that restrict which library items may be picked.
+    /// </summary>
+    /// <remarks>
+    /// Shared for the same reason the item rules above are: <c>media</c> and <c>mediaList</c> pick
+    /// from one library under one set of restrictions, and two copies would diverge the first time
+    /// either gained a setting. All three are declared now and enforced in P5, when the library
+    /// they read exists — see <see cref="FieldConfigurationSetting.NotEnforcedUntil"/> for why they
+    /// are declared early rather than refused until then.
+    /// </remarks>
+    public static FieldConfigurationSchema PickerSettings { get; } = new(
+        [
+            FieldConfigurationSetting.TextList(
+                "allowedTypes",
+                "Media types an editor may pick, such as image or document. An empty list allows any of them.",
+                notEnforcedUntil: "P5"),
+            FieldConfigurationSetting.Integer(
+                "minWidth",
+                "Narrowest original, in pixels, that may be picked.",
+                minimum: 1,
+                notEnforcedUntil: "P5"),
+            FieldConfigurationSetting.Text(
+                "aspectRatio",
+                "Aspect ratio a picked item must have. The syntax is settled in P5 with the crop editor.",
+                notEnforcedUntil: "P5"),
+        ]);
+
+    /// <summary>
     /// Checks one picked item.
     /// </summary>
     /// <param name="value">The media value object.</param>

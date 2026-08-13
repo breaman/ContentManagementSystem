@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -9,8 +8,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// A point in time — an embargo, a countdown target, an event start (spec section 7.1).
 /// </summary>
 /// <remarks>
-/// Stored as <c>{ "type": "dateTime", "value": "2026-08-12T09:30:00Z" }</c>. Configuration keys:
-/// <c>required</c>, <c>min</c>, <c>max</c>, both written the same way.
+/// Stored as <c>{ "type": "dateTime", "value": "2026-08-12T09:30:00Z" }</c>. Configuration keys: <c>min</c> and
+/// <c>max</c>, both written the same way.
 /// <para>
 /// The offset is mandatory. <c>2026-08-12T09:30:00</c> names no instant on its own — it means one
 /// thing to the browser that submitted it, another to the server that stores it, and a third to the
@@ -19,8 +18,6 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </remarks>
 public sealed class DateTimeFieldType : FieldTypeBase
 {
-    private static readonly char[] TimeSeparators = ['T', 't', ' '];
-
     /// <inheritdoc />
     public override string Key => FieldTypeKeys.DateTime;
 
@@ -29,6 +26,20 @@ public sealed class DateTimeFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Text(
+                "min",
+                "Earliest instant an editor may choose, with an offset.",
+                FieldSettingFormat.DateTime),
+            FieldConfigurationSetting.Text(
+                "max",
+                "Latest instant an editor may choose, with an offset.",
+                FieldSettingFormat.DateTime),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
 
     /// <inheritdoc />
     protected override ValidationResult ValidateValue(
@@ -87,36 +98,9 @@ public sealed class DateTimeFieldType : FieldTypeBase
     }
 
     private static bool TryParse(string? value, out DateTimeOffset instant) =>
-        DateTimeOffset.TryParse(
-            value,
-            CultureInfo.InvariantCulture,
-            DateTimeStyles.RoundtripKind,
-            out instant);
+        ValueFormats.TryParseInstant(value, out instant);
 
-    /// <summary>
-    /// Whether the text carries a time zone designator of its own.
-    /// </summary>
-    /// <param name="value">The stored text, already known to parse.</param>
-    /// <returns><see langword="true"/> when the instant is unambiguous.</returns>
-    /// <remarks>
-    /// Checked on the text rather than on the parse result, because
-    /// <see cref="DateTimeOffset.TryParse(string, IFormatProvider, DateTimeStyles, out DateTimeOffset)"/>
-    /// supplies the machine's local offset when the value carries none, leaving nothing in the
-    /// parsed value to distinguish an author who wrote <c>+00:00</c> from a server that happens to
-    /// run in UTC.
-    /// </remarks>
-    private static bool HasExplicitOffset(string value)
-    {
-        var separator = value.IndexOfAny(TimeSeparators);
+    private static bool HasExplicitOffset(string value) => ValueFormats.HasExplicitOffset(value);
 
-        if (separator < 0) return false;
-
-        var time = value.AsSpan(separator + 1).TrimEnd();
-
-        // Within the time portion a '+' or '-' can only introduce the offset.
-        return time.Length > 0 && (time[^1] is 'Z' or 'z' || time.LastIndexOfAny('+', '-') >= 0);
-    }
-
-    private static string Format(DateTimeOffset instant) =>
-        instant.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture);
+    private static string Format(DateTimeOffset instant) => ValueFormats.FormatInstant(instant);
 }

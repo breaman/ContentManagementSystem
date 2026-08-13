@@ -19,8 +19,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// which is what makes a card list pick up a retitled page without being re-authored.
 /// </para>
 /// <para>
-/// Configuration keys: <c>required</c>, <c>multiple</c>, <c>min</c> / <c>max</c> counts, and the P3
-/// addition <c>allowedTemplates</c>.
+/// Configuration keys: <c>multiple</c>, <c>min</c> / <c>max</c> counts, and the P3 addition
+/// <c>allowedTemplates</c>.
 /// </para>
 /// <para>
 /// <strong>Completed in P3</strong>: the content-tree picker, the <c>allowedTemplates</c>
@@ -38,6 +38,27 @@ public sealed class PageReferenceFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.ReferenceBearing;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Boolean(
+                "multiple",
+                "Whether several pages may be referenced, storing an array of ids rather than one."),
+            FieldConfigurationSetting.Integer(
+                "min",
+                "Fewest pages that must be referenced. Only applies when multiple is set.",
+                minimum: 0),
+            FieldConfigurationSetting.Integer(
+                "max",
+                "Most pages that may be referenced. Only applies when multiple is set.",
+                minimum: 0),
+            FieldConfigurationSetting.TextList(
+                "allowedTemplates",
+                "Keys of the templates a referenced page may use. An empty list allows any page.",
+                notEnforcedUntil: "P3"),
+        ],
+        [new FieldSettingRange("min", "max")]);
+
 
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>

@@ -15,7 +15,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// its own. Copying any of that into the page is what makes replacing an image in the library leave
 /// stale copies behind on every page that used it.
 /// <para>
-/// Configuration keys: <c>required</c>, and the P5 additions <c>allowedTypes</c>, <c>minWidth</c>,
+/// Configuration keys: the P5 additions <c>allowedTypes</c>, <c>minWidth</c>, and
 /// <c>aspectRatio</c>.
 /// </para>
 /// <para>
@@ -39,6 +39,9 @@ public sealed class MediaFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.ReferenceBearing;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema => MediaValue.PickerSettings;
+
 
     /// <inheritdoc />
     /// <remarks>

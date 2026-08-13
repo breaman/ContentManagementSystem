@@ -51,6 +51,18 @@ internal static class FieldPatterns
 
     private static readonly ConcurrentDictionary<string, Regex?> Cache = new(StringComparer.Ordinal);
 
+    /// <summary>Whether a configured pattern compiles into something that can be run.</summary>
+    /// <param name="pattern">The configured regular expression.</param>
+    /// <returns><see langword="false"/> when the pattern is not a usable expression.</returns>
+    /// <remarks>
+    /// How configuration validation (P1-12) refuses a pattern before it is stored, using the same
+    /// compilation and the same cache the content path will use to run it. It cannot speak to
+    /// runtime cost: catastrophic backtracking is a property of the pattern <em>and</em> the input,
+    /// so a pattern that compiles here can still time out later, which is why
+    /// <see cref="Evaluate"/> keeps its timeout.
+    /// </remarks>
+    public static bool IsUsable(string pattern) => GetOrCreate(pattern) is not null;
+
     /// <summary>Evaluates a configured pattern against a value.</summary>
     /// <param name="pattern">The configured regular expression.</param>
     /// <param name="value">The value being validated.</param>

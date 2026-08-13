@@ -8,7 +8,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// Shared behaviour of the field types that store a single unmarked string.
 /// </summary>
 /// <remarks>
-/// Configuration keys: <c>required</c>, <c>minLength</c>, <c>maxLength</c>, <c>pattern</c>.
+/// Configuration keys: <c>minLength</c>, <c>maxLength</c>, <c>pattern</c>, <c>patternMessage</c>.
 /// <para>
 /// Lengths are counted in UTF-16 code units, matching <c>nvarchar</c> and therefore matching what
 /// the database would refuse. Counting text elements instead would read more naturally to an author
@@ -19,6 +19,27 @@ public abstract class TextFieldTypeBase : FieldTypeBase
 {
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.Searchable;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Integer(
+                "minLength",
+                "Fewest characters a value may contain.",
+                minimum: 0),
+            FieldConfigurationSetting.Integer(
+                "maxLength",
+                "Most characters a value may contain, counted in UTF-16 code units as nvarchar counts them.",
+                minimum: 1),
+            FieldConfigurationSetting.Text(
+                "pattern",
+                "Regular expression every value must match.",
+                FieldSettingFormat.RegularExpression),
+            FieldConfigurationSetting.Text(
+                "patternMessage",
+                "What to tell an editor when a value does not match the pattern. The default says only that the format is wrong, which a pattern of any complexity makes useless."),
+        ],
+        [new FieldSettingRange("minLength", "maxLength")]);
+
 
     /// <summary>Whether a stored value may contain line breaks.</summary>
     protected abstract bool AllowsLineBreaks { get; }

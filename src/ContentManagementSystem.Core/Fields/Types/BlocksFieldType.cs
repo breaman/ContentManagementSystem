@@ -21,8 +21,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// address the wrong one.
 /// </para>
 /// <para>
-/// Configuration keys: <c>required</c>, <c>allowedBlockTypes</c>, <c>min</c> / <c>max</c>,
-/// <c>allowNesting</c> (one level in v1).
+/// Configuration keys: <c>allowedBlockTypes</c>, <c>min</c> / <c>max</c>, <c>allowNesting</c>
+/// (one level in v1).
 /// </para>
 /// <para>
 /// <strong>What this field type does not do:</strong> check a block's properties against its block
@@ -92,6 +92,17 @@ public sealed class BlocksFieldType : ListFieldTypeBase
         FieldTypeCapabilities.Container |
         FieldTypeCapabilities.ReferenceBearing |
         FieldTypeCapabilities.Searchable;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = ListConfigurationSchema.Extend(
+        [
+            FieldConfigurationSetting.TextList(
+                "allowedBlockTypes",
+                "Keys of the block types an editor may add. An empty list allows any registered block type."),
+            FieldConfigurationSetting.Boolean(
+                "allowNesting",
+                "Whether a block may contain further blocks. One level only in v1."),
+        ]);
+
 
     /// <inheritdoc />
     protected override string PayloadMember => ItemsMember;

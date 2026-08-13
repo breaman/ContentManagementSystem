@@ -14,7 +14,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// values on save, in the same way <c>ContentReference</c> is: the payload stays the record, and the
 /// relational side stays derivable from it.
 /// <para>
-/// Configuration keys: <c>required</c>, <c>min</c> / <c>max</c> counts, <c>maxLength</c> per tag.
+/// Configuration keys: <c>min</c> / <c>max</c> counts, <c>maxLength</c> per tag.
 /// </para>
 /// <para>
 /// Not reference-bearing, which is a real distinction rather than an omission: a tag names a
@@ -38,6 +38,15 @@ public sealed class TagsFieldType : ListFieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.Searchable;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = ListConfigurationSchema.Extend(
+        [
+            FieldConfigurationSetting.Integer(
+                "maxLength",
+                "Most characters a single tag may contain.",
+                minimum: 1),
+        ]);
+
 
     /// <inheritdoc />
     protected override string ItemNoun => "tags";

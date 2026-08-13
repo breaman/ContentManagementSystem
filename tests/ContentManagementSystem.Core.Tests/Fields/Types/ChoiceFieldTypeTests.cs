@@ -129,11 +129,13 @@ public class ChoiceFieldTypeTests
     {
         var draft = await _fieldType.ValidateAsync(
             """{ "type": "choice", "value": [] }""",
-            """{ "multiple": true, "required": true }""");
+            """{ "multiple": true }""",
+            isRequired: true);
         var publish = await _fieldType.ValidateAsync(
             """{ "type": "choice", "value": [] }""",
-            """{ "multiple": true, "required": true }""",
-            ValidationMode.Publish);
+            """{ "multiple": true }""",
+            ValidationMode.Publish,
+            isRequired: true);
 
         draft.IsValid.Should().BeTrue();
         publish.Codes().Should().Equal(FieldValidationCodes.Required);

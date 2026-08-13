@@ -70,6 +70,15 @@ public abstract class FieldTypeBase : IFieldType
     public abstract FieldTypeCapabilities Capabilities { get; }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Empty is the honest default: a field type that takes no configuration should accept none,
+    /// and the closed schema turns anything written into its <c>ConfigurationJson</c> into a save
+    /// error rather than a line that does nothing. A subclass reading a setting must declare it
+    /// here, which the configuration contract test checks rather than trusting.
+    /// </remarks>
+    public virtual FieldConfigurationSchema ConfigurationSchema => FieldConfigurationSchema.Empty;
+
+    /// <inheritdoc />
     public ValueTask<ValidationResult> ValidateAsync(
         JsonElement value,
         FieldConfiguration configuration,
@@ -192,10 +201,15 @@ public abstract class FieldTypeBase : IFieldType
     /// a configured minimum count says the same thing as <c>required</c>, and enforcing counts only
     /// on non-empty lists would leave <c>"min": 1</c> as the one count rule an empty zone slips
     /// past.
+    /// <para>
+    /// Read from <see cref="FieldConfiguration.IsRequired"/>, which carries the <c>IsRequired</c>
+    /// column, rather than from a setting inside the configuration blob — the two would be free to
+    /// disagree, and nothing would say which won.
+    /// </para>
     /// </remarks>
     protected virtual ValidationResult ValidateEmpty(FieldConfiguration configuration, ValidationMode mode)
     {
-        if (mode is ValidationMode.Publish && configuration.GetBoolean("required"))
+        if (mode is ValidationMode.Publish && configuration.IsRequired)
         {
             return ValidationResult.Error(FieldValidationCodes.Required, "This field is required.");
         }

@@ -8,8 +8,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// A colour, optionally constrained to the design system's palette (spec section 7.1).
 /// </summary>
 /// <remarks>
-/// Stored as <c>{ "type": "color", "value": "#1f6feb" }</c>. Configuration keys: <c>required</c> and
-/// <c>palette</c>, a list of the hex values a property is allowed to hold.
+/// Stored as <c>{ "type": "color", "value": "#1f6feb" }</c>. Configuration key: <c>palette</c>, a list of
+/// the hex values a property is allowed to hold.
 /// <para>
 /// One form only — six hex digits behind a hash. Named colours, <c>rgb()</c>, and the three-digit
 /// shorthand are all refused, so that a stored value can be compared, swatched, and emitted into a
@@ -22,9 +22,6 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </remarks>
 public sealed class ColorFieldType : FieldTypeBase
 {
-    /// <summary><c>#RRGGBB</c> — a hash and six hex digits.</summary>
-    private const int HexLength = 7;
-
     /// <inheritdoc />
     public override string Key => FieldTypeKeys.Color;
 
@@ -33,6 +30,15 @@ public sealed class ColorFieldType : FieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.None;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.TextList(
+                "palette",
+                "The colours this property is allowed to hold, each written as #RRGGBB. An empty list accepts any colour.",
+                FieldSettingFormat.HexColor),
+        ]);
+
 
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>
@@ -76,15 +82,5 @@ public sealed class ColorFieldType : FieldTypeBase
             ValueMember);
     }
 
-    private static bool IsHexColor(string? value)
-    {
-        if (value is not { Length: HexLength } || value[0] != '#') return false;
-
-        for (var index = 1; index < HexLength; index++)
-        {
-            if (!char.IsAsciiHexDigit(value[index])) return false;
-        }
-
-        return true;
-    }
+    private static bool IsHexColor(string? value) => ValueFormats.IsHexColor(value);
 }

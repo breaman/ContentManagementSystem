@@ -1,6 +1,6 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 in progress (`P1-12` next)
+**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1 and 1.2 done, 1.3 next (`P1-14`)
 **Version:** 1.0
 **Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 12 | 28.0 | In progress — 1.1 complete; 1.2 field type catalog complete, `P1-12` next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 13 | 28.0 | In progress — 1.1 and 1.2 complete; payload engine (1.3) next | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **31** | **203.5** | | |
+| **v1 total** | **281** | **32** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -349,8 +349,36 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   leave it null; a list or a container reports a path **relative to its own value** (`items[1]`,
   `items[0].properties.image`) and the walk prefixes the rest. 110 new tests, 256 green in
   `Core.Tests`.*
-- [ ] **P1-12** Per-field-type configuration JSON Schema + validation on zone save, in
+- [x] **P1-12** Per-field-type configuration JSON Schema + validation on zone save, in
   `Core/Fields/Configuration/` [§7.2]. — 1 ed
+  *2026-08-13 — **the schema is declared in C# beside the field type and the JSON Schema is
+  generated from it**, not authored as a document and interpreted. Recorded as
+  [`ADR-0015` (D15)](./docs/adr/0015-field-configuration-declared-in-code-json-schema-generated.md):
+  a hand-written subset interpreter silently ignores the first keyword an extension author reaches
+  for, a full one is a third-party dependency on every structure write, and two of the rules that
+  matter — that a `pattern` compiles under .NET and that a lower bound is not above its upper bound
+  — cannot be said in JSON Schema at all. `FieldConfigurationSchemaWriter` still emits a draft
+  2020-12 document per field type for `P1-24` and the `P1-29` configuration form, carrying those two
+  as `x-cms` annotations. `IFieldType` gains `ConfigurationSchema`.*
+  ***Configuration is closed** — a setting the schema does not declare is refused, so a mistyped
+  `maxlength` is a save error rather than a line that persists and does nothing. That forced the
+  settings the stubbed field types will read to be declared now and marked `NotEnforcedUntil`
+  (`media`/`mediaList` P5, `link`/`pageReference` P3, `reusable` P4); configuring one is accepted
+  with a warning naming the phase, because refusing it makes a developer build half a content model
+  and come back.*
+  *Two things this turned up. **`required` was a second source of truth** — the field types read it
+  from `ConfigurationJson` while `Zone.IsRequired` and `BlockTypeProperty.IsRequired` are columns,
+  and nothing said which won. It is now `FieldConfiguration.IsRequired`, supplied by
+  `Parse(json, isRequired)`; declaring it as a setting throws and writing it into the blob is
+  refused. **`patternMessage` was read but undocumented**, which is exactly what a closed schema
+  would have made unstorable. `Fields/Configuration/FieldConfigurationContractTests` now checks both
+  directions — every setting a field type reads is one it declares (recorded through a
+  `FieldConfiguration` subclass, which is why the class is no longer sealed), and every setting it
+  declares can actually be configured. 74 new tests, 330 green in `Core.Tests`.*
+  *Also folded the date, instant, and hex-colour parsing the field types had privately into a shared
+  `ValueFormats`, so a bound accepted at zone save is parsed by the same code that will read it at
+  content-validation time. A configuration validator with its own parser accepts bounds the field
+  type then silently ignores.*
 - [x] **P1-13** Contract test asserting **every registered field type returns references for a
   representative populated value** — the omission that silently produces stale content [§7.3].
   — included above
@@ -410,8 +438,13 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 - [ ] **P1-21** Management API `/api/cms/v1/templates` in `Server/Api/Cms/Structure/` — list, create,
   read, update, revisions. — 0.5 ed
 - [ ] **P1-22** `/api/cms/v1/templates/{id}/zones` — CRUD with key immutability enforced [§8.5]. — 0.5 ed
+  *`P1-12` built `IFieldConfigurationValidator` and registered it; this is the call site [§7.2].
+  Block-type property writes in `P1-23` and the schema sync in `P1-26` are the other two.*
 - [ ] **P1-23** `/api/cms/v1/block-types` and `/block-types/{id}/properties`. — 0.5 ed
 - [ ] **P1-24** `/api/cms/v1/compositions` and `/field-types` (read-only registry introspection). — 0.5 ed
+  *`/field-types` serves each field type's configuration JSON Schema via
+  `FieldConfigurationSchemaWriter` (`P1-12`), which is what `P1-29`'s configuration form builds its
+  controls from.*
 - [ ] **P1-25** `TemplateReconciler` in `Core/Structure/`: scan assemblies for `[CmsTemplate]` /
   `[CmsBlockType]`, insert code-only records, mark DB-only records `IsOrphaned`, **never delete**, log a
   diff in Development [§8.4]. — 1 ed

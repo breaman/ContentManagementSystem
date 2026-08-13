@@ -28,11 +28,11 @@ public class MediaFieldTypeTests
     [Fact]
     public async Task APropertyWithNoPickedItemIsUnfilledRatherThanMalformed()
     {
-        var draft = await _media.ValidateAsync("""{ "type": "media" }""", """{ "required": true }""");
+        var draft = await _media.ValidateAsync("""{ "type": "media" }""", isRequired: true);
         var publish = await _media.ValidateAsync(
             """{ "type": "media" }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         draft.IsValid.Should().BeTrue();
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
@@ -43,8 +43,8 @@ public class MediaFieldTypeTests
     {
         var result = await _media.ValidateAsync(
             """{ "type": "media", "mediaId": null, "focalPoint": { "x": 0.5, "y": 0.5 } }""",
-            """{ "required": true }""",
-            ValidationMode.Publish);
+            mode: ValidationMode.Publish,
+            isRequired: true);
 
         // Leftover state from a cleared picker. Treating it as filled would publish a property the
         // editor sees as empty.

@@ -32,3 +32,4 @@ holds, without reading `spec.md` end to end.
 | [0012](0012-advisory-locks-never-block.md) | D12 — Advisory locks never block; `rowversion` is authoritative | Accepted |
 | [0013](0013-backoffice-editor-bundle-and-style-nonce.md) | D13 — Locally bundled editors; per-request style nonce for the backoffice | Accepted |
 | [0014](0014-field-type-components-resolved-by-the-hosting-layer.md) | D14 — Field type components resolved by the hosting layer, not declared by the field type | Accepted |
+| [0015](0015-field-configuration-declared-in-code-json-schema-generated.md) | D15 — Field configuration declared in code; the JSON Schema generated from it | Accepted |

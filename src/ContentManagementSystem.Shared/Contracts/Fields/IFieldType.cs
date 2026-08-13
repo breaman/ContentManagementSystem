@@ -61,6 +61,25 @@ public interface IFieldType
     FieldTypeCapabilities Capabilities { get; }
 
     /// <summary>
+    /// Every setting this field type accepts in a zone or block-type property's
+    /// <c>ConfigurationJson</c>.
+    /// </summary>
+    /// <remarks>
+    /// Step 3 of adding a field type (spec section 7.3): configuration is checked against this when
+    /// a zone is saved, so a developer cannot persist a configuration the editor component and the
+    /// validator cannot honour. The schema is closed — a setting it does not declare is refused —
+    /// which makes a mistyped <c>maxlength</c> a save error rather than a setting that quietly does
+    /// nothing.
+    /// <para>
+    /// A field type taking no configuration answers
+    /// <see cref="FieldConfigurationSchema.Empty"/>. Answering <see cref="FieldConfigurationSchema.Empty"/>
+    /// while still reading a setting means that setting can never be stored, which is what the
+    /// configuration contract test exists to catch.
+    /// </para>
+    /// </remarks>
+    FieldConfigurationSchema ConfigurationSchema { get; }
+
+    /// <summary>
     /// Checks one stored value against its configuration.
     /// </summary>
     /// <param name="value">

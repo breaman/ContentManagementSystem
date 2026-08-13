@@ -11,8 +11,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// Stored as <c>{ "type": "mediaList", "items": [ { "mediaId": 812, … }, … ] }</c> — the same item
 /// shape <c>media</c> stores, repeated. Order is the author's and is preserved as written.
 /// <para>
-/// Configuration keys: <c>required</c>, <c>min</c>, <c>max</c>, and the P5 additions
-/// <c>allowedTypes</c>, <c>minWidth</c>, <c>aspectRatio</c>.
+/// Configuration keys: <c>min</c>, <c>max</c>, and the P5 additions <c>allowedTypes</c>,
+/// <c>minWidth</c>, <c>aspectRatio</c>.
 /// </para>
 /// <para>
 /// The same item appearing twice is allowed. A gallery that repeats an image is unusual but not
@@ -36,6 +36,10 @@ public sealed class MediaListFieldType : ListFieldTypeBase
 
     /// <inheritdoc />
     public override FieldTypeCapabilities Capabilities => FieldTypeCapabilities.ReferenceBearing;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } =
+        ListConfigurationSchema.Extend(MediaValue.PickerSettings.Settings);
+
 
     /// <inheritdoc />
     protected override string PayloadMember => ItemsMember;

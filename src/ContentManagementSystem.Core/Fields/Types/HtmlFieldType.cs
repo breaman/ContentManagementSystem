@@ -9,8 +9,7 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// Hand-written HTML — embeds, third-party widgets, markup no editor produces (spec section 7.1).
 /// </summary>
 /// <remarks>
-/// Stored as <c>{ "type": "html", "value": "&lt;iframe …&gt;" }</c>. Configuration keys:
-/// <c>required</c>, <c>maxLength</c>.
+/// Stored as <c>{ "type": "html", "value": "&lt;iframe …&gt;" }</c>. Configuration key: <c>maxLength</c>.
 /// <para>
 /// Flagged <see cref="FieldTypeCapabilities.DeveloperOnly"/>: its value reaches the page more or
 /// less as written, so the property is placed on a template by, and authored by, someone holding the
@@ -47,6 +46,15 @@ public sealed class HtmlFieldType : FieldTypeBase
         FieldTypeCapabilities.Searchable |
         FieldTypeCapabilities.Sanitizable |
         FieldTypeCapabilities.DeveloperOnly;
+    /// <inheritdoc />
+    public override FieldConfigurationSchema ConfigurationSchema { get; } = new(
+        [
+            FieldConfigurationSetting.Integer(
+                "maxLength",
+                "Most characters the markup may contain.",
+                minimum: 1),
+        ]);
+
 
     /// <inheritdoc />
     protected override bool IsEmpty(JsonElement value) =>
