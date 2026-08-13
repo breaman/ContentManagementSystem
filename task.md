@@ -1,8 +1,8 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete (all three spikes returned go); Phase 1 next
+**Status:** In progress — Phase 0 complete; Phase 1 section 1.1 done, 1.2 started (`P1-10` next)
 **Version:** 1.0
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-13
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -49,7 +49,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 0 | 28.0 | Not started | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 9 | 28.0 | In progress — 1.1 complete; 1.2 field-type contracts and registry done | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -58,7 +58,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **19** | **203.5** | | |
+| **v1 total** | **281** | **28** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -228,33 +228,78 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 
 ### 1.1 Domain and data — 6.5 ed
 
-- [ ] **P1-01** Entities in `Data/Models/Cms/`: `Template`, `TemplateRevision`, `Zone`, `BlockType`,
+- [x] **P1-01** Entities in `Data/Models/Cms/`: `Template`, `TemplateRevision`, `Zone`, `BlockType`,
   `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`,
   `BlockTypeComposition`, `SiteSettings` — shapes per [§23.1]. — 2.5 ed
-- [ ] **P1-02** `IEntityTypeConfiguration<>` per entity in `Data/Configurations/Cms/`: keys, unique
+  *2026-08-13 — all ten plus the `WorkflowMode` enum. Two additions beyond [§23.1]:
+  `BlockType.IsBuiltIn`, so the seeded `RawHtml` type cannot be deleted, and
+  `SiteSettings.SingletonId`. `SiteSettings.HomePageId` / `NotFoundPageId` /
+  `DefaultOgImageMediaId` are plain `int?` for now — their foreign keys land with `Page` in P2-01
+  and `MediaItem` in P5-01.*
+- [x] **P1-02** `IEntityTypeConfiguration<>` per entity in `Data/Configurations/Cms/`: keys, unique
   indexes (`Template.Key`, `(TemplateId, Zone.Key)`, `(BlockTypeId, Key)`, `(TemplateId,
   RevisionNumber)`), `FieldLengths` constants, `ColumnTypes`. — 2 ed
-- [ ] **P1-03** Extend `Shared/Common/FieldLengths.cs` with CMS constants (`ContentKey = 100`,
+  *2026-08-13 — all four unique indexes asserted against real SQL Server by
+  `Cms/StructureSchemaTests`, including that the same zone key on two templates is allowed. Every
+  structural foreign key is `DeleteBehavior.Restrict`: cascading would take zone definitions with a
+  deleted template and leave stored payloads with no schema to validate against. Added
+  `ColumnTypes.Json` and `ColumnTypes.UnboundedText` rather than writing `nvarchar(max)` inline.*
+- [x] **P1-03** Extend `Shared/Common/FieldLengths.cs` with CMS constants (`ContentKey = 100`,
   `Url = 2000`, `MetaDescription = 500`, `Name = 200`, `Description = 500`,
   `ComponentTypeName = 500`, …). — 0.5 ed
-- [ ] **P1-04** Register CMS `DbSet`s on `Data/Models/ApplicationDbContext.cs` and apply configurations
+  *2026-08-13 — two names in that list collide with constants the template repo already ships.
+  `Name = 200` is exactly the existing `EntityName`, so CMS name columns reuse it rather than
+  introducing a second way to say 200. `Description = 500` collides with the inherited
+  `Description = 4000`, so the CMS one is **`ShortDescription`**. Also added `IconKey`,
+  `SummaryTemplate`, `GroupName`, `Culture`, `TimeZoneId`, `RevisionNotes`, `VerificationToken`.*
+- [x] **P1-04** Register CMS `DbSet`s on `Data/Models/ApplicationDbContext.cs` and apply configurations
   from the assembly. *(Existing-code change.)* — 0.25 ed
-- [ ] **P1-05** Configure `AuthDbContext.AddLogging()` to **skip** `SearchDocument`, `OutboxMessage`,
+  *2026-08-13 — `ApplyConfigurationsFromAssembly`, so a later phase's entity is one new file rather
+  than an edit here that is easy to forget.*
+- [x] **P1-05** Configure `AuthDbContext.AddLogging()` to **skip** `SearchDocument`, `OutboxMessage`,
   `MediaRendition`, `EditLock`, `NotFoundLog` — high-churn derived tables that would otherwise grow
   `AuditLog` without bound [§23.5]. *(Existing-code change; table names registered now, tables added
   later.)* — 0.25 ed
-- [ ] **P1-06** Migration `AddCmsStructure` (`Data/Migrations/`) — migration #2 in the
+  *2026-08-13 — matched by entity-type name, since the tables arrive across P2, P5, and P8 and the
+  exclusion should already be in place when they do. **Not yet covered by a test** — there is no
+  excluded table to write one against until `EditLock` lands in `P2-02`; add it there.*
+- [x] **P1-06** Migration `AddCmsStructure` (`Data/Migrations/`) — migration #2 in the
   [sequence](#database-migration-sequence). Verify `Up` and `Down` both apply cleanly in CI. — 1 ed
-- [ ] **P1-07** Seeding in `Data/Seeding/`: the single `SiteSettings` row (`Culture = en-US`) and the
+  *2026-08-13 — reviewed statement by statement: ten `CreateTable`s, no drop-plus-add, `Down` drops
+  in dependency order. `Up` and `Down` are both asserted from empty by
+  `MigrationsApplyFromEmptyTests`, which now covers two migrations.*
+- [x] **P1-07** Seeding in `Data/Seeding/`: the single `SiteSettings` row (`Culture = en-US`) and the
   built-in `RawHtml` block type [§9.1]. — 0.5 ed
+  *2026-08-13 — `CmsSeedData`, applied through `HasData` so the rows arrive in the same transaction
+  as the schema and the Aspire `ef-migrations` resource needs no extra step. That makes seeding
+  idempotent by construction; a test re-runs `MigrateAsync` over an already-migrated database and
+  asserts no row is duplicated. Singleton-ness of `SiteSettings` is a check constraint, not a
+  convention. `RawHtml` ships with its `content` property and revision 1, so content authored
+  against it has a captured schema from the start.*
 
 ### 1.2 Field type framework — the extensibility spine — 7 ed
 
-- [ ] **P1-08** Contracts in `Shared/Contracts/Fields/`: `IFieldType` (with `ValidateAsync`,
+- [x] **P1-08** Contracts in `Shared/Contracts/Fields/`: `IFieldType` (with `ValidateAsync`,
   `SanitizeAsync`, `ExtractReferences`, `ExtractSearchText` per [§7]), `FieldTypeCapabilities`,
   `FieldConfiguration`, `ValidationResult`, `ContentReference`. — 1 ed
-- [ ] **P1-09** `IFieldTypeRegistry` in `Core/Fields/` + `services.AddCmsFieldType<T>()` DI extension +
+  *2026-08-13 — **one deliberate deviation from the [§7] signature**: `ValidateAsync` takes a
+  fourth `ValidationMode` parameter. [S1](./docs/spikes/s1-runtime-schema.md) requires draft-vs-
+  publish to be a validator parameter rather than a filter on results (consequence 3), and it
+  cannot ride on `FieldConfiguration`, which is cached per schema row and must stay free of
+  request-scoped state (consequence 4). `ValidationResult` carries `ValidationDiagnostic`s with a
+  stable `code`, a `ValidationSeverity`, and a relative path the schema walk prefixes — the field
+  type cannot know where in the document it sits. `FieldTypeCapabilities` gained a `Container`
+  flag beyond the spec's list; it is how `P1-13`'s nested case knows which field types to exercise.
+  Note `ContentReference` here is the extracted value type; the EF entity of the same name is a
+  separate type arriving in `P2-02`, per [§7] and [§23.2] both using the name.*
+- [x] **P1-09** `IFieldTypeRegistry` in `Core/Fields/` + `services.AddCmsFieldType<T>()` DI extension +
   startup discovery. — 1 ed
+  *2026-08-13 — lookups return null rather than throwing, since a payload naming a field type no
+  longer deployed is expected and delivery answers it with a logged warning [§15.3]. Duplicate keys
+  fail at startup: two field types answering to `richText` has no defensible default. Assembly
+  discovery scans **public** types only — a field type key ends up in stored payloads, so
+  registering an assembly's private implementations behind the author's back is wrong, and the
+  first version of the scan took a private test double down with it.*
 - [ ] **P1-10** Implement value field types in `Core/Fields/Types/` per [§7.1]: `plainText`,
   `multilineText`, `richText`, `html`, `number`, `boolean`, `date`, `dateTime`, `choice`, `color`,
   `json`. — 3 ed
@@ -1226,8 +1271,8 @@ verified in CI to apply cleanly against a database restored from the previous on
 
 | # | Migration | Phase | Task | Contents | Done |
 |---|---|---|---|---|:--:|
-| 1 | `InitialDatabase` | — | P0-01 | Existing Identity + `AuditLog` schema | [ ] |
-| 2 | `AddCmsStructure` | 1 | P1-06 | `Template`, `TemplateRevision`, `Zone`, `BlockType`, `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`, `BlockTypeComposition`, `SiteSettings` | [ ] |
+| 1 | `InitialDatabase` | — | P0-01 | Existing Identity + `AuditLog` schema | [x] |
+| 2 | `AddCmsStructure` | 1 | P1-06 | `Template`, `TemplateRevision`, `Zone`, `BlockType`, `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`, `BlockTypeComposition`, `SiteSettings` | [x] |
 | 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` | [ ] |
 | 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [ ] |
 | 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [ ] |
@@ -1248,9 +1293,9 @@ reviewer.
 
 | File | Change | Phase | Task | Done |
 |---|---|---|---|:--:|
-| `Data/Models/AuthDbContext.cs` | Exclude high-churn tables from `AddLogging()` audit capture | 1 | P1-05 | [ ] |
+| `Data/Models/AuthDbContext.cs` | Exclude high-churn tables from `AddLogging()` audit capture | 1 | P1-05 | [x] |
 | `Data/Models/AuthDbContext.cs` | Implement `ApplySoftDeletes()` — the virtual hook exists and is empty | 2 | P2-04 | [ ] |
-| `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [ ] |
+| `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [x] |
 | `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–8 | P1-30, P3-13 | [ ] |
 | `Server/Program.cs` | Tighten the Identity password policy; decide self-registration | 9 | P9-04 | [ ] |
 | `Server/Components/Email/IdentityNoOpEmailSender.cs` | Replace with a real sender | 7 | P7-18 | [ ] |
@@ -1258,7 +1303,7 @@ reviewer.
 | `Server/Components/Routes.razor` | Scope interactive routing to `/admin`; keep public pages static SSR | 3 | P3-14 | [ ] |
 | `aspire/…AppHost/AppHost.cs` | Add Azurite and optional Redis resources | 0 | P0-13, P0-14 | [ ] |
 | `Directory.Packages.props` | Add HtmlSanitizer, Markdig, SkiaSharp, MetadataExtractor, HybridCache, rate limiting, Testcontainers, bUnit, Playwright, k6 tooling | 0–5 | P0-07, P0-12 | [ ] |
-| `Shared/Common/FieldLengths.cs` | Add CMS field length constants | 1 | P1-03 | [ ] |
+| `Shared/Common/FieldLengths.cs` | Add CMS field length constants | 1 | P1-03 | [x] |
 | `styles/site.scss` | Add backoffice and content typography layers | 6 | P6-40 | [ ] |
 | `README.md` | Document CMS setup, template authoring, schema sync CLI | 9 | P9-22 | [ ] |
 | `ContentManagementSystem.slnx` | Add Core, Rendering, and four test projects | 0 | P0-07…P0-11 | [ ] |

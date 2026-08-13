@@ -9,6 +9,30 @@ namespace ContentManagementSystem.Data.Models;
 
 public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 {
+    /// <summary>
+    /// Entity types deliberately excluded from audit capture.
+    /// </summary>
+    /// <remarks>
+    /// Every one of these is high-churn derived data written by a background service rather than by
+    /// a person: search projections, outbox rows, generated image renditions, editor heartbeats,
+    /// and 404 hit counters. Auditing them grows <c>AuditLog</c> without bound and slows every
+    /// <c>SaveChanges</c>, while recording nothing anybody would ever ask about — the source of
+    /// truth they derive from is audited already (spec section 23.5).
+    /// <para>
+    /// Names are matched rather than types because the tables arrive across several phases; the
+    /// exclusion is registered up front so a later phase cannot land the table and forget the
+    /// exclusion. Keep this list in step with the guidance in <c>CONTRIBUTING.md</c>.
+    /// </para>
+    /// </remarks>
+    private static readonly HashSet<string> AuditExemptEntityNames = new(StringComparer.Ordinal)
+    {
+        "SearchDocument",
+        "OutboxMessage",
+        "MediaRendition",
+        "EditLock",
+        "NotFoundLog",
+    };
+
     private readonly IUserService? _userService;
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -114,9 +138,12 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
             if (entry.Entity is AuditLog || entry.State == EntityState.Detached ||
                 entry.State == EntityState.Unchanged) continue;
 
+            var entityName = entry.Entity.GetType().Name;
+            if (AuditExemptEntityNames.Contains(entityName)) continue;
+
             var auditEntry = new AuditEntry(entry)
             {
-                TableName = entry.Entity.GetType().Name,
+                TableName = entityName,
                 UserId = _userService?.UserId ?? default
             };
             auditEntries.Add(auditEntry);

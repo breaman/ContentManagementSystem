@@ -1,4 +1,5 @@
 using ContentManagementSystem.Data.Interfaces;
+using ContentManagementSystem.Data.Models.Cms;
 
 using Microsoft.EntityFrameworkCore;
 
@@ -13,5 +14,45 @@ public class ApplicationDbContext : AuthDbContext
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IUserService userService) :
         base(options, userService)
     {
+    }
+
+    /// <summary>Page shapes a developer defines and editors create pages from.</summary>
+    public DbSet<Template> Templates => Set<Template>();
+
+    /// <summary>Immutable snapshots of each template's zone definitions.</summary>
+    public DbSet<TemplateRevision> TemplateRevisions => Set<TemplateRevision>();
+
+    /// <summary>Typed content slots belonging to templates.</summary>
+    public DbSet<Zone> Zones => Set<Zone>();
+
+    /// <summary>Shapes of the repeatable items placed inside <c>blocks</c> zones.</summary>
+    public DbSet<BlockType> BlockTypes => Set<BlockType>();
+
+    /// <summary>Immutable snapshots of each block type's property definitions.</summary>
+    public DbSet<BlockTypeRevision> BlockTypeRevisions => Set<BlockTypeRevision>();
+
+    /// <summary>Typed properties declared directly on a block type.</summary>
+    public DbSet<BlockTypeProperty> BlockTypeProperties => Set<BlockTypeProperty>();
+
+    /// <summary>Reusable property groups block types inherit from.</summary>
+    public DbSet<Composition> Compositions => Set<Composition>();
+
+    /// <summary>Typed properties belonging to a composition.</summary>
+    public DbSet<CompositionProperty> CompositionProperties => Set<CompositionProperty>();
+
+    /// <summary>Assignments of compositions to block types.</summary>
+    public DbSet<BlockTypeComposition> BlockTypeCompositions => Set<BlockTypeComposition>();
+
+    /// <summary>The single row of site-wide configuration.</summary>
+    public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
+
+    /// <inheritdoc />
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+
+        // Applied from the assembly rather than listed one by one, so adding an entity in a later
+        // phase is a single new file rather than an edit here that is easy to forget.
+        builder.ApplyConfigurationsFromAssembly(typeof(ApplicationDbContext).Assembly);
     }
 }

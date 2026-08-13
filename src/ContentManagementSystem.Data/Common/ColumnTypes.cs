@@ -17,4 +17,24 @@ public static class ColumnTypes
 
     /// <summary>Business dates with no time component, such as a needed-by date.</summary>
     public const string BusinessDate = "date";
+
+    /// <summary>
+    /// Unbounded text holding a serialised JSON document — content payloads, structural snapshots,
+    /// and field-type configuration.
+    /// </summary>
+    /// <remarks>
+    /// These columns are written and read whole and are never queried into. Should payload-internal
+    /// querying become necessary, SQL Server's JSON functions over computed, persisted, indexed
+    /// columns are the migration path — no table restructuring required (spec section 23.5).
+    /// </remarks>
+    public const string Json = "nvarchar(max)";
+
+    /// <summary>
+    /// Unbounded free text with no imposed structure, such as the body of <c>robots.txt</c>.
+    /// </summary>
+    /// <remarks>
+    /// Physically identical to <see cref="Json"/>. Kept separate because the two answer different
+    /// questions — a search for every JSON column should not also return prose.
+    /// </remarks>
+    public const string UnboundedText = "nvarchar(max)";
 }

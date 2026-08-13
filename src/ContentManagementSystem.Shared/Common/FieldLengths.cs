@@ -60,4 +60,63 @@ public static class FieldLengths
 
     /// <summary>Outbox/notification event type discriminator.</summary>
     public const int EventType = 200;
+
+    // ---------------------------------------------------------------------------------------
+    // Content management system (spec section 23). Names of CMS columns reuse EntityName, which
+    // already carries the 200 the spec asks for; a second 200-length "Name" constant would only
+    // create two ways to say the same thing.
+    // ---------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Stable content-model keys: template, zone, block type, composition, and field type keys.
+    /// </summary>
+    /// <remarks>
+    /// These appear inside stored content payloads, so the length is part of the storage contract
+    /// rather than a display preference. Keys are immutable once content references them.
+    /// </remarks>
+    public const int ContentKey = 100;
+
+    /// <summary>
+    /// Absolute or site-relative URLs, including page routes and redirect targets.
+    /// </summary>
+    /// <remarks>
+    /// 2000 is the practical ceiling browsers and proxies agree on. Note that a column this wide
+    /// exceeds SQL Server's 900-byte index key limit — index the <c>binary(32)</c> hash companion
+    /// column instead of the URL itself.
+    /// </remarks>
+    public const int Url = 2000;
+
+    /// <summary>Editor-facing help text on a zone, block type, template, or composition.</summary>
+    /// <remarks>
+    /// Distinct from <see cref="Description"/>, which is the much longer catalogue description
+    /// inherited from the commerce domain.
+    /// </remarks>
+    public const int ShortDescription = 500;
+
+    /// <summary>SEO meta description rendered into the page head.</summary>
+    public const int MetaDescription = 500;
+
+    /// <summary>Assembly-qualified name of the Razor component backing a template or block type.</summary>
+    public const int ComponentTypeName = 500;
+
+    /// <summary>Icon identifier shown against a block type in the block picker.</summary>
+    public const int IconKey = 50;
+
+    /// <summary>Token pattern producing a one-line summary of a collapsed block in the editor.</summary>
+    public const int SummaryTemplate = 500;
+
+    /// <summary>Tab or accordion grouping label applied to a zone or block-type property.</summary>
+    public const int GroupName = 100;
+
+    /// <summary>BCP-47 culture name, such as <c>en-US</c>.</summary>
+    public const int Culture = 16;
+
+    /// <summary>IANA or Windows time zone identifier.</summary>
+    public const int TimeZoneId = 100;
+
+    /// <summary>Free-text note recorded against a structural revision.</summary>
+    public const int RevisionNotes = 1000;
+
+    /// <summary>Site verification token supplied by a search engine.</summary>
+    public const int VerificationToken = 200;
 }
