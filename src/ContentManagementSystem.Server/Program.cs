@@ -104,6 +104,9 @@ try
     builder.Services.AddCmsFieldTypes();
     builder.Services.AddCmsStructure();
     builder.Services.AddCmsAuthorization();
+    // The content tree (task P2-05). Scoped, unlike the payload engine above, because these
+    // services hold a database context.
+    builder.Services.AddCmsPages();
 
     // Which assemblies declare [CmsTemplate] and [CmsBlockType] (task P1-25). Named rather than
     // discovered from the loaded assembly list: the scan has to give the same answer under a trimmed

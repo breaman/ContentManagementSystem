@@ -30,6 +30,16 @@ public static class ColumnTypes
     public const string Json = "nvarchar(max)";
 
     /// <summary>
+    /// Sitemap priority — a single digit either side of the point, holding 0.0 through 1.0.
+    /// </summary>
+    /// <remarks>
+    /// Overrides the model-wide <see cref="Money"/> convention. Sitemaps.org defines the value to
+    /// one decimal place, and storing it as <c>decimal(18,2)</c> would invite a 0.55 that no search
+    /// engine reads back the way it was written.
+    /// </remarks>
+    public const string SitemapPriority = "decimal(2,1)";
+
+    /// <summary>
     /// Unbounded free text with no imposed structure, such as the body of <c>robots.txt</c>.
     /// </summary>
     /// <remarks>

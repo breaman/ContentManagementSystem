@@ -185,7 +185,7 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task TheHealthCheckDegradesWhileAnOrphanExistsAndRecoversWhenItDoesNot()
+    public async Task TheHealthCheckDegradesOnlyOnceAnOrphanedTemplateHasAPage()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -199,14 +199,35 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
 
         clean.Entries[CmsTemplatesHealthCheck.Name].Status.Should().Be(HealthStatus.Healthy);
 
-        context.Templates.Add(new Template
+        var orphan = new Template
         {
             Key = "health-orphan",
             Name = "Health orphan",
             CurrentRevision = 1,
             IsOrphaned = true,
-        });
+        };
 
+        context.Templates.Add(orphan);
+        await context.SaveChangesAsync(cancellationToken);
+
+        var unused = await health.CheckHealthAsync(
+            registration => registration.Name == CmsTemplatesHealthCheck.Name,
+            cancellationToken);
+
+        // An orphan nobody has built on is housekeeping, not an operational matter — and a template
+        // created in the backoffice ahead of its markup is orphaned by design (task P1-21), so
+        // degrading on that would train an operator to ignore this check (task P2-01).
+        unused.Entries[CmsTemplatesHealthCheck.Name].Status.Should().Be(HealthStatus.Healthy);
+
+        var page = new Page
+        {
+            PublicId = Guid.NewGuid(),
+            Slug = "stranded",
+            Path = "/",
+            TemplateId = orphan.Id,
+        };
+
+        context.Pages.Add(page);
         await context.SaveChangesAsync(cancellationToken);
 
         var degraded = await health.CheckHealthAsync(
@@ -220,6 +241,17 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         entry.Status.Should().Be(HealthStatus.Degraded);
         entry.Description.Should().Contain("health-orphan");
         entry.Data["orphanedTemplates"].Should().BeEquivalentTo(new[] { "health-orphan" });
+
+        page.IsDeleted = true;
+        await context.SaveChangesAsync(cancellationToken);
+
+        var recycled = await health.CheckHealthAsync(
+            registration => registration.Name == CmsTemplatesHealthCheck.Name,
+            cancellationToken);
+
+        // A page in the recycle bin is not being served, so it does not make the orphan urgent.
+        // Restoring it starts the check reporting again.
+        recycled.Entries[CmsTemplatesHealthCheck.Name].Status.Should().Be(HealthStatus.Healthy);
     }
 
     [Fact]

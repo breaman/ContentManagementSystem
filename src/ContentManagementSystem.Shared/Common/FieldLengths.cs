@@ -119,4 +119,36 @@ public static class FieldLengths
 
     /// <summary>Site verification token supplied by a search engine.</summary>
     public const int VerificationToken = 200;
+
+    /// <summary>A single URL path segment, as authored on a page.</summary>
+    /// <remarks>
+    /// The per-segment ceiling from spec section 10.3. Distinct from <see cref="ContentKey"/>
+    /// despite sharing a number: a slug is editor-facing text that changes freely, while a content
+    /// key is immutable once a payload quotes it.
+    /// </remarks>
+    public const int Slug = 100;
+
+    /// <summary>
+    /// Materialized ancestor path on a tree node, such as <c>/1/8/44/</c>.
+    /// </summary>
+    /// <remarks>
+    /// 800 rather than the spec's 900 so the column can carry an index key. A nonclustered index
+    /// key is limited to 1700 bytes and silently includes the clustering key, which
+    /// <c>nvarchar(900)</c> — 1800 bytes on its own — exceeds; SQL Server would create the index
+    /// with a warning and then fail inserts of long values. <c>PageTreeService.MaxDepth</c> bounds
+    /// the real worst case far below this.
+    /// </remarks>
+    public const int MaterializedPath = 800;
+
+    /// <summary>Title of a page or content item, as shown in the browser tab and search results.</summary>
+    public const int ContentTitle = 500;
+
+    /// <summary>Editorial note attached to a page for other editors, never rendered publicly.</summary>
+    public const int InternalNotes = 2000;
+
+    /// <summary>Open Graph type and Twitter card discriminators, such as <c>article</c>.</summary>
+    public const int SocialCardType = 50;
+
+    /// <summary>Sitemap change-frequency hint, such as <c>weekly</c>.</summary>
+    public const int ChangeFrequency = 20;
 }

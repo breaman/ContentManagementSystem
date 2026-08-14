@@ -2,6 +2,7 @@ using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models.Cms;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace ContentManagementSystem.Data.Models;
 
@@ -45,6 +46,33 @@ public class ApplicationDbContext : AuthDbContext
 
     /// <summary>The single row of site-wide configuration.</summary>
     public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
+
+    /// <summary>Nodes of the content tree.</summary>
+    public DbSet<Page> Pages => Set<Page>();
+
+    /// <summary>Every state of every page — drafts, published versions, and archived history.</summary>
+    public DbSet<PageVersion> PageVersions => Set<PageVersion>();
+
+    /// <summary>Edges from stored content to the entities it depends on, rebuilt on every save.</summary>
+    public DbSet<ContentReference> ContentReferences => Set<ContentReference>();
+
+    /// <summary>Advisory notes that an editor has a page open.</summary>
+    public DbSet<EditLock> EditLocks => Set<EditLock>();
+
+    /// <inheritdoc />
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        base.OnConfiguring(optionsBuilder);
+
+        // Page carries a soft-delete query filter and is the required end of relationships from
+        // PageVersion and EditLock, which EF warns may filter dependents out unexpectedly. Here
+        // that is the intent: a deleted page's version history has to stay retrievable — it is the
+        // thing the recycle bin exists to preserve (spec section 23.5) — and giving the dependents
+        // a matching filter would hide exactly the rows a restore needs to find. Suppressed here
+        // rather than at each registration so the decision travels with the model that made it.
+        optionsBuilder.ConfigureWarnings(warnings => warnings.Ignore(
+            CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
+    }
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder builder)

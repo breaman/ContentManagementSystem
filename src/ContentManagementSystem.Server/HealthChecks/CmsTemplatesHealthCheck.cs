@@ -15,18 +15,14 @@ namespace ContentManagementSystem.Server.HealthChecks;
 /// because pages on an orphaned template still render a logged fallback and everything else on the
 /// site is fine.
 /// <para>
-/// <b>What this check will tighten in Phase 2.</b> Spec section 24.2 words the condition as "any
-/// <c>IsOrphaned</c> template has non-deleted pages", and that is the condition to end at — an
-/// orphan nobody uses is a housekeeping matter, not an operational one. There is no page table to
-/// ask until <c>P2-01</c>, so today the check fires on orphan existence alone. It is the broader
-/// condition, and it is the honest one meanwhile: in this phase nothing can tell you whether anyone
-/// depends on the orphan.
-/// </para>
-/// <para>
-/// Note the interaction with <c>P1-21</c>: a template created in the backoffice is orphaned by
-/// design until code claims its key, so a developer building a content model ahead of its markup
-/// will see this degrade. That is not a false positive. Such a template cannot render, and the
-/// check saying so is exactly the signal spec section 8.4 asks for.
+/// <b>Templates are judged on use, block types on existence.</b> An orphaned template degrades only
+/// once a non-deleted page is built on it, which is how spec section 24.2 words it and which is the
+/// condition this narrowed to when <c>P2-01</c> supplied a page table to ask. An orphan nobody has
+/// used is a housekeeping matter — and a template created in the backoffice ahead of its markup is
+/// orphaned by design (<c>P1-21</c>), so degrading on that would train an operator to ignore the
+/// check. A block type has no equivalent question available: nothing references one relationally,
+/// because block instances name it from inside a payload, so its existence is the only signal there
+/// is until the reference index can answer for it.
 /// </para>
 /// </remarks>
 /// <param name="context">The application database context.</param>
@@ -40,9 +36,12 @@ public sealed class CmsTemplatesHealthCheck(ApplicationDbContext context) : IHea
         HealthCheckContext healthContext,
         CancellationToken cancellationToken = default)
     {
+        // The page query filter excludes soft-deleted rows, so "has non-deleted pages" needs no
+        // clause of its own here — a template whose only pages are in the recycle bin is not an
+        // operational problem, and if they are restored this starts reporting again.
         var templates = await context.Templates
             .AsNoTracking()
-            .Where(template => template.IsOrphaned)
+            .Where(template => template.IsOrphaned && context.Pages.Any(page => page.TemplateId == template.Id))
             .Select(template => template.Key)
             .OrderBy(key => key)
             .ToListAsync(cancellationToken);

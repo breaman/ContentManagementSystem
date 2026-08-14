@@ -42,6 +42,19 @@ public class SiteSettingsConfiguration : IEntityTypeConfiguration<SiteSettings>
         builder.Property(s => s.GoogleSiteVerification)
             .HasMaxLength(FieldLengths.VerificationToken);
 
+        // Deferred from P1-01 until Page existed. Navigation-less because nothing traverses from a
+        // page back to the settings row, and Restrict because deleting the page the site root
+        // resolves to is a decision somebody has to make deliberately, not a side effect.
+        builder.HasOne<Page>()
+            .WithMany()
+            .HasForeignKey(s => s.HomePageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne<Page>()
+            .WithMany()
+            .HasForeignKey(s => s.NotFoundPageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Enforced in the database rather than by convention: a second settings row would make
         // "the site's culture" a question with two answers, and nothing in the code reads more
         // than the first row it finds.

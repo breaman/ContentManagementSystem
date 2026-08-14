@@ -1,7 +1,7 @@
 # Content Management System — Implementation Task List
 
 **Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-30` registration that
-waits on Phase 2 and the `P1-32` guard that waits on the `Page` table
+waits on the content schema catalog and the `P1-32` template-delete guard; Phase 2 data layer built
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -51,7 +51,7 @@ and record the date in the progress table.
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 31 | 28.0 | In progress — 1.1 to 1.5 built; `P1-30` and `P1-32` finish in Phase 2 | — |
-| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
+| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 7 | 27.0 | In progress — 2.1 data layer complete; services next | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
@@ -59,7 +59,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **50** | **203.5** | | |
+| **v1 total** | **281** | **57** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -744,6 +744,11 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   reports it: a template created in the backoffice ahead of its markup is orphaned **by design**
   (`P1-21`), so a developer building a content model early will see this degrade. That is not a false
   positive — such a template cannot render — but narrowing it is the first thing `P2-01` should do.*
+  ***Narrowed 2026-08-14 in `P2-01`.*** It now degrades only once an orphaned template has a
+  non-deleted page, which is [§24.2]'s condition and was unaskable without the `Page` table. A
+  template created ahead of its markup no longer degrades anything. Block types keep the broad
+  condition: nothing references one relationally — block instances name it from inside a payload —
+  so existence is the only signal available until the reference index can answer for it.*
 - [x] **P1-28** CLI verbs in `Server/Cli/`: `cms schema export | diff | apply` [§27.1]. — 0.25 ed
   *2026-08-14 — `dotnet run -- cms schema export|diff|apply [directory]`, handled after `Build()` so
   the verbs use exactly the services the site uses, and before anything is mapped so no request
@@ -834,6 +839,9 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   the schema sync obey them too. **What is left is one rule**: template delete blocked while a
   non-deleted page references it. It stays open until `P2-01`. The composition delete guard, which
   is the same shape against a join table that already exists, shipped in `P1-24`.*
+  *2026-08-14 — **the blocker is cleared**: `P2-01` landed `Page`, so the delete verb and its guard
+  can now be written against a real query. Still open because the verb itself does not exist yet —
+  it lands with the template endpoints' next revision, alongside `P2-16`.*
 - [x] **P1-33** ADRs for any Phase 1 decision not already covered by D1–D12.
   *2026-08-14 — Phase 1 produced seven: `D13`–`D16` during 1.1–1.4, and three from 1.5.
   [`D17`](./docs/adr/0017-revisions-cut-only-when-content-is-read-differently.md) — a revision is cut
@@ -932,18 +940,100 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 ### 2.1 Data — 6.5 ed
 
-- [ ] **P2-01** `Page` and `PageVersion` entities + configurations per [§23.2], including the mutual
+- [x] **P2-01** `Page` and `PageVersion` entities + configurations per [§23.2], including the mutual
   `Page.DraftVersionId` / `PageVersion.PageId` FK handling from [§23.5] (`DeleteBehavior.Restrict`,
   `DraftVersionId` set in a second statement inside the creating transaction). — 2 ed
-- [ ] **P2-02** `ContentReference` and `EditLock` entities + configurations, with the two hot indexes
+  *2026-08-14 — both, plus `PageVersionStatus` and the `ISoftDeletable` interface `P2-04` needed.
+  The mutual reference is three relationships, not two: `DraftVersionId` and `PublishedVersionId`
+  are separate navigation-less FKs beside `PageVersion.PageId`, all `Restrict` — cascade would be a
+  cycle SQL Server refuses outright, and version history is the thing a soft delete exists to
+  preserve.*
+  ***One deliberate deviation from [§23.2]: `Path` is `nvarchar(800)`, not 900.*** A nonclustered
+  index key is capped at 1700 bytes and silently includes the clustering key; `nvarchar(900)` is
+  1800 bytes on its own, so SQL Server would create `IX_Pages_Path` with a warning and then fail
+  inserts of long values — an index that works until a site gets deep. `PageTreeService.MaxDepth`
+  bounds the real worst case at 551 characters, so the column is provably wide enough.
+  *Three smaller decisions. `PageVersion.TemplateId` is a **navigation-less** FK: a version's
+  template is a captured coordinate rather than a relationship anyone traverses, but a version whose
+  template row is gone can neither be rendered nor diffed, so the constraint stays. `Priority`
+  needed `ColumnTypes.SitemapPriority` — the model-wide `decimal` convention is `Money`, and storing
+  a sitemap priority as `decimal(18,2)` invites a `0.55` no search engine reads back as written.
+  And `Page.PublicId` carries a unique index with no database default, so a service that forgets to
+  assign one fails loudly on the second page rather than quietly sharing `Guid.Empty`.*
+  ***Also closed here: the `SiteSettings.HomePageId` / `NotFoundPageId` foreign keys that `P1-01`
+  deferred to this task**, and the `P1-27` narrowing — `cms-templates` now degrades only once an
+  orphaned template has a non-deleted page, which is how [§24.2] words it and was impossible to ask
+  until now. Its test asserts all three states: unused orphan healthy, orphan with a live page
+  degraded, orphan whose only page is in the recycle bin healthy again.*
+- [x] **P2-02** `ContentReference` and `EditLock` entities + configurations, with the two hot indexes
   `(TargetType, TargetId)` and `(SourceType, SourceVersionId)`. — 1 ed
-- [ ] **P2-03** `rowversion` concurrency tokens on `Page` and `PageVersion`; global query filters
+  *2026-08-14 — `ContentReference` reuses `ContentReferenceTargetType` from `Shared` and adds
+  `ContentSourceType`; the name collision with the `P1-08` value type is the one [§7] and [§23.2]
+  both chose, and the namespaces separate them. **Both ends are polymorphic, so the table carries no
+  foreign key at all** — `TargetId` means a page, a media item, or a reusable item depending on
+  `TargetType`, which no constraint can express. Every guard built on these rows is therefore a
+  query, which is also why `P1-16` over-reports by design.*
+  ***`ContentReference` is added to the audit exemption list, beyond the five [§23.5] names.*** It is
+  deleted and reinserted wholesale on every draft save — every twenty seconds per open editor —
+  which is precisely the unbounded-growth argument that exempts the others, and it records nothing
+  the audited payload beside it does not already hold. `CONTRIBUTING.md` already states the rule
+  this follows.
+  *`EditLock` is keyed on `PageId` with no surrogate: at most one lock exists per page, and a table
+  whose primary key **is** that fact cannot hold two. Its FK to `Page` is **the one cascade in this
+  schema** — a lock is disposable UX state, and `Restrict` would let a stale heartbeat block a
+  permanent delete the recycle bin had already cleared. This finally makes `P1-05`'s registered
+  exclusion testable: `EditLocksAreNotWrittenToTheAuditLog` is the test that note asked for.*
+- [x] **P2-03** `rowversion` concurrency tokens on `Page` and `PageVersion`; global query filters
   excluding `IsDeleted = 1`; filtered indexes per [§23.5]. — 1 ed
-- [ ] **P2-04** Implement `AuthDbContext.ApplySoftDeletes()` — the virtual hook exists and is empty, so
+  *2026-08-14 — `rowversion` on both, asserted by two contexts saving the same draft from state each
+  loaded before the other wrote. **`PageVersion` deliberately has no query filter of its own**: a
+  deleted page's history is the thing the recycle bin exists to preserve, and a matching filter
+  would hide exactly the rows a restore has to find. EF warns about that shape (10622), so the
+  warning is suppressed in `ApplicationDbContext.OnConfiguring` with the reason — at the model
+  rather than at each registration, so the decision travels with what made it.*
+  *The tree index `IX_Pages_ParentId_SortOrder_Live` is filtered to `IsDeleted = 0` because the
+  recycle bin is the only caller that wants deleted rows and it asks explicitly; `IX_Pages_Path` is
+  deliberately **unfiltered**, since restoring a subtree has to find deleted rows by prefix. Note
+  that Phase 2's schema has no filtered *unique* index — the first is `PageRoute.UrlHash WHERE
+  IsPublished = 1` in `P3-01`.*
+- [x] **P2-04** Implement `AuthDbContext.ApplySoftDeletes()` — the virtual hook exists and is empty, so
   a stray `Remove()` on a `Page` would destroy version history. *(Existing-code change.)* — 0.5 ed
-- [ ] **P2-05** `Page.Path` materialization (`/1/8/44/`) and maintenance on insert/move in
+  *2026-08-14 — the hook was empty **and never called**; both halves are fixed. It runs before
+  fingerprinting and audit capture, so a rewritten delete is stamped and logged as the update it has
+  become. An entity already flagged deleted is left `Deleted`, because reaching `Remove` a second
+  time is the permanent delete the recycle bin performs deliberately.*
+  ***The test found a hole that would have made the net useless in exactly the case it exists for.***
+  EF resolves a severed required relationship the instant `Remove` is called, so removing a page
+  whose versions happened to be loaded threw **there** — before any `SaveChanges` override could
+  rewrite it — while the same call against an unloaded page was caught silently. A safety net whose
+  behaviour depends on what the change tracker was holding is not one. `AuthDbContext` now sets
+  `CascadeDeleteTiming` and `DeleteOrphansTiming` to `OnSaveChanges`, which changes nothing about
+  the SQL finally sent and only decides when the tracker computes it. The test loads the versions
+  first, on purpose.*
+- [x] **P2-05** `Page.Path` materialization (`/1/8/44/`) and maintenance on insert/move in
   `Core/Content/PageTreeService.cs`; index it for prefix matching [§10.1]. — 1 ed
-- [ ] **P2-06** Migration `AddCmsPages` — migration #3. `Up`/`Down` verified in CI. — 1 ed
+  *2026-08-14 — `AttachAsync` after insert (the path contains the page's own id, so it is a second
+  statement for the same reason `DraftVersionId` is) and `MoveAsync`, which rewrites every
+  descendant's prefix in one pass. **Nothing here calls `SaveChanges`**: a move that committed while
+  the route rebuild beside it failed would leave the tree and the URLs disagreeing.*
+  ***`MaxDepth = 50` is a real rule, not a defensive one.*** It is what bounds `Path` below its
+  column and therefore below SQL Server's index key limit, and it is far past any navigable site —
+  a tree that deep is a modelling mistake, and refusing it names the mistake where it is made.
+  *Two rules the task's wording does not mention and the tree cannot do without. **A page may not be
+  moved under its own descendant**: the subtree would still be in the table, reachable from nothing,
+  and no query would report it missing. **A deleted page is not an available parent**, since
+  adopting one would put a live subtree under a page sitting in the recycle bin. Conversely deleted
+  *descendants* do move — the subtree query uses `IgnoreQueryFilters`, or restoring one later puts
+  it back into a branch that no longer exists.*
+  *Refusals are a plain `PageMoveOutcome` enum rather than a diagnostic-carrying result: each is a
+  single fact about the tree with nothing further to say, and the caller is the layer that knows how
+  to phrase it. Registered by a new `AddCmsPages()`, kept separate from `AddCmsContent()` because
+  these services are scoped and the payload engine is singleton.*
+- [x] **P2-06** Migration `AddCmsPages` — migration #3. `Up`/`Down` verified in CI. — 1 ed
+  *2026-08-14 — reviewed statement by statement: four `CreateTable`s and no drop-plus-add, with the
+  three FKs that close the `Page`/`PageVersion` cycle added after both tables exist. `Down` drops
+  those first and then the tables in dependency order; both directions are asserted from empty by
+  `MigrationsApplyFromEmptyTests`, which now covers three migrations.*
 
 ### 2.2 Services — 16 ed
 
@@ -996,8 +1086,18 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 - [ ] **P2-24** Unit: draft save concurrency, version numbering, retention policy selection.
 - [ ] **P2-25** Unit: diff algorithm — reorder, insert, delete, nested block change.
-- [ ] **P2-26** Data integration: filtered unique indexes behave; query filters exclude deleted rows;
+- [x] **P2-26** Data integration: filtered unique indexes behave; query filters exclude deleted rows;
   `rowversion` conflicts surface as `DbUpdateConcurrencyException`.
+  *2026-08-14 — `Data.Tests/Cms/PageSchemaTests`, eight cases against real SQL Server: the creating
+  transaction leaves the page and its draft consistent, a duplicate version number and a duplicate
+  `PublicId` are refused, a stray `Remove` retires the page and keeps its history, the query filter
+  hides it while `IgnoreQueryFilters` and the version table still find it, a stale draft save raises
+  `DbUpdateConcurrencyException`, and neither `EditLock` nor `ContentReference` reaches the audit
+  log. Plus `Server.Tests/Content/PageTreeServiceTests` for the six tree rules.*
+  *One wording note: **there is no filtered unique index in Phase 2's schema**, so what is asserted
+  here is the filtered tree index's predicate (read back from `sys.indexes`) beside the plain unique
+  ones. The filtered-unique case the criterion has in mind arrives with `PageRoute.UrlHash WHERE
+  IsPublished = 1` in `P3-01`.*
 - [ ] **P2-27** API integration: authorization, validation, and concurrency behavior for every endpoint.
 - [ ] **P2-28** API integration: publish transactionality under fault injection.
 - [ ] **P2-29** Telemetry: `cms.publish.count` / `.duration` metrics and publish trace spans [§24.1].
@@ -1822,7 +1922,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 |---|---|---|---|---|:--:|
 | 1 | `InitialDatabase` | — | P0-01 | Existing Identity + `AuditLog` schema | [x] |
 | 2 | `AddCmsStructure` | 1 | P1-06 | `Template`, `TemplateRevision`, `Zone`, `BlockType`, `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`, `BlockTypeComposition`, `SiteSettings` | [x] |
-| 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` | [ ] |
+| 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` (+ the `SiteSettings` home / not-found FKs deferred from P1-01) | [x] |
 | 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [ ] |
 | 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [ ] |
 | 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [ ] |
@@ -1843,7 +1943,9 @@ reviewer.
 | File | Change | Phase | Task | Done |
 |---|---|---|---|:--:|
 | `Data/Models/AuthDbContext.cs` | Exclude high-churn tables from `AddLogging()` audit capture | 1 | P1-05 | [x] |
-| `Data/Models/AuthDbContext.cs` | Implement `ApplySoftDeletes()` — the virtual hook exists and is empty | 2 | P2-04 | [ ] |
+| `Data/Models/AuthDbContext.cs` | Implement `ApplySoftDeletes()` — the virtual hook exists, is empty, and is never called | 2 | P2-04 | [x] |
+| `Data/Models/AuthDbContext.cs` | Defer cascade and orphan timing to `SaveChanges`, without which the soft-delete net is bypassed whenever the dependents happen to be loaded | 2 | P2-04 | [x] |
+| `Data/Models/ApplicationDbContext.cs` | Suppress EF warning 10622: `PageVersion` deliberately carries no soft-delete filter, so a deleted page's history stays retrievable | 2 | P2-03 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [x] |
 | `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–8 | P1-30, P3-13 | [ ] |
 | `Server/Program.cs` | Tighten the Identity password policy; decide self-registration | 9 | P9-04 | [ ] |

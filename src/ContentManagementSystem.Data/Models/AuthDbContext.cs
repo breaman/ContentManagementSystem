@@ -31,6 +31,13 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
         "MediaRendition",
         "EditLock",
         "NotFoundLog",
+
+        // Beyond the list in spec section 23.5, and deliberately so. ContentReference rows are a
+        // projection of the payload, deleted and reinserted wholesale on every draft save — which
+        // happens every twenty seconds per open editor. Auditing them would multiply the audit
+        // table by the number of references on a page, per autosave, to record something already
+        // recoverable from the payload that is audited beside it.
+        "ContentReference",
     };
 
     private readonly IUserService? _userService;
@@ -39,17 +46,20 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 
     protected AuthDbContext(DbContextOptions options) : base(options)
     {
+        DeferCascadesToSaveChanges();
     }
 
     protected AuthDbContext(DbContextOptions options, IUserService userService) :
         base(options)
     {
         _userService = userService;
+        DeferCascadesToSaveChanges();
     }
 
     public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
         CancellationToken cancellationToken = default)
     {
+        ApplySoftDeletes();
         AddFingerPrinting();
         AddApplicationInfo();
         AddLogging();
@@ -58,6 +68,7 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 
     public override int SaveChanges()
     {
+        ApplySoftDeletes();
         AddFingerPrinting();
         AddApplicationInfo();
         AddLogging();
@@ -94,10 +105,48 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
     /// <remarks>
     /// This is a safety net, not the intended path: services expose explicit deactivate/restore
     /// operations. It exists so that a stray <c>Remove</c> call cannot destroy a row that order or
-    /// invoice history still references.
+    /// invoice history still references — or, in the CMS, take a page's entire version history with
+    /// it, which is exactly what the recycle bin exists to prevent (spec section 23.5).
+    /// <para>
+    /// It runs before fingerprinting and audit capture, so the rewritten entry is stamped and logged
+    /// as the update it has become rather than as the delete it was written as. An entity already
+    /// flagged deleted is left <see cref="EntityState.Deleted"/>: reaching <c>Remove</c> a second
+    /// time is the permanent delete the recycle bin performs deliberately, and turning that into a
+    /// no-op would make purging impossible.
+    /// </para>
     /// </remarks>
     protected virtual void ApplySoftDeletes()
     {
+        foreach (var entry in ChangeTracker.Entries<ISoftDeletable>())
+        {
+            if (entry.State is not EntityState.Deleted || entry.Entity.IsDeleted) continue;
+
+            entry.State = EntityState.Modified;
+            entry.Entity.IsDeleted = true;
+            entry.Entity.DeletedOn = DateTimeOffset.UtcNow;
+            entry.Entity.DeletedBy = _userService?.UserId;
+        }
+    }
+
+    /// <summary>
+    /// Moves cascade and orphan handling from <c>Remove</c> to <c>SaveChanges</c>.
+    /// </summary>
+    /// <remarks>
+    /// Without this, <see cref="ApplySoftDeletes"/> is a net with a hole in it. EF's default timing
+    /// resolves severed required relationships the instant <c>Remove</c> is called, so removing a
+    /// page whose versions happen to be loaded throws there — before any override of
+    /// <c>SaveChanges</c> gets a chance to rewrite the delete into a flag update. The same call
+    /// against a page whose versions are <em>not</em> loaded succeeds and is caught, which makes the
+    /// safety net's behaviour depend on what the change tracker happened to be holding.
+    /// <para>
+    /// Deferring changes nothing about the SQL that is finally sent; it only decides when the change
+    /// tracker computes it.
+    /// </para>
+    /// </remarks>
+    private void DeferCascadesToSaveChanges()
+    {
+        ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
+        ChangeTracker.DeleteOrphansTiming = CascadeTiming.OnSaveChanges;
     }
 
     private void AddFingerPrinting()
