@@ -104,8 +104,14 @@ try
     builder.Services.AddCmsFieldTypes();
     builder.Services.AddCmsStructure();
     builder.Services.AddCmsAuthorization();
-    // The content tree (task P2-05). Scoped, unlike the payload engine above, because these
-    // services hold a database context.
+    // The payload engine (task P1-30, completed in P2-10). This is what P1-30 was waiting for: the
+    // catalog it registers is DatabaseContentSchemaCatalog, which reads captured revision snapshots
+    // and caches them for the life of the process. Registering an empty catalog earlier, to make
+    // startup succeed, would have produced a deployment that validated every payload against
+    // nothing — worse than not validating at all, because it reports success.
+    builder.Services.AddCmsContent();
+    // Pages, drafts, versions, publishing, and the recycle bin (tasks P2-05 to P2-15). Scoped,
+    // unlike the stateless halves of the payload engine, because these hold a database context.
     builder.Services.AddCmsPages();
 
     // Which assemblies declare [CmsTemplate] and [CmsBlockType] (task P1-25). Named rather than
@@ -124,12 +130,6 @@ try
         .AddCheck<CmsTemplatesHealthCheck>(
             CmsTemplatesHealthCheck.Name,
             tags: ["ready", "cms"]);
-
-    // AddCmsContent() is deliberately not called yet. The payload validator it registers needs an
-    // IContentSchemaCatalog, and the only honest implementation is the cached, database-backed one
-    // that arrives with the endpoints that validate payloads in Phase 2. Registering an empty
-    // catalog to make startup succeed would produce a deployment that validates every payload
-    // against nothing, which is worse than not validating at all — it reports success.
 
     // The management API is cookie-authenticated, so every write carries an antiforgery token in a
     // header. Naming the header here is what lets the JSON endpoints validate one at all — the

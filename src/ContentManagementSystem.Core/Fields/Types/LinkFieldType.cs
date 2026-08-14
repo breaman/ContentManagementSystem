@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -281,4 +282,28 @@ public sealed class LinkFieldType : FieldTypeBase
 
     private static string? ReadString(JsonElement property, string member) =>
         GetMember(property, member) is { ValueKind: JsonValueKind.String } value ? value.GetString() : null;
+
+    /// <inheritdoc />
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        // Only the members the matching kind actually uses. A link that used to point at a page and
+        // now points at a URL can still carry the old pageId, and rewriting that would resurrect a
+        // reference the editor removed.
+        var kind = GetStringValue(value);
+
+        var changed = kind switch
+        {
+            PageKind => ReferenceRemapping.RemapMember(
+                copy, PageIdMember, ContentReferenceTargetType.Page, remap),
+            MediaKind => ReferenceRemapping.RemapMember(
+                copy, MediaValue.MediaIdMember, ContentReferenceTargetType.Media, remap),
+            _ => false,
+        };
+
+        return changed ? copy : null;
+    }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -46,4 +47,6 @@ public sealed class DiscoverableFieldType : IFieldType
 
     /// <inheritdoc />
     public string ExtractSearchText(JsonElement value) => string.Empty;
+
+    public JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap) => null;
 }

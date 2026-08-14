@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -433,4 +434,71 @@ public sealed class BlocksFieldType : ListFieldTypeBase
         type.ValueKind is JsonValueKind.String
             ? type.GetString()
             : null;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A container rewrites nothing of its own — a block instance points at no entity — and
+    /// everything of its children's, dispatching each nested value by the stored <c>type</c>
+    /// discriminator exactly as <see cref="ExtractReferences"/> does. Reporting a reference at a
+    /// level it will not rewrite is the failure this mirrors: a duplicated section whose blocks
+    /// still link to the originals.
+    /// </remarks>
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        return RemapItems(copy, remap, depth: 0) ? copy : null;
+    }
+
+    /// <summary>Rewrites every nested value of a container's items, recursing into nested containers.</summary>
+    /// <returns><see langword="true"/> when anything changed.</returns>
+    private bool RemapItems(JsonObject container, ReferenceRemapper remap, int depth)
+    {
+        if (depth > MaxWalkDepth) return false;
+
+        if (container[ItemsMember] is not JsonArray items) return false;
+
+        var changed = false;
+
+        foreach (var item in items)
+        {
+            if (item is not JsonObject block ||
+                block[PropertiesMember] is not JsonObject properties)
+            {
+                continue;
+            }
+
+            foreach (var property in properties.ToList())
+            {
+                if (property.Value is not JsonObject stored ||
+                    stored[TypeMember]?.GetValue<string>() is not { } typeKey)
+                {
+                    continue;
+                }
+
+                if (typeKey == Key)
+                {
+                    changed |= RemapItems(stored, remap, depth + 1);
+
+                    continue;
+                }
+
+                if (_registry.Value.Find(typeKey) is not { } fieldType) continue;
+
+                // Re-parsed into an element so the nested field type reads the same shape it was
+                // written with. The node has to be detached from its parent before it can be
+                // replaced, which is why the rewritten value is assigned rather than mutated.
+                using var document = JsonDocument.Parse(stored.ToJsonString());
+
+                if (fieldType.RemapReferences(document.RootElement, remap) is not { } rewritten) continue;
+
+                properties[property.Key] = rewritten;
+                changed = true;
+            }
+        }
+
+        return changed;
+    }
 }

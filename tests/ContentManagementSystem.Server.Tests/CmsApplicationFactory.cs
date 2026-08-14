@@ -25,6 +25,17 @@ namespace ContentManagementSystem.Server.Tests;
 /// </remarks>
 public sealed class CmsApplicationFactory(string connectionString) : WebApplicationFactory<Program>
 {
+    /// <summary>
+    /// Extra registrations applied last, for suites that drive services directly.
+    /// </summary>
+    /// <remarks>
+    /// The service-layer suites replace <c>ICmsAuthorization</c> and <c>IUserService</c>, which
+    /// outside a request answer "no permissions" and "user 0" — correct behaviour, and not what a
+    /// test of what a service does with a caller who <em>has</em> permissions is about. Everything
+    /// else stays the real graph, so a service the container cannot build still fails here.
+    /// </remarks>
+    public Action<IServiceCollection, string>? ConfigureServices { get; init; }
+
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -47,6 +58,8 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
             // permission checks the API tests exercise are the ones the application registers.
             services.AddAuthentication(TestAuthHandler.SchemeName)
                 .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.SchemeName, _ => { });
+
+            ConfigureServices?.Invoke(services, connectionString);
         });
     }
 
@@ -96,9 +109,11 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
     /// </summary>
     /// <param name="fixture">The container fixture supplying the SQL Server instance.</param>
     /// <param name="cancellationToken">Token observed while migrating.</param>
+    /// <param name="configureServices">Extra registrations, applied after the application's own.</param>
     public static async Task<CmsApplicationFactory> CreateAsync(
         SqlServerFixture fixture,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<IServiceCollection, string>? configureServices = null)
     {
         var databaseName = $"cms_srv_{Guid.NewGuid():N}";
 
@@ -106,6 +121,9 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
         {
         }
 
-        return new CmsApplicationFactory(fixture.ConnectionStringFor(databaseName));
+        return new CmsApplicationFactory(fixture.ConnectionStringFor(databaseName))
+        {
+            ConfigureServices = configureServices,
+        };
     }
 }

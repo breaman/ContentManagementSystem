@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -201,5 +202,18 @@ public sealed class PageReferenceFieldType : FieldTypeBase
         }
 
         return Result(diagnostics);
+    }
+
+    /// <inheritdoc />
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        return ReferenceRemapping.RemapIdOrArray(
+            copy, ValueMember, ContentReferenceTargetType.Page, remap)
+            ? copy
+            : null;
     }
 }

@@ -1,8 +1,7 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-30` registration that
-waits on the content schema catalog and the `P1-32` template-delete guard; Phase 2 data layer built
-and `PageService` with it
+**Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-32` template-delete
+guard; Phase 2's data layer and services (2.1 and 2.2) complete, API and UI next
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -51,8 +50,8 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 31 | 28.0 | In progress — 1.1 to 1.5 built; `P1-30` and `P1-32` finish in Phase 2 | — |
-| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 8 | 27.0 | In progress — 2.1 complete; `PageService` built, rest of 2.2 next | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 32 | 28.0 | In progress — `P1-30` closed by `P2-10`; only `P1-32`'s template-delete guard left | — |
+| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 16 | 27.0 | In progress — 2.1 and 2.2 complete; API and UI (2.3) next | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
@@ -60,7 +59,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **58** | **203.5** | | |
+| **v1 total** | **281** | **67** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -792,7 +791,7 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   *One framework rule learned the hard way: a `[PersistentState]` property **must not** have an
   initializer (`BL0009`) — the initializer runs after the restored state is applied and throws it
   away.*
-- [~] **P1-30** Register CMS services and the field type registry in `Server/Program.cs`.
+- [x] **P1-30** Register CMS services and the field type registry in `Server/Program.cs`.
   *(Existing-code change.)* — 0.25 ed
   *2026-08-13 — sanitization, the field types and their registry, the structure services, the
   authorization policies, and the antiforgery header name are registered; `P1-21`'s endpoints are
@@ -809,6 +808,19 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   `ServerStructureClient` for the pre-rendered admin screens. `Program` now returns an exit code so
   `dotnet run -- cms schema …` can fail a CI job. **`AddCmsContent()` is still not called**, for the
   reason above — this task stays open until `P2` supplies a real `IContentSchemaCatalog`.*
+  *2026-08-14 — **closed**. `P2-10` needed the catalog to validate a draft save, so
+  `DatabaseContentSchemaCatalog` was built: revision snapshots read from the database and held in a
+  process-wide `ContentSchemaCache`, which is safe to keep forever because a revision's snapshot is
+  written once and a structural change cuts a new revision rather than editing the old one [§8.5].
+  `AddCmsContent()` is now called, along with the eight Phase 2 page services.*
+  ***One decision inside it worth stating: a cache miss reads synchronously.***
+  `IContentSchemaCatalog` is deliberately a synchronous interface — `ContentSchemaValidator` resolves
+  a block type revision in the middle of a walk that is itself on a hot path — and making it async
+  would put an await on the inner loop of every payload validation to serve a cache that hits
+  essentially always. The blocking call happens at most once per revision per process. The catalog
+  and therefore the validator are now **scoped** rather than singleton, since resolving a revision
+  reads through a database context; the indexer and the markdown renderer hold no state and stay
+  singleton.*
 - [x] **P1-31** Wire axe-core accessibility checks into CI against the structure screens — the
   continuous a11y gate starts here, not in P9. — 0.25 ed
   *2026-08-14 — its own CI job (`Accessibility (axe)`), separate for the reason `migrations` and
@@ -1077,27 +1089,187 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
   `PageRoute.UrlHash WHERE IsPublished = 1` does properly in `P3-01`. Said so in
   `SiblingSlugExistsAsync`'s remarks. 13 integration tests in `Server.Tests/Content/PageServiceTests`
   and 28 unit tests in `Core.Tests/Content/SlugsTests`; 1099 green across the four suites.*
-- [ ] **P2-08** `RecycleBinService` in `Core/Content/` — subtree-aware soft delete/restore, route
+- [x] **P2-08** `RecycleBinService` in `Core/Content/` — subtree-aware soft delete/restore, route
   retirement, parent-redirect option, permanent-delete guard against live `ContentReference` rows
   [§14.10]. Restore returns a page as a **draft**, never live. — 1.5 ed
-- [ ] **P2-09** `DuplicationService` in `Core/Content/` — shallow and deep duplication with
+  *2026-08-14 — four operations. Delete and restore both walk the subtree by materialized path,
+  which is what `P2-05` denormalised it for; a live child under a deleted parent is a page reachable
+  by URL and invisible in the tree, so per-page delete is not an option. **Restore returns drafts** —
+  `PublishedVersionId` is left null on every page it touches, so nothing reappears publicly that
+  nobody has looked at since it was deleted.*
+  ***Two halves of the task's wording cannot be built yet, and the note is the deliverable.***
+  "Route retirement" and "parent-redirect option" both need `PageRoute` and `Redirect`, which arrive
+  in `P3-01`. Until then a URL is derived from the tree at request time and the query filter already
+  makes a deleted page unreachable, so clearing `PublishedVersionId` is the whole of what
+  "unpublished" means. Said so at both call sites rather than left for someone to discover.*
+  ***The permanent delete is the one irreversible operation in the system, and it is gated three
+  ways.*** It needs `Users.Manage` rather than `Content.Delete` — an editor who can empty the bin
+  can destroy history — it refuses a page that is not already in the bin, and it refuses while any
+  `ContentReference` row targets it, **naming the pages in the way**. A count is not something an
+  editor can act on. Because `P1-16` over-reports by design, that refusal is occasionally cautious;
+  that is the right direction to be wrong in when the alternative cannot be undone. The delete
+  itself runs in a transaction that nulls both version pointers first — `Page` and `PageVersion`
+  reference each other and both directions are `Restrict`, so nothing can be removed while either
+  pointer is set.*
+  *One rule beyond the spec's wording: **a restored page whose former parent is still deleted comes
+  back at the root**, with a warning, and its descendants' paths are rewritten to match. [§14.10]
+  asks for the root fallback; what it does not say is that leaving the stored path pointing through
+  a deleted ancestor produces a subtree queries silently stop finding, which is the failure
+  `P2-05` exists to prevent.*
+- [x] **P2-09** `DuplicationService` in `Core/Content/` — shallow and deep duplication with
   intra-subtree link rewriting; media referenced, never copied; copy starts at version 1 [§14.12].
   — 1.5 ed
-- [ ] **P2-10** `DraftService` in `Core/Content/` — load, save (payload + `rowversion` concurrency),
+  *2026-08-14 — all three rules hold, and the interesting one needed a contract change.*
+  ***Link rewriting forced `IFieldType.RemapReferences`***, the mirror of `ExtractReferences`, with
+  `FieldTypeBase` defaulting to "nothing to rewrite" and the six reference-bearing types overriding
+  it. The alternatives were both worse: rewriting ids by walking the payload for numbers that happen
+  to match would eventually rewrite a `number` field, and rewriting by the path `ExtractReferences`
+  reports does not work at all — a single `pageReference` reports a null path pointing at the
+  property object, while a multiple one reports `value[1]` pointing at the id, so the two shapes
+  need different surgery. The failure being prevented is specific: a field type that reports a
+  reference and does not rewrite it makes a duplicated section keep pointing at the originals, which
+  reads as working until somebody edits the copy and watches the original change.
+  `ReferenceExtractionContractTests` now fails any field type claiming `ReferenceBearing` with no
+  remap, including the nested case for containers — the same friction the extraction half already
+  had.*
+  ***The copy is written in two passes and it has to be.*** A link inside the subtree can only be
+  pointed at its copy once every page in the set has an identity, and identities are assigned on
+  insert; a single pass would be guessing at ids it was about to create. Pass one inserts in depth
+  order so a parent always exists before its children, pass two remaps and reprojects. All of it in
+  one transaction.
+  *Four smaller decisions. **Links out of the subtree are left alone** — that is the rule that makes
+  "duplicate last year's campaign" produce a section navigating to itself rather than back into last
+  year, and it falls out of the map lookup missing. **`ExplicitUrl` is dropped**, because an explicit
+  URL is unique by construction and copying one gives two pages the same address at the copy's first
+  publish. **Only the root gets a free slug and the "(copy)" suffix**; descendants land under a new
+  parent, so nothing they could collide with is in scope. And the search for a free slug is bounded
+  at a hundred attempts — a loop that cannot terminate is a request that never returns.*
+- [x] **P2-10** `DraftService` in `Core/Content/` — load, save (payload + `rowversion` concurrency),
   discard (reset to published), named checkpoint [§11.3]. — 2 ed
-- [ ] **P2-11** `PublishingService` in `Core/Publishing/` — validate → snapshot draft into a new
+  *2026-08-14 — four operations, and **every write mutates the draft row in place**. That is what
+  makes `P2 #2` structural rather than a rule somebody has to remember: nothing in this service can
+  reach the published row, so an autosave every twenty seconds cannot bury the history an editor
+  reads. The one exception is a checkpoint, which inserts an `Archived` row deliberately.*
+  ***`ExpectedRowVersion` is applied as EF's `OriginalValue`, not compared in code.*** Comparing
+  would check against the value *this request* just read, leaving the window between its read and
+  its write unguarded — which is exactly the window two editors saving at once occupy. Setting the
+  original value moves the check into the `UPDATE` predicate, where the database arbitrates.
+  ***A conflict hands back the stored draft***, which needed `CmsResult.Conflict` to accept a value.
+  [§11.8] wants the editor to offer keep-mine / take-theirs / open-diff, and a second round trip to
+  fetch the winner would race the same way. The change tracker is cleared before reloading it, or
+  the "theirs" copy would be the losing editor's own text read back out of the tracker.*
+  ***The envelope is a privilege boundary, not data.*** A payload declares which template and which
+  revision judge it, so a client free to name either can pick rules its content happens to satisfy.
+  `templateKey` must match the page's template; `templateRevision` must be the draft's own or the
+  template's current one — the second being how an editor adopts a structural change [§8.5] — and
+  anything else is refused. Without this the draft endpoint changes the content model of a live page,
+  which is the [§20.1] mass-assignment hole one level deeper.
+  *Two more. **Discard copies field by field rather than repointing `DraftVersionId` at the
+  published row**: a draft that *is* the published row would be mutable the moment somebody typed
+  into it, which is the one thing the whole model exists to prevent. And **reference rows are
+  rewritten on every draft save**, not only on publish, because where-used and the delete guards are
+  only as good as the last projection.*
+- [x] **P2-11** `PublishingService` in `Core/Publishing/` — validate → snapshot draft into a new
   immutable version → archive the previous published version → repoint `Page.PublishedVersionId` →
   reindex `ContentReference` → enqueue invalidation, **all in one transaction** [§5.5]. — 3 ed
-- [ ] **P2-12** Fault-injection tests forcing a mid-transaction failure at each step of `PublishingService`,
+  *2026-08-14 — publish, unpublish, and a dry-run validate that **runs the identical check path**,
+  because a separate implementation eventually disagrees and the direction it disagrees in is a
+  green check followed by a refused publish.*
+  ***The commit is four explicit `SaveChangesAsync` calls inside one transaction, and keeping them
+  apart is deliberate.*** Batching them would be marginally faster and would make the failure modes
+  indistinguishable; separate steps are what let `P2-12` force a failure at each one. Step 4 is the
+  cache-invalidation outbox row [§5.5] — `OutboxMessage` arrives in P8, and until then delivery
+  reads through no cache, so the step is kept as a position in the sequence so that adding it later
+  is an insertion rather than a restructuring. The whole thing runs under `CreateExecutionStrategy()`
+  for the reason `P2-07` gives.*
+  ***Validation adds two things the payload walk cannot see.*** Referenced pages are checked to
+  still exist — a link to a deleted page is an **error**, because publishing it puts a dead link on
+  the site — while a link to a page that merely is not live yet is a **warning**, since publishing a
+  section top-down is ordinary work and refusing it would make a landing page unpublishable before
+  everything it links to. And a disabled template blocks a publish. Media and reusable content are
+  checked the same way once those tables exist; their references are already extracted, so it is two
+  more queries rather than a new mechanism.
+  *`acknowledgeWarnings` defaults to **false**, so an unattended caller cannot publish past a
+  warning a person would have looked at [§14.6]. Unpublish archives the live version and leaves the
+  draft alone; re-publishing is an ordinary publish rather than an undo.*
+- [x] **P2-12** Fault-injection tests forcing a mid-transaction failure at each step of `PublishingService`,
   asserting all-or-nothing *(mitigates R4 — stop-the-line severity)*. — included above
-- [ ] **P2-13** `VersionService` in `Core/Publishing/` — history, fetch one version, restore-into-draft
+  *2026-08-14 — `Content/PublishTransactionTests`, one case per step plus a control. The fault is
+  injected through an **EF `SaveChangesInterceptor` that throws on the nth save**, not through a seam
+  in the service: a production hook existing only for a test is a hook a deployment can trip over,
+  and the interceptor also proves more, because it fails at the real database boundary inside the
+  real transaction. Each case snapshots the page's pointers, every version row, and the reference
+  count, forces the failure, and asserts the snapshot is unchanged.*
+  ***The control case is the part worth keeping.*** Without a successful publish asserting all four
+  steps applied, an interceptor that broke publishing outright would make every roll-back assertion
+  pass for the wrong reason. The arrange half also publishes once first, so the failing publish has
+  a previous version to archive and a pointer to move — failing on a page that was never live would
+  never exercise step 2 at all.*
+  *One wiring note for whoever adds the next interceptor: EF resolves interceptors from the options
+  the context was **built** with, so registering one in DI after `AddDbContext` does nothing. The
+  workbench re-registers the context with the interceptor attached.*
+- [x] **P2-13** `VersionService` in `Core/Publishing/` — history, fetch one version, restore-into-draft
   (copy, never resurrect [§11.5]), retention pruning policy [§11.7]. — 2 ed
-- [ ] **P2-14** `ContentDiffService` in `Core/Publishing/` — structural diff with GUID-based block
+  *2026-08-14 — history, read, restore, and the retention sweep. **Restore copies into the draft's
+  own row**, which keeps its identity, its number, and its row version; the published version is not
+  touched, so the timeline stays forward-moving and the history never gains a cycle (`P2 #7`).
+  Restoring the draft onto itself is refused rather than silently doing nothing.*
+  ***History reads through `IgnoreQueryFilters` on the page.*** The recycle bin lists the history of
+  a deleted page, and the soft-delete filter would hide exactly the rows a restore has to show. This
+  is the case `P2-03` deliberately left `PageVersion` unfiltered for.
+  ***The retention policy is five clauses and every one protects something an editor would be upset
+  to lose***: everything inside the window, the last twenty versions per page, every version that was
+  ever published, every named checkpoint, and everything belonging to a page in the recycle bin —
+  because a restore that came back with no history is not a restore. The window comes from
+  `SiteSettings.VersionRetentionDays`, falling back to ninety. Reference rows are deleted with the
+  versions they belong to: a row pointing at a version that no longer exists makes every delete
+  guard permanently cautious about a page nothing actually references.*
+  *The clock is injected as a `TimeProvider` so the sweep is testable without waiting ninety days;
+  the same registration makes edit-lock expiry testable.*
+- [x] **P2-14** `ContentDiffService` in `Core/Publishing/` — structural diff with GUID-based block
   matching (reports *moved*, not removed+added), word-level text diff, target-identity diff for
   media/link/reference fields, flat metadata diff [§11.4]. Computed on demand, **never in the publish
   path**. — 3 ed
-- [ ] **P2-15** `EditLockService` in `Core/Content/` — acquire on editor open, 30 s heartbeat, override,
+  *2026-08-14 — all four kinds of comparison, plus `WordDiff` as its own type. **Blocks are matched
+  on the stable GUID the `blocks` field type writes**, which is what turns a drag-and-drop reorder
+  into one `Moved` entry instead of a wall of removals and additions — the edit people make most,
+  and the one a positional comparison is useless on (`P2 #6`).*
+  ***Values are rendered by the field type that wrote them***, dispatched on the stored `type`
+  discriminator, which keeps this service from knowing any field type's shape. Text comes from
+  `ExtractSearchText`; a reference-bearing value renders as the identities it points at instead,
+  because "Media 12 → Media 15" *is* the change and the alt text beside it is not. The human labels
+  those ids resolve to arrive with the media library in P5.
+  ***`WordDiff` is words, not characters***, because the reader is a person checking a paragraph and
+  a character diff of a rewritten sentence is a cloud of single letters. Common prefix and suffix are
+  stripped before the quadratic step, separators are kept attached to their words so the segments
+  reassemble into the original text, and beyond ten thousand words it degrades to one removal plus
+  one addition — still correct, and not a request thread tied up on a pasted book. Its unit tests
+  assert reassembly on every case, since a diff that renders nicely and has dropped a word gives the
+  reader no way to tell.
+  *Two smaller decisions. **Metadata is hand-listed rather than reflected over the entity** — a
+  reflected walk sweeps in the row version and the audit stamps, which differ between two versions by
+  definition, and a diff in which everything always changed says nothing. And **values are compared
+  as canonicalised JSON**, because member order inside a stored value is not meaningful; only zone
+  order is, and `ContentPayloadBuilder` already preserves that.*
+- [x] **P2-15** `EditLockService` in `Core/Content/` — acquire on editor open, 30 s heartbeat, override,
   2-minute expiry reaper. **A lock never blocks editing** [§11.8, D12]. — 1 ed
+  *2026-08-14 — acquire, read, release, reap. **Nothing here refuses anything.** Acquiring a page
+  somebody else holds succeeds and reports who held it; the caller decides whether to warn and the
+  editor decides whether to carry on. The test asserts the write itself still goes through, which is
+  the property the whole design turns on — locks that block are locks that get stuck, and a closed
+  laptop on a Friday would otherwise take a page out of circulation until somebody with database
+  access noticed [D12].*
+  *Three details. **Expiry is enforced on read as well as by the reaper**, so a stale row can never
+  be shown as live just because nothing swept the table in the last few seconds — and the two use the
+  same inclusive boundary, which a test caught: a strict comparison in the reaper left a lock that
+  read as expired and was never collected. **A heartbeat leaves `AcquiredOn` alone**, so "opened at
+  09:14" keeps meaning what it says over a three-hour session. And **releasing somebody else's lock
+  does nothing and is not an error**: the ordinary way to reach it is an editor closing a tab they
+  had already been taken over from, and a failure would put an alarming message in front of the
+  wrong person.*
+  *The holder's navigation is deliberately not loaded on the acquire path — a take-over reassigns
+  `UserId`, and EF's relationship fixup would put the old holder's key straight back from the loaded
+  navigation.*
 
 ### 2.3 API and UI — 4.5 ed
 
@@ -1142,27 +1314,61 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 ### Acceptance criteria — Phase 2
 
-- [ ] **P2 #1** Creating a page from a template produces a draft version with an empty, schema-valid
+- [x] **P2 #1** Creating a page from a template produces a draft version with an empty, schema-valid
   payload.
-- [ ] **P2 #2** Saving the draft mutates the draft version in place and creates no new version row.
-- [ ] **P2 #3** Publishing creates a new immutable version, archives the previous published version, and
+  *2026-08-14 — `Content/PageServiceTests`. The payload is checked through the real
+  `ContentSchemaValidator` against a catalog built from the template's own revision, with the zone
+  marked **required** — the case that must still save, since a required zone blocks only a publish.*
+- [x] **P2 #2** Saving the draft mutates the draft version in place and creates no new version row.
+  *2026-08-14 — `Content/DraftAndPublishTests`, asserted by counting the rows rather than by
+  inspecting the one that came back.*
+- [x] **P2 #3** Publishing creates a new immutable version, archives the previous published version, and
   repoints `Page.PublishedVersionId` — all or nothing under a forced mid-transaction failure.
-- [ ] **P2 #4** **After publishing, editing the draft leaves the published version byte-for-byte
+  *2026-08-14 — `Content/PublishTransactionTests`, one case per step of the transaction plus a
+  control that asserts a successful publish applied all four. See `P2-12` for why the fault is
+  injected through an EF interceptor rather than a seam in the service.*
+- [x] **P2 #4** **After publishing, editing the draft leaves the published version byte-for-byte
   unchanged.** *(The requirement's central promise — R-10.)*
-- [ ] **P2 #5** Version history lists every version with status, author, and timestamp.
-- [ ] **P2 #6** The diff between two versions reports a reordered block as *moved*, not as
+  *2026-08-14 — `DraftAndPublishTests.PublishingSnapshotsTheDraftAndLeavesItByteForByteAloneAfterwards`.
+  Literal: the published row's `ContentJson` and `RowVersion` are captured, the draft is saved three
+  more times, and both are compared again. The row version is part of the assertion on purpose — a
+  row whose concurrency token moved was written to, whatever it now says.*
+- [x] **P2 #5** Version history lists every version with status, author, and timestamp.
+  *2026-08-14 — `Content/VersionAndDiffTests`, newest first, with `IsDraft` and `IsPublished`
+  resolved against the page's two pointers rather than inferred from the status column.*
+- [x] **P2 #6** The diff between two versions reports a reordered block as *moved*, not as
   removed-plus-added.
-- [ ] **P2 #7** Restoring an old version copies it into the draft and leaves the published version
+  *2026-08-14 — three blocks rotated, and every one of them comes back `Moved` with its before and
+  after index. Matched on the stable GUID, which is the whole reason the `blocks` field type writes
+  one.*
+- [x] **P2 #7** Restoring an old version copies it into the draft and leaves the published version
   untouched.
-- [ ] **P2 #8** Two concurrent draft saves: the second receives `409 Conflict` with both payloads.
-- [ ] **P2 #9** An advisory lock is visible to a second editor and can be overridden; it expires after 2
+  *2026-08-14 — the published row's bytes, status, and the page's `PublishedVersionId` are all
+  asserted unchanged after the restore.*
+- [~] **P2 #8** Two concurrent draft saves: the second receives `409 Conflict` with both payloads.
+  *2026-08-14 — the behaviour is asserted at the service layer: the second save returns
+  `CmsOutcome.Conflict` carrying the stored draft, so the editor has both copies. **What is not yet
+  asserted is the literal `409`**, which is the endpoint mapping — `CmsProblems` already maps
+  `Conflict` to 409, but there is no draft endpoint to drive until `P2-16`.*
+- [x] **P2 #9** An advisory lock is visible to a second editor and can be overridden; it expires after 2
   minutes of silence.
-- [ ] **P2 #10** Soft-deleting a page hides it from default queries while keeping full history
+  *2026-08-14 — `Content/EditLockTests`, all three, on an injected clock. The suite also asserts the
+  rule the criterion does not name: the second editor's save goes through regardless, because a lock
+  never blocks editing [D12].*
+- [x] **P2 #10** Soft-deleting a page hides it from default queries while keeping full history
   retrievable.
-- [ ] **P2 #11** Publishing with an unfilled required zone returns `422` naming that zone.
+  *2026-08-14 — `Content/RecycleBinAndDuplicationTests`: the subtree disappears from the default
+  query, is still there under `IgnoreQueryFilters`, and its version history still lists.*
+- [~] **P2 #11** Publishing with an unfilled required zone returns `422` naming that zone.
+  *2026-08-14 — the publish is refused and the diagnostic names the zone in its path. As with
+  `P2 #8`, the literal status code waits on the endpoint in `P2-17`.*
 
 **Exit gate:** acceptance test **#4** passes — the requirement's central promise is mechanically
-verified. — [ ] met on ____
+verified. — [x] met on **2026-08-14**.
+*The gate is the one criterion that could not be faked by careful implementation, and it passes:
+publishing snapshots the draft into a separate row, and no operation in `DraftService` can reach it.
+Two criteria remain `[~]` — both only for the HTTP status code, which needs `2.3`'s endpoints — and
+neither weakens the gate, since the behaviour underneath each is asserted.*
 
 **Risks:** R4 (publish transaction correctness), R5 (diff complexity).
 
@@ -2033,7 +2239,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [ ] |
 | R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [ ] |
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
-| R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [ ] |
+| R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [~] `P2 #4` met 2026-08-14; `P3 #3` awaits delivery |
 | R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [ ] |
 | R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [ ] |
 | R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [ ] |

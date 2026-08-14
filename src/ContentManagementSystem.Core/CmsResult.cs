@@ -59,7 +59,15 @@ public sealed class CmsResult<T>
     /// <summary>How the operation ended.</summary>
     public CmsOutcome Outcome { get; }
 
-    /// <summary>What the operation produced, or null when it did not succeed.</summary>
+    /// <summary>
+    /// What the operation produced, or null when it did not succeed.
+    /// </summary>
+    /// <remarks>
+    /// One exception, and it is deliberate: a <see cref="CmsOutcome.Conflict"/> may carry the state
+    /// the caller lost to. A draft save that lost a race has to hand back what is stored so the
+    /// editor can offer "keep mine / take theirs / open diff" (spec section 11.8), and a second
+    /// round trip to fetch it would race the same way.
+    /// </remarks>
     public T? Value { get; }
 
     /// <summary>Why the operation ended the way it did. Empty on an uneventful success.</summary>
@@ -103,8 +111,12 @@ public sealed class CmsResult<T>
     /// <param name="code">Stable code from <see cref="StructureCodes"/> or <see cref="PageCodes"/>.</param>
     /// <param name="message">Human-readable explanation.</param>
     /// <param name="path">Name of the offending member of the request, when one is to blame.</param>
-    public static CmsResult<T> Conflict(string code, string message, string? path = null) =>
-        new(CmsOutcome.Conflict, default, ValidationResult.Error(code, message, path));
+    /// <param name="value">
+    /// The state that blocked the request, when the caller needs it to resolve the conflict. See
+    /// <see cref="Value"/>.
+    /// </param>
+    public static CmsResult<T> Conflict(string code, string message, string? path = null, T? value = default) =>
+        new(CmsOutcome.Conflict, value, ValidationResult.Error(code, message, path));
 
     /// <summary>The caller may not perform this operation.</summary>
     /// <param name="message">What was refused. Never names what the caller would need to hold.</param>

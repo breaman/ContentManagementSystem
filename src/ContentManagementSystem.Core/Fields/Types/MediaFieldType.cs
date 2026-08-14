@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -68,4 +69,23 @@ public sealed class MediaFieldType : FieldTypeBase
     /// <inheritdoc />
     public override IEnumerable<ContentReference> ExtractReferences(JsonElement value) =>
         MediaValue.ExtractReferences(value, path: null);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Implemented even though duplication never remaps media — the copy references the same item
+    /// rather than duplicating the bytes (spec section 14.12). The delegate decides that, not this
+    /// method, and a field type that quietly ignored a replacement it was handed would be a hole the
+    /// day something else needs one.
+    /// </remarks>
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        return ReferenceRemapping.RemapMember(
+            copy, MediaValue.MediaIdMember, ContentReferenceTargetType.Media, remap)
+            ? copy
+            : null;
+    }
 }

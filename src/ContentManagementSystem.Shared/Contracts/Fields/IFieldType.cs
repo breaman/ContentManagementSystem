@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -145,4 +146,29 @@ public interface IFieldType
     /// Never null.
     /// </returns>
     string ExtractSearchText(JsonElement value);
+
+    /// <summary>
+    /// Rewrites the entities this value points at, for duplication.
+    /// </summary>
+    /// <param name="value">The value as stored in the payload.</param>
+    /// <param name="remap">
+    /// Maps a target to its replacement, returning the identity it was given when the target has no
+    /// replacement. Applied to every reference this value holds.
+    /// </param>
+    /// <returns>
+    /// A rewritten value, or <see langword="null"/> when nothing changed. Null rather than a copy so
+    /// that a payload with no affected references is left byte-for-byte as it was.
+    /// </returns>
+    /// <remarks>
+    /// The mirror of <see cref="ExtractReferences"/>, and it has the same failure mode: a field type
+    /// that reports a reference but does not rewrite it makes "duplicate this section" produce
+    /// copies whose internal links still point back at the originals — which reads as working until
+    /// somebody edits the copy and finds the original changing (spec section 14.12).
+    /// <para>
+    /// A <see cref="FieldTypeCapabilities.Container"/> must dispatch each nested value back through
+    /// this method on the field type that wrote it, by the stored <c>type</c> discriminator, for the
+    /// reason <see cref="ExtractReferences"/> gives.
+    /// </para>
+    /// </remarks>
+    JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap);
 }

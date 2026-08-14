@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -255,4 +256,13 @@ public abstract class FieldTypeBase : IFieldType
             ? ValidateEmpty(configuration, mode)
             : ValidateValue(property, value, configuration, mode);
     }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Nothing to rewrite by default, which is correct for every field type that holds no
+    /// references. A reference-bearing one that inherits this silently produces duplicated content
+    /// still pointing at the originals, so <c>ReferenceExtractionContractTests</c> fails any field
+    /// type that claims <see cref="FieldTypeCapabilities.ReferenceBearing"/> and does not override.
+    /// </remarks>
+    public virtual JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap) => null;
 }

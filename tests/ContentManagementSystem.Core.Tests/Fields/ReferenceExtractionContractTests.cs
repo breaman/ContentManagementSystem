@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Tests.Fields.Types;
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -24,6 +26,9 @@ namespace ContentManagementSystem.Core.Tests.Fields;
 /// </remarks>
 public class ReferenceExtractionContractTests
 {
+    /// <summary>Amount every id is shifted by in the remap cases, chosen to be unmistakable.</summary>
+    private const int Shift = 1_000;
+
     private const string BlockId = "0f6c8b1e-3a4d-4f2b-9c7e-1d2a3b4c5d6e";
 
     private const string NestedBlockId = "7a1b2c3d-4e5f-4061-8293-a4b5c6d7e8f9";
@@ -144,6 +149,74 @@ public class ReferenceExtractionContractTests
             // without declaring it would have them read on some paths and ignored on others.
             fieldType.ExtractReferences(populated).Should().BeEmpty();
         }
+    }
+
+    [Theory]
+    [MemberData(nameof(ReferenceBearingKeys))]
+    public void EveryReferenceBearingFieldTypeRewritesTheReferencesItReports(string key)
+    {
+        var fieldType = Registry().Find(key);
+
+        fieldType.Should().NotBeNull();
+
+        var value = JsonDocument.Parse(PopulatedValues[key]).RootElement;
+        var originals = fieldType.ExtractReferences(value).ToList();
+
+        originals.Should().NotBeEmpty();
+
+        // Every target shifted by a fixed amount, which is the shape duplication produces: a set of
+        // ids replaced by the ids of their copies.
+        var rewritten = fieldType.RemapReferences(value, (_, id) => id + Shift);
+
+        rewritten.Should().NotBeNull(
+            "a field type that reports a reference and does not rewrite it makes a duplicated " +
+            "section keep pointing at the originals, which reads as working until somebody edits " +
+            "the copy (spec section 14.12)");
+
+        using var rewrittenDocument = JsonDocument.Parse(rewritten.ToJsonString());
+
+        fieldType.ExtractReferences(rewrittenDocument.RootElement)
+            .Select(reference => (reference.TargetType, reference.TargetId))
+            .Should().BeEquivalentTo(
+                originals.Select(reference => (reference.TargetType, reference.TargetId + Shift)));
+    }
+
+    [Theory]
+    [MemberData(nameof(ContainerKeys))]
+    public void EveryContainerRewritesTheReferencesOfANestedValue(string key)
+    {
+        var fieldType = Registry().Find(key);
+
+        fieldType.Should().NotBeNull();
+
+        var value = JsonDocument.Parse(NestedValues[key]).RootElement;
+        var originals = fieldType.ExtractReferences(value).ToList();
+
+        var rewritten = fieldType.RemapReferences(value, (_, id) => id + Shift);
+
+        // The same gap the nested extraction case exists to catch, on the write side: a container
+        // that rewrites only its own level leaves every nested link pointing at the original.
+        rewritten.Should().NotBeNull();
+
+        using var rewrittenDocument = JsonDocument.Parse(rewritten.ToJsonString());
+
+        fieldType.ExtractReferences(rewrittenDocument.RootElement)
+            .Select(reference => reference.TargetId)
+            .Should().BeEquivalentTo(originals.Select(reference => reference.TargetId + Shift));
+    }
+
+    [Theory]
+    [MemberData(nameof(ReferenceBearingKeys))]
+    public void ARemapThatChangesNothingLeavesTheValueAlone(string key)
+    {
+        var fieldType = Registry().Find(key);
+
+        fieldType.Should().NotBeNull();
+
+        // Null rather than an identical copy, so a payload with no affected references is written
+        // back byte-for-byte as it was — which is what lets the duplication service skip the write.
+        fieldType.RemapReferences(JsonDocument.Parse(PopulatedValues[key]).RootElement, (_, id) => id)
+            .Should().BeNull();
     }
 
     private static TheoryData<string> Keys(FieldTypeCapabilities capability)

@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Content.Markdown;
+using ContentManagementSystem.Core.Content.Schema;
 
 using ContentManagementSystem.Shared.Contracts.Content;
 
@@ -22,17 +23,26 @@ public static class ContentServiceCollectionExtensions
     /// <c>AddCmsFieldTypes()</c>; the markdown renderer depends on an
     /// <see cref="Shared.Contracts.Security.IContentSanitizer"/>, so call
     /// <c>AddCmsSanitization()</c> as well. The validator also needs an
-    /// <see cref="Schema.IContentSchemaCatalog"/>, which is deliberately <em>not</em> registered
-    /// here: what serves captured template revisions is a database-backed, cached implementation
-    /// that belongs to the hosting layer, and defaulting to an empty one would let a deployment
-    /// start up validating every payload against nothing.
+    /// <see cref="Schema.IContentSchemaCatalog"/>, served here by
+    /// <see cref="Schema.DatabaseContentSchemaCatalog"/> — revision snapshots read from the database
+    /// and cached for the life of the process. That implementation is what task <c>P1-30</c> was
+    /// waiting for: registering an empty catalog instead would have let a deployment start up
+    /// validating every payload against nothing and reporting success.
+    /// <para>
+    /// The catalog and therefore the validator are <em>scoped</em>, since resolving a revision reads
+    /// through a database context. The indexer and the markdown renderer hold no state and stay
+    /// singleton.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddCmsContent(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton<IContentSchemaValidator, ContentSchemaValidator>();
+        services.TryAddSingleton<ContentSchemaCache>();
+        services.TryAddScoped<IContentSchemaCatalog, DatabaseContentSchemaCatalog>();
+        services.TryAddScoped<IContentSchemaValidator, ContentSchemaValidator>();
         services.TryAddSingleton<IReferenceIndexer, ReferenceIndexer>();
+        services.TryAddSingleton<IContentPayloadRemapper, ContentPayloadRemapper>();
         // One registration, so the editor preview and delivery cannot end up holding two pipelines
         // that agree today (acceptance criterion P1 #7).
         services.TryAddSingleton<IMarkdownRenderer, MarkdownRenderer>();

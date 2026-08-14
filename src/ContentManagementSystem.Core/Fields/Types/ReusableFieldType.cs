@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -106,5 +107,18 @@ public sealed class ReusableFieldType : FieldTypeBase
                 ContentReferenceTargetType.ReusableContent,
                 reusableContentId);
         }
+    }
+
+    /// <inheritdoc />
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        return ReferenceRemapping.RemapMember(
+            copy, ReusableContentIdMember, ContentReferenceTargetType.ReusableContent, remap)
+            ? copy
+            : null;
     }
 }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -113,5 +114,7 @@ public class FieldTypeRegistrationTests
         public IEnumerable<ContentReference> ExtractReferences(JsonElement value) => [];
 
         public string ExtractSearchText(JsonElement value) => string.Empty;
+
+        public JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap) => null;
     }
 }

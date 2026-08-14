@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 using ContentManagementSystem.Shared.Contracts.Fields;
 
@@ -83,5 +84,27 @@ public sealed class MediaListFieldType : ListFieldTypeBase
 
             index++;
         }
+    }
+
+    /// <inheritdoc />
+    public override JsonNode? RemapReferences(JsonElement value, ReferenceRemapper remap)
+    {
+        ArgumentNullException.ThrowIfNull(remap);
+
+        if (ReferenceRemapping.Clone(value) is not { } copy) return null;
+
+        if (copy[ItemsMember] is not JsonArray items) return null;
+
+        var changed = false;
+
+        foreach (var item in items)
+        {
+            if (item is not JsonObject entry) continue;
+
+            changed |= ReferenceRemapping.RemapMember(
+                entry, MediaValue.MediaIdMember, ContentReferenceTargetType.Media, remap);
+        }
+
+        return changed ? copy : null;
     }
 }
