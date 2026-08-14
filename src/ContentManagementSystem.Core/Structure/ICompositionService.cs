@@ -23,20 +23,20 @@ public interface ICompositionService
     /// <summary>Lists every composition, with how far each one reaches.</summary>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The compositions, or a forbidden result.</returns>
-    Task<StructureResult<IReadOnlyList<CompositionSummary>>> ListAsync(
+    Task<CmsResult<IReadOnlyList<CompositionSummary>>> ListAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>Reads one composition with its properties and where it is used.</summary>
     /// <param name="id">Identity of the composition.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The composition, or a not-found result.</returns>
-    Task<StructureResult<CompositionDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
+    Task<CmsResult<CompositionDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a composition.</summary>
     /// <param name="request">The composition to create.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The created composition, an invalid result, or a conflict when the key is taken.</returns>
-    Task<StructureResult<CompositionDetail>> CreateAsync(
+    Task<CmsResult<CompositionDetail>> CreateAsync(
         CreateCompositionRequest request,
         CancellationToken cancellationToken = default);
 
@@ -49,7 +49,7 @@ public interface ICompositionService
     /// Cuts nothing anywhere: a group's name never reaches a block instance, so no block type's
     /// captured schema changes.
     /// </remarks>
-    Task<StructureResult<CompositionDetail>> UpdateAsync(
+    Task<CmsResult<CompositionDetail>> UpdateAsync(
         int id,
         UpdateCompositionRequest request,
         CancellationToken cancellationToken = default);
@@ -66,7 +66,7 @@ public interface ICompositionService
     /// not. Deleting a composed group would take properties out of block types whose content is
     /// using them, so the refusal names every block type in the way.
     /// </remarks>
-    Task<StructureResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default);
+    Task<CmsResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Adds a property to the group and recuts every block type composing it.</summary>
     /// <param name="compositionId">Identity of the composition.</param>
@@ -76,7 +76,7 @@ public interface ICompositionService
     /// The stored property and the block types it reached, an invalid result when the key collides
     /// with one of those block types' own properties, or a conflict.
     /// </returns>
-    Task<StructureResult<CompositionPropertySaveResult>> CreatePropertyAsync(
+    Task<CmsResult<CompositionPropertySaveResult>> CreatePropertyAsync(
         int compositionId,
         CreatePropertyRequest request,
         CancellationToken cancellationToken = default);
@@ -87,7 +87,7 @@ public interface ICompositionService
     /// <param name="request">The new values. A changed key or field type is refused.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The stored property and the block types it reached, or a not-found result.</returns>
-    Task<StructureResult<CompositionPropertySaveResult>> UpdatePropertyAsync(
+    Task<CmsResult<CompositionPropertySaveResult>> UpdatePropertyAsync(
         int compositionId,
         int propertyId,
         UpdatePropertyRequest request,
@@ -98,7 +98,7 @@ public interface ICompositionService
     /// <param name="propertyId">Identity of the property.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>What was removed and the block types it reached, or a not-found result.</returns>
-    Task<StructureResult<CompositionPropertyRemovalResult>> DeletePropertyAsync(
+    Task<CmsResult<CompositionPropertyRemovalResult>> DeletePropertyAsync(
         int compositionId,
         int propertyId,
         CancellationToken cancellationToken = default);

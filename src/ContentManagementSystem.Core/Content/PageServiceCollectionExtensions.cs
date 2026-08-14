@@ -24,6 +24,7 @@ public static class PageServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddScoped<IPageTreeService, PageTreeService>();
+        services.TryAddScoped<IPageService, PageService>();
 
         return services;
     }

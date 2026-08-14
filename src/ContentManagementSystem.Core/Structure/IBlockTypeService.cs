@@ -29,20 +29,20 @@ public interface IBlockTypeService
     /// <summary>Lists every block type, in picker order.</summary>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The block types, or a forbidden result.</returns>
-    Task<StructureResult<IReadOnlyList<BlockTypeSummary>>> ListAsync(
+    Task<CmsResult<IReadOnlyList<BlockTypeSummary>>> ListAsync(
         CancellationToken cancellationToken = default);
 
     /// <summary>Reads one block type with its own, composed, and effective property sets.</summary>
     /// <param name="id">Identity of the block type.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The block type, or a not-found result.</returns>
-    Task<StructureResult<BlockTypeDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
+    Task<CmsResult<BlockTypeDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Creates a block type and cuts its first revision.</summary>
     /// <param name="request">The block type to create.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The created block type, an invalid result, or a conflict when the key is taken.</returns>
-    Task<StructureResult<BlockTypeDetail>> CreateAsync(
+    Task<CmsResult<BlockTypeDetail>> CreateAsync(
         CreateBlockTypeRequest request,
         CancellationToken cancellationToken = default);
 
@@ -51,7 +51,7 @@ public interface IBlockTypeService
     /// <param name="request">The new values. A changed key is refused.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The updated block type, a not-found result, or an invalid result.</returns>
-    Task<StructureResult<BlockTypeDetail>> UpdateAsync(
+    Task<CmsResult<BlockTypeDetail>> UpdateAsync(
         int id,
         UpdateBlockTypeRequest request,
         CancellationToken cancellationToken = default);
@@ -60,7 +60,7 @@ public interface IBlockTypeService
     /// <param name="id">Identity of the block type.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The revision history, or a not-found result.</returns>
-    Task<StructureResult<IReadOnlyList<BlockTypeRevisionSummary>>> ListRevisionsAsync(
+    Task<CmsResult<IReadOnlyList<BlockTypeRevisionSummary>>> ListRevisionsAsync(
         int id,
         CancellationToken cancellationToken = default);
 
@@ -69,7 +69,7 @@ public interface IBlockTypeService
     /// <param name="revisionNumber">The revision number, as a block instance records it.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The revision, or a not-found result.</returns>
-    Task<StructureResult<BlockTypeRevisionDetail>> GetRevisionAsync(
+    Task<CmsResult<BlockTypeRevisionDetail>> GetRevisionAsync(
         int id,
         int revisionNumber,
         CancellationToken cancellationToken = default);
@@ -79,7 +79,7 @@ public interface IBlockTypeService
     /// <param name="request">The property to add.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The stored property with any warnings, an invalid result, or a conflict.</returns>
-    Task<StructureResult<PropertySaveResult>> CreatePropertyAsync(
+    Task<CmsResult<PropertySaveResult>> CreatePropertyAsync(
         int blockTypeId,
         CreatePropertyRequest request,
         CancellationToken cancellationToken = default);
@@ -90,7 +90,7 @@ public interface IBlockTypeService
     /// <param name="request">The new values. A changed key or field type is refused.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The stored property with any warnings, or a not-found or invalid result.</returns>
-    Task<StructureResult<PropertySaveResult>> UpdatePropertyAsync(
+    Task<CmsResult<PropertySaveResult>> UpdatePropertyAsync(
         int blockTypeId,
         int propertyId,
         UpdatePropertyRequest request,
@@ -105,7 +105,7 @@ public interface IBlockTypeService
     /// Unguarded, like removing a zone: values already stored under the key survive in their block
     /// instances and are reported as orphaned rather than invalid (spec section 8.5).
     /// </remarks>
-    Task<StructureResult<PropertyRemovalResult>> DeletePropertyAsync(
+    Task<CmsResult<PropertyRemovalResult>> DeletePropertyAsync(
         int blockTypeId,
         int propertyId,
         CancellationToken cancellationToken = default);
@@ -118,7 +118,7 @@ public interface IBlockTypeService
     /// The block type as it now stands, or an invalid result when a composed key collides with one
     /// the block type already has.
     /// </returns>
-    Task<StructureResult<BlockTypeDetail>> AttachCompositionAsync(
+    Task<CmsResult<BlockTypeDetail>> AttachCompositionAsync(
         int blockTypeId,
         AttachCompositionRequest request,
         CancellationToken cancellationToken = default);
@@ -128,7 +128,7 @@ public interface IBlockTypeService
     /// <param name="compositionId">Identity of the composition.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The block type as it now stands, or a not-found result.</returns>
-    Task<StructureResult<BlockTypeDetail>> DetachCompositionAsync(
+    Task<CmsResult<BlockTypeDetail>> DetachCompositionAsync(
         int blockTypeId,
         int compositionId,
         CancellationToken cancellationToken = default);

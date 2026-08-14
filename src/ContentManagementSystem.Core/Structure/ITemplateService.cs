@@ -21,13 +21,13 @@ public interface ITemplateService
     /// <summary>Lists every template, in the order the create-page picker shows them.</summary>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The templates, or a forbidden result when the caller may not read content.</returns>
-    Task<StructureResult<IReadOnlyList<TemplateSummary>>> ListAsync(CancellationToken cancellationToken = default);
+    Task<CmsResult<IReadOnlyList<TemplateSummary>>> ListAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Reads one template with its current zone definitions.</summary>
     /// <param name="id">Identity of the template.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The template, or a not-found result.</returns>
-    Task<StructureResult<TemplateDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
+    Task<CmsResult<TemplateDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Creates a template and cuts its first revision.
@@ -38,7 +38,7 @@ public interface ITemplateService
     /// The created template, an invalid result naming every rule the request broke, or a conflict
     /// when the key is taken.
     /// </returns>
-    Task<StructureResult<TemplateDetail>> CreateAsync(
+    Task<CmsResult<TemplateDetail>> CreateAsync(
         CreateTemplateRequest request,
         CancellationToken cancellationToken = default);
 
@@ -54,7 +54,7 @@ public interface ITemplateService
     /// nothing about how stored content is read, and cutting one for it would bury the structural
     /// history that revisions exist to record.
     /// </remarks>
-    Task<StructureResult<TemplateDetail>> UpdateAsync(
+    Task<CmsResult<TemplateDetail>> UpdateAsync(
         int id,
         UpdateTemplateRequest request,
         CancellationToken cancellationToken = default);
@@ -63,7 +63,7 @@ public interface ITemplateService
     /// <param name="id">Identity of the template.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The revision history, or a not-found result.</returns>
-    Task<StructureResult<IReadOnlyList<TemplateRevisionSummary>>> ListRevisionsAsync(
+    Task<CmsResult<IReadOnlyList<TemplateRevisionSummary>>> ListRevisionsAsync(
         int id,
         CancellationToken cancellationToken = default);
 
@@ -72,7 +72,7 @@ public interface ITemplateService
     /// <param name="revisionNumber">The revision number, as a page version records it.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The revision, or a not-found result.</returns>
-    Task<StructureResult<TemplateRevisionDetail>> GetRevisionAsync(
+    Task<CmsResult<TemplateRevisionDetail>> GetRevisionAsync(
         int id,
         int revisionNumber,
         CancellationToken cancellationToken = default);

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 
+using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -30,7 +31,7 @@ public static class CmsProblems
     /// <param name="result">The outcome to map.</param>
     /// <param name="onSuccess">Builds the response for a successful outcome.</param>
     /// <returns>The response.</returns>
-    public static IResult ToHttpResult<T>(this StructureResult<T> result, Func<T, IResult> onSuccess)
+    public static IResult ToHttpResult<T>(this CmsResult<T> result, Func<T, IResult> onSuccess)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(onSuccess);
@@ -39,15 +40,15 @@ public static class CmsProblems
 
         return result.Outcome switch
         {
-            StructureOutcome.NotFound => Problem(
+            CmsOutcome.NotFound => Problem(
                 HttpStatusCode.NotFound, "not-found", "Not found", result.Diagnostics),
-            StructureOutcome.Forbidden => Problem(
+            CmsOutcome.Forbidden => Problem(
                 HttpStatusCode.Forbidden, "forbidden", "Forbidden", result.Diagnostics),
-            StructureOutcome.Conflict => Problem(
+            CmsOutcome.Conflict => Problem(
                 HttpStatusCode.Conflict, "conflict", "Conflict", result.Diagnostics),
             // 422 rather than 400: the request parsed and bound, and what it asked for is
             // understood — it simply breaks a rule of the content model.
-            StructureOutcome.Invalid => Problem(
+            CmsOutcome.Invalid => Problem(
                 HttpStatusCode.UnprocessableEntity, "validation", "Validation failed", result.Diagnostics),
             _ => throw new UnreachableException($"Unmapped structure outcome '{result.Outcome}'."),
         };

@@ -13,7 +13,7 @@ namespace ContentManagementSystem.Shared.Contracts.Structure;
 /// whose phase has not shipped. Empty is the ordinary case.
 /// </param>
 /// <remarks>
-/// Deliberately not <c>StructureResult&lt;T&gt;</c>: that type lives in <c>Core</c>, which the
+/// Deliberately not <c>CmsResult&lt;T&gt;</c>: that type lives in <c>Core</c>, which the
 /// WebAssembly backoffice cannot reference, and it carries an outcome enum whose only consumer is
 /// the HTTP status mapping. What a screen needs is narrower — did it work, and what should I show
 /// the developer — and this is that, in a project both implementations can see.

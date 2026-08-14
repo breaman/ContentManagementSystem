@@ -23,12 +23,12 @@ public sealed class TemplateService(
     ILogger<TemplateService> logger) : ITemplateService
 {
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<TemplateSummary>>> ListAsync(
+    public async Task<CmsResult<IReadOnlyList<TemplateSummary>>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<TemplateSummary>>.Forbidden("Reading templates is not permitted.");
+            return CmsResult<IReadOnlyList<TemplateSummary>>.Forbidden("Reading templates is not permitted.");
         }
 
         var templates = await context.Templates
@@ -48,17 +48,17 @@ public sealed class TemplateService(
                 template.Zones.Count))
             .ToListAsync(cancellationToken);
 
-        return StructureResult<IReadOnlyList<TemplateSummary>>.Success(templates);
+        return CmsResult<IReadOnlyList<TemplateSummary>>.Success(templates);
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<TemplateDetail>> GetAsync(
+    public async Task<CmsResult<TemplateDetail>> GetAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<TemplateDetail>.Forbidden("Reading templates is not permitted.");
+            return CmsResult<TemplateDetail>.Forbidden("Reading templates is not permitted.");
         }
 
         var template = await context.Templates
@@ -67,12 +67,12 @@ public sealed class TemplateService(
             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         return template is null
-            ? StructureResult<TemplateDetail>.NotFound($"No template has id {id}.")
-            : StructureResult<TemplateDetail>.Success(ToDetail(template));
+            ? CmsResult<TemplateDetail>.NotFound($"No template has id {id}.")
+            : CmsResult<TemplateDetail>.Success(ToDetail(template));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<TemplateDetail>> CreateAsync(
+    public async Task<CmsResult<TemplateDetail>> CreateAsync(
         CreateTemplateRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -80,7 +80,7 @@ public sealed class TemplateService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<TemplateDetail>.Forbidden("Managing templates is not permitted.");
+            return CmsResult<TemplateDetail>.Forbidden("Managing templates is not permitted.");
         }
 
         var diagnostics = new List<ValidationDiagnostic>();
@@ -89,7 +89,7 @@ public sealed class TemplateService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<TemplateDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<TemplateDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         var key = request.Key!.Trim();
@@ -149,11 +149,11 @@ public sealed class TemplateService(
             template.Key,
             template.Id);
 
-        return StructureResult<TemplateDetail>.Success(ToDetail(template));
+        return CmsResult<TemplateDetail>.Success(ToDetail(template));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<TemplateDetail>> UpdateAsync(
+    public async Task<CmsResult<TemplateDetail>> UpdateAsync(
         int id,
         UpdateTemplateRequest request,
         CancellationToken cancellationToken = default)
@@ -162,7 +162,7 @@ public sealed class TemplateService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<TemplateDetail>.Forbidden("Managing templates is not permitted.");
+            return CmsResult<TemplateDetail>.Forbidden("Managing templates is not permitted.");
         }
 
         var template = await context.Templates
@@ -171,7 +171,7 @@ public sealed class TemplateService(
 
         if (template is null)
         {
-            return StructureResult<TemplateDetail>.NotFound($"No template has id {id}.");
+            return CmsResult<TemplateDetail>.NotFound($"No template has id {id}.");
         }
 
         var diagnostics = new List<ValidationDiagnostic>(ValidateMetadata(request.Name, request.Description));
@@ -192,7 +192,7 @@ public sealed class TemplateService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<TemplateDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<TemplateDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         template.Name = request.Name!.Trim();
@@ -202,17 +202,17 @@ public sealed class TemplateService(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return StructureResult<TemplateDetail>.Success(ToDetail(template));
+        return CmsResult<TemplateDetail>.Success(ToDetail(template));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<TemplateRevisionSummary>>> ListRevisionsAsync(
+    public async Task<CmsResult<IReadOnlyList<TemplateRevisionSummary>>> ListRevisionsAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<TemplateRevisionSummary>>.Forbidden(
+            return CmsResult<IReadOnlyList<TemplateRevisionSummary>>.Forbidden(
                 "Reading templates is not permitted.");
         }
 
@@ -222,7 +222,7 @@ public sealed class TemplateService(
 
         if (template is null)
         {
-            return StructureResult<IReadOnlyList<TemplateRevisionSummary>>.NotFound($"No template has id {id}.");
+            return CmsResult<IReadOnlyList<TemplateRevisionSummary>>.NotFound($"No template has id {id}.");
         }
 
         var revisions = await context.TemplateRevisions
@@ -235,18 +235,18 @@ public sealed class TemplateService(
             .Select(revision => ToSummary(revision, template))
             .ToList();
 
-        return StructureResult<IReadOnlyList<TemplateRevisionSummary>>.Success(summaries);
+        return CmsResult<IReadOnlyList<TemplateRevisionSummary>>.Success(summaries);
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<TemplateRevisionDetail>> GetRevisionAsync(
+    public async Task<CmsResult<TemplateRevisionDetail>> GetRevisionAsync(
         int id,
         int revisionNumber,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<TemplateRevisionDetail>.Forbidden("Reading templates is not permitted.");
+            return CmsResult<TemplateRevisionDetail>.Forbidden("Reading templates is not permitted.");
         }
 
         var template = await context.Templates
@@ -255,7 +255,7 @@ public sealed class TemplateService(
 
         if (template is null)
         {
-            return StructureResult<TemplateRevisionDetail>.NotFound($"No template has id {id}.");
+            return CmsResult<TemplateRevisionDetail>.NotFound($"No template has id {id}.");
         }
 
         var revision = await context.TemplateRevisions
@@ -266,11 +266,11 @@ public sealed class TemplateService(
 
         if (revision is null)
         {
-            return StructureResult<TemplateRevisionDetail>.NotFound(
+            return CmsResult<TemplateRevisionDetail>.NotFound(
                 $"Template '{template.Key}' has no revision {revisionNumber}.");
         }
 
-        return StructureResult<TemplateRevisionDetail>.Success(new TemplateRevisionDetail(
+        return CmsResult<TemplateRevisionDetail>.Success(new TemplateRevisionDetail(
             ToSummary(revision, template),
             template.Key,
             StructureJson.Read(revision.ZoneSnapshotJson, logger, $"revision {revisionNumber} of template '{template.Key}'")));
@@ -280,8 +280,8 @@ public sealed class TemplateService(
     private Task<bool> KeyExistsAsync(string key, CancellationToken cancellationToken) =>
         context.Templates.AnyAsync(template => template.Key == key, cancellationToken);
 
-    private static StructureResult<TemplateDetail> DuplicateKey(string key) =>
-        StructureResult<TemplateDetail>.Conflict(
+    private static CmsResult<TemplateDetail> DuplicateKey(string key) =>
+        CmsResult<TemplateDetail>.Conflict(
             StructureCodes.KeyDuplicate,
             $"A template already uses the key '{key}'.",
             nameof(CreateTemplateRequest.Key));

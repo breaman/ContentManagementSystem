@@ -25,12 +25,12 @@ public sealed class CompositionService(
     ILogger<CompositionService> logger) : ICompositionService
 {
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<CompositionSummary>>> ListAsync(
+    public async Task<CmsResult<IReadOnlyList<CompositionSummary>>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<CompositionSummary>>.Forbidden(
+            return CmsResult<IReadOnlyList<CompositionSummary>>.Forbidden(
                 "Reading compositions is not permitted.");
         }
 
@@ -46,17 +46,17 @@ public sealed class CompositionService(
                 composition.BlockTypes.Count))
             .ToListAsync(cancellationToken);
 
-        return StructureResult<IReadOnlyList<CompositionSummary>>.Success(compositions);
+        return CmsResult<IReadOnlyList<CompositionSummary>>.Success(compositions);
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionDetail>> GetAsync(
+    public async Task<CmsResult<CompositionDetail>> GetAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<CompositionDetail>.Forbidden("Reading compositions is not permitted.");
+            return CmsResult<CompositionDetail>.Forbidden("Reading compositions is not permitted.");
         }
 
         var composition = await Query()
@@ -64,12 +64,12 @@ public sealed class CompositionService(
             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         return composition is null
-            ? StructureResult<CompositionDetail>.NotFound($"No composition has id {id}.")
-            : StructureResult<CompositionDetail>.Success(ToDetail(composition));
+            ? CmsResult<CompositionDetail>.NotFound($"No composition has id {id}.")
+            : CmsResult<CompositionDetail>.Success(ToDetail(composition));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionDetail>> CreateAsync(
+    public async Task<CmsResult<CompositionDetail>> CreateAsync(
         CreateCompositionRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -77,7 +77,7 @@ public sealed class CompositionService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<CompositionDetail>.Forbidden("Managing compositions is not permitted.");
+            return CmsResult<CompositionDetail>.Forbidden("Managing compositions is not permitted.");
         }
 
         var diagnostics = new List<ValidationDiagnostic>();
@@ -86,7 +86,7 @@ public sealed class CompositionService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<CompositionDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<CompositionDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         var key = request.Key!.Trim();
@@ -116,11 +116,11 @@ public sealed class CompositionService(
             throw;
         }
 
-        return StructureResult<CompositionDetail>.Success(ToDetail(composition));
+        return CmsResult<CompositionDetail>.Success(ToDetail(composition));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionDetail>> UpdateAsync(
+    public async Task<CmsResult<CompositionDetail>> UpdateAsync(
         int id,
         UpdateCompositionRequest request,
         CancellationToken cancellationToken = default)
@@ -129,14 +129,14 @@ public sealed class CompositionService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<CompositionDetail>.Forbidden("Managing compositions is not permitted.");
+            return CmsResult<CompositionDetail>.Forbidden("Managing compositions is not permitted.");
         }
 
         var composition = await Query().FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         if (composition is null)
         {
-            return StructureResult<CompositionDetail>.NotFound($"No composition has id {id}.");
+            return CmsResult<CompositionDetail>.NotFound($"No composition has id {id}.");
         }
 
         var diagnostics = SlotRules.ValidateMetadata(request.Name, request.Description, group: null);
@@ -154,7 +154,7 @@ public sealed class CompositionService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<CompositionDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<CompositionDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         composition.Name = request.Name!.Trim();
@@ -162,22 +162,22 @@ public sealed class CompositionService(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return StructureResult<CompositionDetail>.Success(ToDetail(composition));
+        return CmsResult<CompositionDetail>.Success(ToDetail(composition));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    public async Task<CmsResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<bool>.Forbidden("Managing compositions is not permitted.");
+            return CmsResult<bool>.Forbidden("Managing compositions is not permitted.");
         }
 
         var composition = await Query().FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         if (composition is null)
         {
-            return StructureResult<bool>.NotFound($"No composition has id {id}.");
+            return CmsResult<bool>.NotFound($"No composition has id {id}.");
         }
 
         var composedInto = composition.BlockTypes
@@ -188,7 +188,7 @@ public sealed class CompositionService(
 
         if (composedInto.Count > 0)
         {
-            return StructureResult<bool>.Conflict(
+            return CmsResult<bool>.Conflict(
                 StructureCodes.InUse,
                 $"'{composition.Key}' is composed into {string.Join(", ", composedInto.Select(k => $"'{k}'"))}. " +
                 "Detach it from each of them first — deleting it here would take those properties out " +
@@ -202,11 +202,11 @@ public sealed class CompositionService(
 
         logger.LogInformation("Composition {CompositionKey} deleted.", composition.Key);
 
-        return StructureResult<bool>.Success(true);
+        return CmsResult<bool>.Success(true);
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionPropertySaveResult>> CreatePropertyAsync(
+    public async Task<CmsResult<CompositionPropertySaveResult>> CreatePropertyAsync(
         int compositionId,
         CreatePropertyRequest request,
         CancellationToken cancellationToken = default)
@@ -215,7 +215,7 @@ public sealed class CompositionService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<CompositionPropertySaveResult>.Forbidden(
+            return CmsResult<CompositionPropertySaveResult>.Forbidden(
                 "Managing compositions is not permitted.");
         }
 
@@ -225,7 +225,7 @@ public sealed class CompositionService(
 
         if (composition is null)
         {
-            return StructureResult<CompositionPropertySaveResult>.NotFound(
+            return CmsResult<CompositionPropertySaveResult>.NotFound(
                 $"No composition has id {compositionId}.");
         }
 
@@ -238,13 +238,13 @@ public sealed class CompositionService(
 
         var checks = ValidationResult.From(diagnostics);
 
-        if (checks.HasErrors) return StructureResult<CompositionPropertySaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<CompositionPropertySaveResult>.Invalid(checks);
 
         var key = request.Key!.Trim();
 
         if (composition.Properties.Any(p => string.Equals(p.Key, key, StringComparison.OrdinalIgnoreCase)))
         {
-            return StructureResult<CompositionPropertySaveResult>.Conflict(
+            return CmsResult<CompositionPropertySaveResult>.Conflict(
                 StructureCodes.KeyDuplicate,
                 $"Composition '{composition.Key}' already has a property with the key '{key}'.",
                 SlotRules.KeyPath);
@@ -258,7 +258,7 @@ public sealed class CompositionService(
 
         if (Collisions(hosts, [key]) is { Count: > 0 } collisions)
         {
-            return StructureResult<CompositionPropertySaveResult>.Invalid(
+            return CmsResult<CompositionPropertySaveResult>.Invalid(
                 StructureCodes.CompositionCollision,
                 $"'{key}' is already a property of {Describe(collisions)}, which compose " +
                 $"'{composition.Key}'. One key cannot have two definitions in one block instance.",
@@ -289,7 +289,7 @@ public sealed class CompositionService(
             composition.Key,
             affected.Count);
 
-        return StructureResult<CompositionPropertySaveResult>.Success(
+        return CmsResult<CompositionPropertySaveResult>.Success(
             new CompositionPropertySaveResult(
                 ToDefinition(property, composition.Key),
                 affected,
@@ -298,7 +298,7 @@ public sealed class CompositionService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionPropertySaveResult>> UpdatePropertyAsync(
+    public async Task<CmsResult<CompositionPropertySaveResult>> UpdatePropertyAsync(
         int compositionId,
         int propertyId,
         UpdatePropertyRequest request,
@@ -308,7 +308,7 @@ public sealed class CompositionService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<CompositionPropertySaveResult>.Forbidden(
+            return CmsResult<CompositionPropertySaveResult>.Forbidden(
                 "Managing compositions is not permitted.");
         }
 
@@ -318,13 +318,13 @@ public sealed class CompositionService(
 
         if (composition is null)
         {
-            return StructureResult<CompositionPropertySaveResult>.NotFound(
+            return CmsResult<CompositionPropertySaveResult>.NotFound(
                 $"No composition has id {compositionId}.");
         }
 
         if (composition.Properties.FirstOrDefault(candidate => candidate.Id == propertyId) is not { } property)
         {
-            return StructureResult<CompositionPropertySaveResult>.NotFound(
+            return CmsResult<CompositionPropertySaveResult>.NotFound(
                 $"Composition {compositionId} has no property with id {propertyId}.");
         }
 
@@ -344,7 +344,7 @@ public sealed class CompositionService(
 
         var checks = ValidationResult.From(diagnostics);
 
-        if (checks.HasErrors) return StructureResult<CompositionPropertySaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<CompositionPropertySaveResult>.Invalid(checks);
 
         var isStructural = property.IsRequired != request.IsRequired ||
             !string.Equals(property.ConfigurationJson, configurationJson, StringComparison.Ordinal);
@@ -364,7 +364,7 @@ public sealed class CompositionService(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return StructureResult<CompositionPropertySaveResult>.Success(
+        return CmsResult<CompositionPropertySaveResult>.Success(
             new CompositionPropertySaveResult(
                 ToDefinition(property, composition.Key),
                 affected,
@@ -373,14 +373,14 @@ public sealed class CompositionService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<CompositionPropertyRemovalResult>> DeletePropertyAsync(
+    public async Task<CmsResult<CompositionPropertyRemovalResult>> DeletePropertyAsync(
         int compositionId,
         int propertyId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<CompositionPropertyRemovalResult>.Forbidden(
+            return CmsResult<CompositionPropertyRemovalResult>.Forbidden(
                 "Managing compositions is not permitted.");
         }
 
@@ -390,13 +390,13 @@ public sealed class CompositionService(
 
         if (composition is null)
         {
-            return StructureResult<CompositionPropertyRemovalResult>.NotFound(
+            return CmsResult<CompositionPropertyRemovalResult>.NotFound(
                 $"No composition has id {compositionId}.");
         }
 
         if (composition.Properties.FirstOrDefault(candidate => candidate.Id == propertyId) is not { } property)
         {
-            return StructureResult<CompositionPropertyRemovalResult>.NotFound(
+            return CmsResult<CompositionPropertyRemovalResult>.NotFound(
                 $"Composition {compositionId} has no property with id {propertyId}.");
         }
 
@@ -416,7 +416,7 @@ public sealed class CompositionService(
             composition.Key,
             affected.Count);
 
-        return StructureResult<CompositionPropertyRemovalResult>.Success(
+        return CmsResult<CompositionPropertyRemovalResult>.Success(
             new CompositionPropertyRemovalResult(property.Key, affected));
     }
 
@@ -472,8 +472,8 @@ public sealed class CompositionService(
     private Task<bool> KeyExistsAsync(string key, CancellationToken cancellationToken) =>
         context.Compositions.AnyAsync(composition => composition.Key == key, cancellationToken);
 
-    private static StructureResult<T> DuplicateKey<T>(string key) =>
-        StructureResult<T>.Conflict(
+    private static CmsResult<T> DuplicateKey<T>(string key) =>
+        CmsResult<T>.Conflict(
             StructureCodes.KeyDuplicate,
             $"A composition already uses the key '{key}'.",
             SlotRules.KeyPath);

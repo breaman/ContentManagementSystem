@@ -24,18 +24,18 @@ public sealed class ZoneService(
     ILogger<ZoneService> logger) : IZoneService
 {
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<ZoneDefinition>>> ListAsync(
+    public async Task<CmsResult<IReadOnlyList<ZoneDefinition>>> ListAsync(
         int templateId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<ZoneDefinition>>.Forbidden("Reading templates is not permitted.");
+            return CmsResult<IReadOnlyList<ZoneDefinition>>.Forbidden("Reading templates is not permitted.");
         }
 
         if (!await context.Templates.AnyAsync(template => template.Id == templateId, cancellationToken))
         {
-            return StructureResult<IReadOnlyList<ZoneDefinition>>.NotFound($"No template has id {templateId}.");
+            return CmsResult<IReadOnlyList<ZoneDefinition>>.NotFound($"No template has id {templateId}.");
         }
 
         var zones = await context.Zones
@@ -45,19 +45,19 @@ public sealed class ZoneService(
             .ThenBy(zone => zone.Key)
             .ToListAsync(cancellationToken);
 
-        return StructureResult<IReadOnlyList<ZoneDefinition>>.Success(
+        return CmsResult<IReadOnlyList<ZoneDefinition>>.Success(
             zones.Select(ToDefinition).ToList());
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<ZoneDefinition>> GetAsync(
+    public async Task<CmsResult<ZoneDefinition>> GetAsync(
         int templateId,
         int zoneId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<ZoneDefinition>.Forbidden("Reading templates is not permitted.");
+            return CmsResult<ZoneDefinition>.Forbidden("Reading templates is not permitted.");
         }
 
         var zone = await context.Zones
@@ -70,12 +70,12 @@ public sealed class ZoneService(
         // mismatch: the pair is the address, and answering "wrong template" would confirm the
         // existence of a row the caller did not ask about.
         return zone is null
-            ? StructureResult<ZoneDefinition>.NotFound($"Template {templateId} has no zone with id {zoneId}.")
-            : StructureResult<ZoneDefinition>.Success(ToDefinition(zone));
+            ? CmsResult<ZoneDefinition>.NotFound($"Template {templateId} has no zone with id {zoneId}.")
+            : CmsResult<ZoneDefinition>.Success(ToDefinition(zone));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<ZoneSaveResult>> CreateAsync(
+    public async Task<CmsResult<ZoneSaveResult>> CreateAsync(
         int templateId,
         CreateZoneRequest request,
         CancellationToken cancellationToken = default)
@@ -84,14 +84,14 @@ public sealed class ZoneService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<ZoneSaveResult>.Forbidden("Managing templates is not permitted.");
+            return CmsResult<ZoneSaveResult>.Forbidden("Managing templates is not permitted.");
         }
 
         var template = await LoadForWriteAsync(templateId, cancellationToken);
 
         if (template is null)
         {
-            return StructureResult<ZoneSaveResult>.NotFound($"No template has id {templateId}.");
+            return CmsResult<ZoneSaveResult>.NotFound($"No template has id {templateId}.");
         }
 
         var configurationJson = StructureJson.Normalize(request.Configuration);
@@ -106,7 +106,7 @@ public sealed class ZoneService(
         // Errors block; warnings do not. A configuration setting whose phase has not shipped is
         // stored and reported back with the saved zone (P1-12), so the result has to be judged on
         // severity rather than on whether anything was said at all.
-        if (checks.HasErrors) return StructureResult<ZoneSaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<ZoneSaveResult>.Invalid(checks);
 
         var key = request.Key!.Trim();
 
@@ -151,7 +151,7 @@ public sealed class ZoneService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<ZoneSaveResult>> UpdateAsync(
+    public async Task<CmsResult<ZoneSaveResult>> UpdateAsync(
         int templateId,
         int zoneId,
         UpdateZoneRequest request,
@@ -161,19 +161,19 @@ public sealed class ZoneService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<ZoneSaveResult>.Forbidden("Managing templates is not permitted.");
+            return CmsResult<ZoneSaveResult>.Forbidden("Managing templates is not permitted.");
         }
 
         var template = await LoadForWriteAsync(templateId, cancellationToken);
 
         if (template is null)
         {
-            return StructureResult<ZoneSaveResult>.NotFound($"No template has id {templateId}.");
+            return CmsResult<ZoneSaveResult>.NotFound($"No template has id {templateId}.");
         }
 
         if (template.Zones.FirstOrDefault(candidate => candidate.Id == zoneId) is not { } zone)
         {
-            return StructureResult<ZoneSaveResult>.NotFound($"Template {templateId} has no zone with id {zoneId}.");
+            return CmsResult<ZoneSaveResult>.NotFound($"Template {templateId} has no zone with id {zoneId}.");
         }
 
         var configurationJson = StructureJson.Normalize(request.Configuration);
@@ -195,7 +195,7 @@ public sealed class ZoneService(
 
         var checks = ValidationResult.From(diagnostics);
 
-        if (checks.HasErrors) return StructureResult<ZoneSaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<ZoneSaveResult>.Invalid(checks);
 
         // Structural means "changes how a stored value is read or judged". Everything else on a
         // zone is a label, and cutting a revision for a corrected typo would bury the changes that
@@ -224,26 +224,26 @@ public sealed class ZoneService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<ZoneRemovalResult>> DeleteAsync(
+    public async Task<CmsResult<ZoneRemovalResult>> DeleteAsync(
         int templateId,
         int zoneId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<ZoneRemovalResult>.Forbidden("Managing templates is not permitted.");
+            return CmsResult<ZoneRemovalResult>.Forbidden("Managing templates is not permitted.");
         }
 
         var template = await LoadForWriteAsync(templateId, cancellationToken);
 
         if (template is null)
         {
-            return StructureResult<ZoneRemovalResult>.NotFound($"No template has id {templateId}.");
+            return CmsResult<ZoneRemovalResult>.NotFound($"No template has id {templateId}.");
         }
 
         if (template.Zones.FirstOrDefault(candidate => candidate.Id == zoneId) is not { } zone)
         {
-            return StructureResult<ZoneRemovalResult>.NotFound(
+            return CmsResult<ZoneRemovalResult>.NotFound(
                 $"Template {templateId} has no zone with id {zoneId}.");
         }
 
@@ -268,7 +268,7 @@ public sealed class ZoneService(
             template.Key,
             template.CurrentRevision);
 
-        return StructureResult<ZoneRemovalResult>.Success(
+        return CmsResult<ZoneRemovalResult>.Success(
             new ZoneRemovalResult(zone.Key, template.CurrentRevision));
     }
 
@@ -370,7 +370,7 @@ public sealed class ZoneService(
     /// close that window, the index can. Anything else is rethrown: a save that failed for an
     /// unrelated reason must not be reported as a conflict a client will retry forever.
     /// </remarks>
-    private async Task<StructureResult<T>> ExplainAsync<T>(
+    private async Task<CmsResult<T>> ExplainAsync<T>(
         DbUpdateException failure,
         Template template,
         string key,
@@ -385,7 +385,7 @@ public sealed class ZoneService(
                         candidate.RevisionNumber == revision.RevisionNumber,
                     cancellationToken))
         {
-            return StructureResult<T>.Conflict(
+            return CmsResult<T>.Conflict(
                 StructureCodes.ConcurrentChange,
                 $"The structure of template '{template.Key}' was changed by someone else while this " +
                 "change was being saved. Reload the template and apply the change again.");
@@ -399,14 +399,14 @@ public sealed class ZoneService(
         throw failure;
     }
 
-    private static StructureResult<T> DuplicateKey<T>(string key, string templateKey) =>
-        StructureResult<T>.Conflict(
+    private static CmsResult<T> DuplicateKey<T>(string key, string templateKey) =>
+        CmsResult<T>.Conflict(
             StructureCodes.KeyDuplicate,
             $"Template '{templateKey}' already has a zone with the key '{key}'.",
             SlotRules.KeyPath);
 
-    private StructureResult<ZoneSaveResult> Saved(Zone zone, Template template, ValidationResult checks) =>
-        StructureResult<ZoneSaveResult>.Success(
+    private CmsResult<ZoneSaveResult> Saved(Zone zone, Template template, ValidationResult checks) =>
+        CmsResult<ZoneSaveResult>.Success(
             new ZoneSaveResult(
                 ToDefinition(zone),
                 template.CurrentRevision,

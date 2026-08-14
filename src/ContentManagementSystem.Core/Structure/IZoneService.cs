@@ -27,7 +27,7 @@ public interface IZoneService
     /// <param name="templateId">Identity of the template.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The zone definitions, or a not-found result when the template does not exist.</returns>
-    Task<StructureResult<IReadOnlyList<ZoneDefinition>>> ListAsync(
+    Task<CmsResult<IReadOnlyList<ZoneDefinition>>> ListAsync(
         int templateId,
         CancellationToken cancellationToken = default);
 
@@ -36,7 +36,7 @@ public interface IZoneService
     /// <param name="zoneId">Identity of the zone.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <returns>The zone definition, or a not-found result.</returns>
-    Task<StructureResult<ZoneDefinition>> GetAsync(
+    Task<CmsResult<ZoneDefinition>> GetAsync(
         int templateId,
         int zoneId,
         CancellationToken cancellationToken = default);
@@ -56,7 +56,7 @@ public interface IZoneService
     /// as absent. A required zone added to a template with live pages fails those pages only on
     /// their next publish, which is the behaviour spec section 8.5 asks for.
     /// </remarks>
-    Task<StructureResult<ZoneSaveResult>> CreateAsync(
+    Task<CmsResult<ZoneSaveResult>> CreateAsync(
         int templateId,
         CreateZoneRequest request,
         CancellationToken cancellationToken = default);
@@ -69,7 +69,7 @@ public interface IZoneService
     /// <param name="request">The new values. A changed key or field type is refused.</param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The stored zone with any warnings, an invalid result, or a not-found result.</returns>
-    Task<StructureResult<ZoneSaveResult>> UpdateAsync(
+    Task<CmsResult<ZoneSaveResult>> UpdateAsync(
         int templateId,
         int zoneId,
         UpdateZoneRequest request,
@@ -89,7 +89,7 @@ public interface IZoneService
     /// content exists would be the stricter-looking choice and the wrong one: it would make a
     /// content model unchangeable the moment anybody used it.
     /// </remarks>
-    Task<StructureResult<ZoneRemovalResult>> DeleteAsync(
+    Task<CmsResult<ZoneRemovalResult>> DeleteAsync(
         int templateId,
         int zoneId,
         CancellationToken cancellationToken = default);

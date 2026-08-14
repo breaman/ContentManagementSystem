@@ -27,12 +27,12 @@ public sealed class BlockTypeService(
     ILogger<BlockTypeService> logger) : IBlockTypeService
 {
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<BlockTypeSummary>>> ListAsync(
+    public async Task<CmsResult<IReadOnlyList<BlockTypeSummary>>> ListAsync(
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<BlockTypeSummary>>.Forbidden(
+            return CmsResult<IReadOnlyList<BlockTypeSummary>>.Forbidden(
                 "Reading block types is not permitted.");
         }
 
@@ -41,18 +41,18 @@ public sealed class BlockTypeService(
             .OrderBy(blockType => blockType.Name)
             .ToListAsync(cancellationToken);
 
-        return StructureResult<IReadOnlyList<BlockTypeSummary>>.Success(
+        return CmsResult<IReadOnlyList<BlockTypeSummary>>.Success(
             blockTypes.Select(ToSummary).ToList());
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeDetail>> GetAsync(
+    public async Task<CmsResult<BlockTypeDetail>> GetAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<BlockTypeDetail>.Forbidden("Reading block types is not permitted.");
+            return CmsResult<BlockTypeDetail>.Forbidden("Reading block types is not permitted.");
         }
 
         var blockType = await Query()
@@ -60,12 +60,12 @@ public sealed class BlockTypeService(
             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         return blockType is null
-            ? StructureResult<BlockTypeDetail>.NotFound($"No block type has id {id}.")
-            : StructureResult<BlockTypeDetail>.Success(ToDetail(blockType));
+            ? CmsResult<BlockTypeDetail>.NotFound($"No block type has id {id}.")
+            : CmsResult<BlockTypeDetail>.Success(ToDetail(blockType));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeDetail>> CreateAsync(
+    public async Task<CmsResult<BlockTypeDetail>> CreateAsync(
         CreateBlockTypeRequest request,
         CancellationToken cancellationToken = default)
     {
@@ -73,7 +73,7 @@ public sealed class BlockTypeService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
         }
 
         var diagnostics = new List<ValidationDiagnostic>();
@@ -83,7 +83,7 @@ public sealed class BlockTypeService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<BlockTypeDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<BlockTypeDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         var key = request.Key!.Trim();
@@ -139,11 +139,11 @@ public sealed class BlockTypeService(
             blockType.Key,
             blockType.Id);
 
-        return StructureResult<BlockTypeDetail>.Success(ToDetail(blockType));
+        return CmsResult<BlockTypeDetail>.Success(ToDetail(blockType));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeDetail>> UpdateAsync(
+    public async Task<CmsResult<BlockTypeDetail>> UpdateAsync(
         int id,
         UpdateBlockTypeRequest request,
         CancellationToken cancellationToken = default)
@@ -152,14 +152,14 @@ public sealed class BlockTypeService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(id, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<BlockTypeDetail>.NotFound($"No block type has id {id}.");
+            return CmsResult<BlockTypeDetail>.NotFound($"No block type has id {id}.");
         }
 
         var diagnostics = SlotRules.ValidateMetadata(request.Name, request.Description, group: null);
@@ -178,7 +178,7 @@ public sealed class BlockTypeService(
 
         if (diagnostics.Count > 0)
         {
-            return StructureResult<BlockTypeDetail>.Invalid(ValidationResult.From(diagnostics));
+            return CmsResult<BlockTypeDetail>.Invalid(ValidationResult.From(diagnostics));
         }
 
         // Metadata only, so a built-in is fair game here: renaming "Raw HTML" or changing its icon
@@ -190,17 +190,17 @@ public sealed class BlockTypeService(
 
         await context.SaveChangesAsync(cancellationToken);
 
-        return StructureResult<BlockTypeDetail>.Success(ToDetail(blockType));
+        return CmsResult<BlockTypeDetail>.Success(ToDetail(blockType));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<IReadOnlyList<BlockTypeRevisionSummary>>> ListRevisionsAsync(
+    public async Task<CmsResult<IReadOnlyList<BlockTypeRevisionSummary>>> ListRevisionsAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<IReadOnlyList<BlockTypeRevisionSummary>>.Forbidden(
+            return CmsResult<IReadOnlyList<BlockTypeRevisionSummary>>.Forbidden(
                 "Reading block types is not permitted.");
         }
 
@@ -210,7 +210,7 @@ public sealed class BlockTypeService(
 
         if (blockType is null)
         {
-            return StructureResult<IReadOnlyList<BlockTypeRevisionSummary>>.NotFound(
+            return CmsResult<IReadOnlyList<BlockTypeRevisionSummary>>.NotFound(
                 $"No block type has id {id}.");
         }
 
@@ -220,19 +220,19 @@ public sealed class BlockTypeService(
             .OrderByDescending(revision => revision.RevisionNumber)
             .ToListAsync(cancellationToken);
 
-        return StructureResult<IReadOnlyList<BlockTypeRevisionSummary>>.Success(
+        return CmsResult<IReadOnlyList<BlockTypeRevisionSummary>>.Success(
             revisions.Select(revision => ToSummary(revision, blockType)).ToList());
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeRevisionDetail>> GetRevisionAsync(
+    public async Task<CmsResult<BlockTypeRevisionDetail>> GetRevisionAsync(
         int id,
         int revisionNumber,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
-            return StructureResult<BlockTypeRevisionDetail>.Forbidden("Reading block types is not permitted.");
+            return CmsResult<BlockTypeRevisionDetail>.Forbidden("Reading block types is not permitted.");
         }
 
         var blockType = await context.BlockTypes
@@ -241,7 +241,7 @@ public sealed class BlockTypeService(
 
         if (blockType is null)
         {
-            return StructureResult<BlockTypeRevisionDetail>.NotFound($"No block type has id {id}.");
+            return CmsResult<BlockTypeRevisionDetail>.NotFound($"No block type has id {id}.");
         }
 
         var revision = await context.BlockTypeRevisions
@@ -252,11 +252,11 @@ public sealed class BlockTypeService(
 
         if (revision is null)
         {
-            return StructureResult<BlockTypeRevisionDetail>.NotFound(
+            return CmsResult<BlockTypeRevisionDetail>.NotFound(
                 $"Block type '{blockType.Key}' has no revision {revisionNumber}.");
         }
 
-        return StructureResult<BlockTypeRevisionDetail>.Success(new BlockTypeRevisionDetail(
+        return CmsResult<BlockTypeRevisionDetail>.Success(new BlockTypeRevisionDetail(
             ToSummary(revision, blockType),
             blockType.Key,
             StructureJson.Read(
@@ -266,7 +266,7 @@ public sealed class BlockTypeService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<PropertySaveResult>> CreatePropertyAsync(
+    public async Task<CmsResult<PropertySaveResult>> CreatePropertyAsync(
         int blockTypeId,
         CreatePropertyRequest request,
         CancellationToken cancellationToken = default)
@@ -275,14 +275,14 @@ public sealed class BlockTypeService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<PropertySaveResult>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<PropertySaveResult>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(blockTypeId, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<PropertySaveResult>.NotFound($"No block type has id {blockTypeId}.");
+            return CmsResult<PropertySaveResult>.NotFound($"No block type has id {blockTypeId}.");
         }
 
         if (BuiltIn<PropertySaveResult>(blockType) is { } refusal) return refusal;
@@ -296,13 +296,13 @@ public sealed class BlockTypeService(
 
         var checks = ValidationResult.From(diagnostics);
 
-        if (checks.HasErrors) return StructureResult<PropertySaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<PropertySaveResult>.Invalid(checks);
 
         var key = request.Key!.Trim();
 
         if (ComposedKey(blockType, key) is { } composition)
         {
-            return StructureResult<PropertySaveResult>.Invalid(
+            return CmsResult<PropertySaveResult>.Invalid(
                 StructureCodes.CompositionCollision,
                 $"The composition '{composition}' already contributes a property called '{key}' to " +
                 "this block type, and both would land in the same block instance. Rename this " +
@@ -348,7 +348,7 @@ public sealed class BlockTypeService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<PropertySaveResult>> UpdatePropertyAsync(
+    public async Task<CmsResult<PropertySaveResult>> UpdatePropertyAsync(
         int blockTypeId,
         int propertyId,
         UpdatePropertyRequest request,
@@ -358,21 +358,21 @@ public sealed class BlockTypeService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<PropertySaveResult>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<PropertySaveResult>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(blockTypeId, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<PropertySaveResult>.NotFound($"No block type has id {blockTypeId}.");
+            return CmsResult<PropertySaveResult>.NotFound($"No block type has id {blockTypeId}.");
         }
 
         if (BuiltIn<PropertySaveResult>(blockType) is { } refusal) return refusal;
 
         if (blockType.Properties.FirstOrDefault(candidate => candidate.Id == propertyId) is not { } property)
         {
-            return StructureResult<PropertySaveResult>.NotFound(
+            return CmsResult<PropertySaveResult>.NotFound(
                 $"Block type {blockTypeId} has no property with id {propertyId}.");
         }
 
@@ -392,7 +392,7 @@ public sealed class BlockTypeService(
 
         var checks = ValidationResult.From(diagnostics);
 
-        if (checks.HasErrors) return StructureResult<PropertySaveResult>.Invalid(checks);
+        if (checks.HasErrors) return CmsResult<PropertySaveResult>.Invalid(checks);
 
         var isStructural = property.IsRequired != request.IsRequired ||
             !string.Equals(property.ConfigurationJson, configurationJson, StringComparison.Ordinal);
@@ -418,28 +418,28 @@ public sealed class BlockTypeService(
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<PropertyRemovalResult>> DeletePropertyAsync(
+    public async Task<CmsResult<PropertyRemovalResult>> DeletePropertyAsync(
         int blockTypeId,
         int propertyId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<PropertyRemovalResult>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<PropertyRemovalResult>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(blockTypeId, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<PropertyRemovalResult>.NotFound($"No block type has id {blockTypeId}.");
+            return CmsResult<PropertyRemovalResult>.NotFound($"No block type has id {blockTypeId}.");
         }
 
         if (BuiltIn<PropertyRemovalResult>(blockType) is { } refusal) return refusal;
 
         if (blockType.Properties.FirstOrDefault(candidate => candidate.Id == propertyId) is not { } property)
         {
-            return StructureResult<PropertyRemovalResult>.NotFound(
+            return CmsResult<PropertyRemovalResult>.NotFound(
                 $"Block type {blockTypeId} has no property with id {propertyId}.");
         }
 
@@ -463,12 +463,12 @@ public sealed class BlockTypeService(
             blockType.Key,
             blockType.CurrentRevision);
 
-        return StructureResult<PropertyRemovalResult>.Success(
+        return CmsResult<PropertyRemovalResult>.Success(
             new PropertyRemovalResult(property.Key, blockType.CurrentRevision));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeDetail>> AttachCompositionAsync(
+    public async Task<CmsResult<BlockTypeDetail>> AttachCompositionAsync(
         int blockTypeId,
         AttachCompositionRequest request,
         CancellationToken cancellationToken = default)
@@ -477,14 +477,14 @@ public sealed class BlockTypeService(
 
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(blockTypeId, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<BlockTypeDetail>.NotFound($"No block type has id {blockTypeId}.");
+            return CmsResult<BlockTypeDetail>.NotFound($"No block type has id {blockTypeId}.");
         }
 
         if (BuiltIn<BlockTypeDetail>(blockType) is { } refusal) return refusal;
@@ -495,13 +495,13 @@ public sealed class BlockTypeService(
 
         if (composition is null)
         {
-            return StructureResult<BlockTypeDetail>.NotFound(
+            return CmsResult<BlockTypeDetail>.NotFound(
                 $"No composition has id {request.CompositionId}.");
         }
 
         if (blockType.Compositions.Any(binding => binding.CompositionId == composition.Id))
         {
-            return StructureResult<BlockTypeDetail>.Conflict(
+            return CmsResult<BlockTypeDetail>.Conflict(
                 StructureCodes.CompositionDuplicate,
                 $"Block type '{blockType.Key}' already composes '{composition.Key}'.",
                 nameof(AttachCompositionRequest.CompositionId));
@@ -527,7 +527,7 @@ public sealed class BlockTypeService(
 
         if (collisions.Count > 0)
         {
-            return StructureResult<BlockTypeDetail>.Invalid(
+            return CmsResult<BlockTypeDetail>.Invalid(
                 StructureCodes.CompositionCollision,
                 $"Composing '{composition.Key}' into '{blockType.Key}' would define " +
                 $"{string.Join(", ", collisions.Select(key => $"'{key}'"))} twice in one block " +
@@ -549,25 +549,25 @@ public sealed class BlockTypeService(
                 failure, blockType, composition.Key, revision, cancellationToken);
         }
 
-        return StructureResult<BlockTypeDetail>.Success(ToDetail(blockType));
+        return CmsResult<BlockTypeDetail>.Success(ToDetail(blockType));
     }
 
     /// <inheritdoc />
-    public async Task<StructureResult<BlockTypeDetail>> DetachCompositionAsync(
+    public async Task<CmsResult<BlockTypeDetail>> DetachCompositionAsync(
         int blockTypeId,
         int compositionId,
         CancellationToken cancellationToken = default)
     {
         if (!authorization.HasPermission(CmsPermissions.StructureEdit))
         {
-            return StructureResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
+            return CmsResult<BlockTypeDetail>.Forbidden("Managing block types is not permitted.");
         }
 
         var blockType = await LoadAsync(blockTypeId, cancellationToken);
 
         if (blockType is null)
         {
-            return StructureResult<BlockTypeDetail>.NotFound($"No block type has id {blockTypeId}.");
+            return CmsResult<BlockTypeDetail>.NotFound($"No block type has id {blockTypeId}.");
         }
 
         if (BuiltIn<BlockTypeDetail>(blockType) is { } refusal) return refusal;
@@ -575,7 +575,7 @@ public sealed class BlockTypeService(
         if (blockType.Compositions.FirstOrDefault(candidate => candidate.CompositionId == compositionId)
             is not { } binding)
         {
-            return StructureResult<BlockTypeDetail>.NotFound(
+            return CmsResult<BlockTypeDetail>.NotFound(
                 $"Block type {blockTypeId} does not compose composition {compositionId}.");
         }
 
@@ -591,7 +591,7 @@ public sealed class BlockTypeService(
             return await ExplainAsync<BlockTypeDetail>(failure, blockType, key, revision, cancellationToken);
         }
 
-        return StructureResult<BlockTypeDetail>.Success(ToDetail(blockType));
+        return CmsResult<BlockTypeDetail>.Success(ToDetail(blockType));
     }
 
     /// <summary>Everything a block type's flattened property set needs, in one query.</summary>
@@ -607,9 +607,9 @@ public sealed class BlockTypeService(
 
     /// <summary>Refuses a structural change to a block type the system itself depends on.</summary>
     /// <returns>The refusal, or null when the block type is an ordinary one.</returns>
-    private static StructureResult<T>? BuiltIn<T>(BlockType blockType) =>
+    private static CmsResult<T>? BuiltIn<T>(BlockType blockType) =>
         blockType.IsBuiltIn
-            ? StructureResult<T>.Invalid(
+            ? CmsResult<T>.Invalid(
                 StructureCodes.BuiltInImmutable,
                 $"'{blockType.Key}' is a built-in block type and its property set is fixed. The code " +
                 "that renders it expects exactly these properties, so a change here would break a " +
@@ -662,7 +662,7 @@ public sealed class BlockTypeService(
     /// <c>(BlockTypeId, RevisionNumber)</c> is a concurrent structural change and is retryable,
     /// <c>(BlockTypeId, Key)</c> is a duplicate property key. Anything else is rethrown.
     /// </remarks>
-    private async Task<StructureResult<T>> ExplainAsync<T>(
+    private async Task<CmsResult<T>> ExplainAsync<T>(
         DbUpdateException failure,
         BlockType blockType,
         string key,
@@ -677,7 +677,7 @@ public sealed class BlockTypeService(
                         candidate.RevisionNumber == revision.RevisionNumber,
                     cancellationToken))
         {
-            return StructureResult<T>.Conflict(
+            return CmsResult<T>.Conflict(
                 StructureCodes.ConcurrentChange,
                 $"The structure of block type '{blockType.Key}' was changed by someone else while " +
                 "this change was being saved. Reload it and apply the change again.");
@@ -691,23 +691,23 @@ public sealed class BlockTypeService(
         throw failure;
     }
 
-    private static StructureResult<T> DuplicateBlockTypeKey<T>(string key) =>
-        StructureResult<T>.Conflict(
+    private static CmsResult<T> DuplicateBlockTypeKey<T>(string key) =>
+        CmsResult<T>.Conflict(
             StructureCodes.KeyDuplicate,
             $"A block type already uses the key '{key}'.",
             SlotRules.KeyPath);
 
-    private static StructureResult<T> DuplicatePropertyKey<T>(string key, string blockTypeKey) =>
-        StructureResult<T>.Conflict(
+    private static CmsResult<T> DuplicatePropertyKey<T>(string key, string blockTypeKey) =>
+        CmsResult<T>.Conflict(
             StructureCodes.KeyDuplicate,
             $"Block type '{blockTypeKey}' already has a property with the key '{key}'.",
             SlotRules.KeyPath);
 
-    private StructureResult<PropertySaveResult> Saved(
+    private CmsResult<PropertySaveResult> Saved(
         BlockTypeProperty property,
         BlockType blockType,
         ValidationResult checks) =>
-        StructureResult<PropertySaveResult>.Success(
+        CmsResult<PropertySaveResult>.Success(
             new PropertySaveResult(
                 ToDefinition(property),
                 blockType.CurrentRevision,

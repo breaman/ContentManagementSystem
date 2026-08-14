@@ -2,6 +2,7 @@
 
 **Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-30` registration that
 waits on the content schema catalog and the `P1-32` template-delete guard; Phase 2 data layer built
+and `PageService` with it
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -51,7 +52,7 @@ and record the date in the progress table.
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 31 | 28.0 | In progress — 1.1 to 1.5 built; `P1-30` and `P1-32` finish in Phase 2 | — |
-| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 7 | 27.0 | In progress — 2.1 data layer complete; services next | — |
+| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 8 | 27.0 | In progress — 2.1 complete; `PageService` built, rest of 2.2 next | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
@@ -59,7 +60,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **57** | **203.5** | | |
+| **v1 total** | **281** | **58** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1037,8 +1038,45 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 ### 2.2 Services — 16 ed
 
-- [ ] **P2-07** `PageService` in `Core/Content/` — create from template (produces a draft version with
+- [x] **P2-07** `PageService` in `Core/Content/` — create from template (produces a draft version with
   an empty, schema-valid payload), read, metadata patch. — 2 ed
+  *2026-08-14 — three operations over `IPageService`, plus `Slugs` (generation and the [§10.2]/[§10.3]
+  segment rules) and `PageCodes`. The create is one transaction of three statements, because two of
+  its values cannot be known until the rows exist: the path contains the page's own id and
+  `DraftVersionId` points at a row that points back [§23.5]. It runs under
+  `CreateExecutionStrategy()` — Aspire's `EnrichSqlServerDbContext` turns retries on, and a manual
+  transaction without one throws the moment a connection blips — and clears the change tracker on
+  entry, since a retry re-runs the whole lambda and would otherwise insert the failed attempt's
+  entities a second time.*
+  ***`StructureResult<T>` / `StructureOutcome` are now `CmsResult<T>` / `CmsOutcome`** in
+  `Core` (199 references, a pure token rename). A page service returning a type named for structure
+  is a lie, and a second identical carrier beside it would mean a second `CmsProblems` mapping — two
+  places to answer "what status is a conflict", which is exactly how a 404 becomes a 400 in one
+  corner of the surface. `NotFound`/`Forbidden` gained an optional code so a page refusal reads
+  `page.not-found`; the default stays `structure.*` because those codes have shipped and a shipped
+  code does not change [§22.2].*
+  ***The metadata patch needed a way to say "not supplied", and that is `Patch<T>`*** in
+  `Shared/Contracts/Api/`. Binding a PATCH body to plain nullables collapses `{"ownerUserId": null}`
+  (clear it) and an omitted member (leave it) into one value, so a client sending only the field it
+  changed silently clears every field it did not — the way an editor's SEO settings disappear when
+  someone fixes a title. `System.Text.Json` supplies the reading half free, since the converter runs
+  only for a member that is present; the writing half needs `WhenWritingDefault` on the member,
+  because a converter cannot suppress a property name its parent already wrote.*
+  *Four decisions the task's wording did not settle. **A bad `templateId` or `parentId` is `422`, not
+  `404`** — the address of the request is the page collection, and answering 404 tells a client the
+  endpoint is not there. **The slug is checked against live siblings only**: a full URL is its
+  ancestors' slugs joined, so that is the only way two tree-derived URLs collide, and counting
+  deleted siblings would hold a URL hostage to the recycle bin. **A non-ASCII slug is a warning, not
+  an error** [§10.3], which made the same errors-block-warnings-do-not rule `P1-22` needed apply
+  here. And **`OwnerUserId` is checked against the user table** rather than left to the foreign key,
+  because a constraint violation reaches the client as a 500 about a database it should not know
+  exists.*
+  ***One gap recorded rather than papered over.*** Phase 2's schema has no unique index on
+  `(ParentId, Slug)`, so two simultaneous creates can both pass the sibling check. There is no
+  constraint for a catch block to re-interpret, and inventing one here would duplicate what
+  `PageRoute.UrlHash WHERE IsPublished = 1` does properly in `P3-01`. Said so in
+  `SiblingSlugExistsAsync`'s remarks. 13 integration tests in `Server.Tests/Content/PageServiceTests`
+  and 28 unit tests in `Core.Tests/Content/SlugsTests`; 1099 green across the four suites.*
 - [ ] **P2-08** `RecycleBinService` in `Core/Content/` — subtree-aware soft delete/restore, route
   retirement, parent-redirect option, permanent-delete guard against live `ContentReference` rows
   [§14.10]. Restore returns a page as a **draft**, never live. — 1.5 ed

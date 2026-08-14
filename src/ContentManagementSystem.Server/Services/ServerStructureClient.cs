@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Fields;
@@ -119,7 +120,7 @@ public sealed class ServerStructureClient(
     /// A pre-render that reported failures differently would be a second error contract nobody
     /// tests.
     /// </remarks>
-    private static StructureClientResult<T> Project<T>(StructureResult<T> result) =>
+    private static StructureClientResult<T> Project<T>(CmsResult<T> result) =>
         result.IsSuccess
             ? StructureClientResult<T>.Success(
                 result.Value!,
