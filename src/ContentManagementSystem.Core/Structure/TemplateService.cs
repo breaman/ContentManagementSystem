@@ -22,9 +22,6 @@ public sealed class TemplateService(
     ICmsAuthorization authorization,
     ILogger<TemplateService> logger) : ITemplateService
 {
-    /// <summary>Stands in for a snapshot or configuration that cannot be read.</summary>
-    private static readonly JsonElement EmptyArray = JsonDocument.Parse("[]").RootElement.Clone();
-
     /// <inheritdoc />
     public async Task<StructureResult<IReadOnlyList<TemplateSummary>>> ListAsync(
         CancellationToken cancellationToken = default)
@@ -106,7 +103,7 @@ public sealed class TemplateService(
         {
             Key = key,
             Name = request.Name!.Trim(),
-            Description = Clean(request.Description),
+            Description = SlotRules.Clean(request.Description),
             SortOrder = request.SortOrder,
             IsEnabled = true,
             // A template created here has no Razor component behind it — no deployed code declares
@@ -199,7 +196,7 @@ public sealed class TemplateService(
         }
 
         template.Name = request.Name!.Trim();
-        template.Description = Clean(request.Description);
+        template.Description = SlotRules.Clean(request.Description);
         template.IsEnabled = request.IsEnabled;
         template.SortOrder = request.SortOrder;
 
@@ -276,7 +273,7 @@ public sealed class TemplateService(
         return StructureResult<TemplateRevisionDetail>.Success(new TemplateRevisionDetail(
             ToSummary(revision, template),
             template.Key,
-            ReadJson(revision.ZoneSnapshotJson, $"revision {revisionNumber} of template '{template.Key}'")));
+            StructureJson.Read(revision.ZoneSnapshotJson, logger, $"revision {revisionNumber} of template '{template.Key}'")));
     }
 
     /// <summary>Checks the key the way the unique index will, under the database's collation.</summary>
@@ -323,14 +320,11 @@ public sealed class TemplateService(
         return diagnostics;
     }
 
-    private static string? Clean(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-
     private static TemplateRevisionSummary ToSummary(TemplateRevision revision, Template template) =>
         new(
             revision.RevisionNumber,
             revision.RevisionNumber == template.CurrentRevision,
-            CountSlots(revision.ZoneSnapshotJson),
+            StructureJson.CountSlots(revision.ZoneSnapshotJson),
             revision.CreatedOn,
             revision.CreatedBy,
             revision.Notes);
@@ -359,7 +353,7 @@ public sealed class TemplateService(
                     zone.FieldTypeKey,
                     string.IsNullOrWhiteSpace(zone.ConfigurationJson)
                         ? null
-                        : ReadJson(zone.ConfigurationJson, $"the configuration of zone '{zone.Key}'"),
+                        : StructureJson.Read(zone.ConfigurationJson, logger, $"the configuration of zone '{zone.Key}'"),
                     zone.IsRequired,
                     zone.IsInlineEditable,
                     zone.Group,
@@ -367,54 +361,4 @@ public sealed class TemplateService(
                 .ToList(),
             template.CreatedOn,
             template.ModifiedOn);
-
-    /// <summary>
-    /// Reads stored JSON for pass-through to the client.
-    /// </summary>
-    /// <remarks>
-    /// Unreadable JSON is logged and reported as an empty array rather than thrown. These columns
-    /// are written only by this application and validated before they are stored, so a failure here
-    /// means corruption — and a corrupt configuration on one zone should not take out the structure
-    /// screen an operator would use to find it.
-    /// </remarks>
-    private JsonElement ReadJson(string? json, string description)
-    {
-        if (string.IsNullOrWhiteSpace(json)) return EmptyArray;
-
-        try
-        {
-            using var document = JsonDocument.Parse(json);
-
-            return document.RootElement.Clone();
-        }
-        catch (JsonException exception)
-        {
-            logger.LogWarning(exception, "Stored JSON for {Subject} could not be read.", description);
-
-            return EmptyArray;
-        }
-    }
-
-    /// <summary>Counts the slots in a snapshot without validating them.</summary>
-    /// <remarks>
-    /// A count is wanted for a history list, where one corrupt row must not fail the request; the
-    /// revision detail endpoint hands back the snapshot itself for anyone who needs to see it.
-    /// </remarks>
-    private static int CountSlots(string? snapshotJson)
-    {
-        if (string.IsNullOrWhiteSpace(snapshotJson)) return 0;
-
-        try
-        {
-            using var document = JsonDocument.Parse(snapshotJson);
-
-            return document.RootElement.ValueKind is JsonValueKind.Array
-                ? document.RootElement.GetArrayLength()
-                : 0;
-        }
-        catch (JsonException)
-        {
-            return 0;
-        }
-    }
 }

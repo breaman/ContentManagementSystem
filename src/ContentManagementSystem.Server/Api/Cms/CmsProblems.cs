@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 
 using ContentManagementSystem.Core.Structure;
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Fields;
 
 using Microsoft.AspNetCore.Mvc;
@@ -68,8 +69,8 @@ public static class CmsProblems
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
 
-        var errors = Project(diagnostics, ValidationSeverity.Error);
-        var warnings = Project(diagnostics, ValidationSeverity.Warning);
+        var errors = ApiDiagnostics.Project(diagnostics, ValidationSeverity.Error);
+        var warnings = ApiDiagnostics.Project(diagnostics, ValidationSeverity.Warning);
 
         var problem = new ProblemDetails
         {
@@ -90,20 +91,5 @@ public static class CmsProblems
         problem.Extensions["warnings"] = warnings;
 
         return Results.Problem(problem);
-    }
-
-    private static List<ApiDiagnostic> Project(ValidationResult diagnostics, ValidationSeverity severity)
-    {
-        var projected = new List<ApiDiagnostic>();
-
-        foreach (var diagnostic in diagnostics.Diagnostics)
-        {
-            if (diagnostic.Severity == severity)
-            {
-                projected.Add(new ApiDiagnostic(diagnostic.Code, diagnostic.Message, diagnostic.RelativePath));
-            }
-        }
-
-        return projected;
     }
 }

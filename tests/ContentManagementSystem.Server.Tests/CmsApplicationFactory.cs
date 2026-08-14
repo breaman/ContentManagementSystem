@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 
 using ContentManagementSystem.Server.Api.Cms;
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.ServiceDefaults;
 using ContentManagementSystem.TestSupport;
 

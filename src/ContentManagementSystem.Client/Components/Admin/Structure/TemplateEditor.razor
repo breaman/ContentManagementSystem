@@ -1,0 +1,97 @@
+@page "/admin/structure/templates/{Id:int}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.StructureEditors)]
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Detail?.Template.Name ?? "Template")</PageTitle>
+
+<p><a href="/admin/structure/templates">Back to templates</a></p>
+
+@if (Detail is null)
+{
+    <p role="status">Loading template…</p>
+}
+else
+{
+    <h1>@Detail.Template.Name</h1>
+    <dl class="row">
+        <dt class="col-sm-3">Key</dt>
+        <dd class="col-sm-9"><code>@Detail.Template.Key</code></dd>
+        <dt class="col-sm-3">Current revision</dt>
+        <dd class="col-sm-9">@Detail.Template.CurrentRevision</dd>
+        <dt class="col-sm-3">Component</dt>
+        <dd class="col-sm-9">
+            @if (Detail.Template.IsOrphaned)
+            {
+                <span class="badge text-bg-warning">
+                    No deployed component declares this key
+                </span>
+            }
+            else
+            {
+                <code>@Detail.Template.ComponentTypeName</code>
+            }
+        </dd>
+    </dl>
+
+    <DiagnosticList Diagnostics="Errors" Heading="The change was refused" />
+    <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Saved, with warnings" />
+
+    <h2 class="h5">Zones</h2>
+
+    @if (Detail.Zones.Count == 0)
+    {
+        <p>No zones yet. Add one below; adding a zone never invalidates existing content.</p>
+    }
+    else
+    {
+        <table class="table">
+            <caption>@Detail.Zones.Count zone(s), in editor order</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Field type</th>
+                    <th scope="col">Required</th>
+                    <th scope="col">Group</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var zone in Detail.Zones)
+                {
+                    <tr>
+                        <th scope="row"><code>@zone.Key</code></th>
+                        <td>@zone.Name</td>
+                        <td>@zone.FieldTypeKey</td>
+                        <td>@(zone.IsRequired ? "Yes" : "No")</td>
+                        <td>@zone.Group</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                    @onclick="() => Edit(zone)">
+                                Edit<span class="visually-hidden"> zone @zone.Key</span>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    @onclick="() => RemoveAsync(zone)" disabled="@IsBusy">
+                                Remove<span class="visually-hidden"> zone @zone.Key</span>
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <p class="text-body-secondary">
+            Removing a zone removes the definition only. Values already stored under its key are kept
+            and reported as orphaned content until someone discards them.
+        </p>
+    }
+
+    <SlotForm Model="Form"
+              FieldTypes="FieldTypes ?? []"
+              Noun="zone"
+              ShowInlineEditable="true"
+              IsBusy="IsBusy"
+              OnSubmit="SaveAsync"
+              OnCancel="Reset" />
+}

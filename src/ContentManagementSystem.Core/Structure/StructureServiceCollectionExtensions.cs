@@ -24,6 +24,42 @@ public static class StructureServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddScoped<ITemplateService, TemplateService>();
+        services.TryAddScoped<IZoneService, ZoneService>();
+        services.TryAddScoped<IBlockTypeService, BlockTypeService>();
+        services.TryAddScoped<ICompositionService, CompositionService>();
+
+        // Singleton, unlike the rest: it describes the field type registry, which is itself a
+        // singleton whose contents cannot change without a restart. Building a dozen JSON Schema
+        // documents per request to describe something constant would be waste on the one screen a
+        // developer refreshes repeatedly.
+        services.TryAddSingleton<IFieldTypeCatalog, FieldTypeCatalog>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the startup reconciliation and schema sync (tasks P1-25 and P1-26).
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="assemblies">
+    /// The assemblies declaring <c>[CmsTemplate]</c> and <c>[CmsBlockType]</c>. Named explicitly —
+    /// see <see cref="CmsStructureAssemblies"/> for why the scan is not left to discover them.
+    /// </param>
+    /// <returns>The service collection, for chaining.</returns>
+    /// <remarks>
+    /// Separate from <see cref="AddCmsStructure"/> because the two are wanted independently: the
+    /// admin API is useful in a host that reconciles nothing, and a migration or tooling host may
+    /// want the reconciler without mapping an endpoint.
+    /// </remarks>
+    public static IServiceCollection AddCmsStructureReconciliation(
+        this IServiceCollection services,
+        params System.Reflection.Assembly[] assemblies)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton(new CmsStructureAssemblies(assemblies));
+        services.TryAddScoped<ITemplateReconciler, TemplateReconciler>();
+        services.TryAddScoped<ISchemaSyncService, SchemaSyncService>();
 
         return services;
     }

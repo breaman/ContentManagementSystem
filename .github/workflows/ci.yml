@@ -191,6 +191,43 @@ jobs:
           --configuration Release
           --filter "FullyQualifiedName~MigrationsApplyFromEmptyTests"
 
+  accessibility:
+    name: Accessibility (axe)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: global.json
+
+      # Its own job and its own required check, for the reason the migrations job is separate: an
+      # accessibility regression should not be one red test among many, because the usual response
+      # to that is to disable the rule. The gate starts in Phase 1 against the structure screens
+      # (task P1-31) rather than waiting for P9, so a screen is never merged inaccessible and fixed
+      # later.
+      #
+      # It renders the components with the framework's static renderer and hands the markup to a
+      # real browser, so it needs no database and no login and runs in seconds on every pull
+      # request. The full-journey pass against the running site — including colour contrast, which
+      # needs the compiled stylesheet — is P9's.
+      - name: Structure screen accessibility
+        run: >-
+          dotnet test tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
+          --configuration Release
+          --filter "FullyQualifiedName~StructureScreenAccessibilityTests"
+          --logger "trx;LogFileName=accessibility.trx"
+          --results-directory ${{ runner.temp }}/test-results
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: accessibility-results
+          path: ${{ runner.temp }}/test-results
+          retention-days: 7
+
   e2e-tests:
     name: E2E and accessibility
     runs-on: ubuntu-latest

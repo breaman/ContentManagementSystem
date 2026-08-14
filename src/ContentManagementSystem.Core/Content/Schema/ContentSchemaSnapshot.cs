@@ -140,6 +140,28 @@ public static class ContentSchemaSnapshot
                 property.ConfigurationJson, property.IsRequired, property.SortOrder)));
     }
 
+    /// <summary>
+    /// Writes a snapshot from slots already flattened and ordered by the caller.
+    /// </summary>
+    /// <param name="slots">The slots, in the order an editor will see them.</param>
+    /// <returns>JSON for a snapshot column.</returns>
+    /// <exception cref="JsonException">A slot's <c>ConfigurationJson</c> is not well-formed.</exception>
+    /// <remarks>
+    /// For the case the two overloads above cannot express: a block type's property set is its own
+    /// properties followed by each composed group's, and that order comes from two different
+    /// <c>SortOrder</c> columns which are free to overlap. Re-sorting by either would interleave the
+    /// groups, so the caller's order is taken as given and each slot's recorded <c>sortOrder</c> is
+    /// its <em>effective</em> position — what an editor should see — rather than the raw column
+    /// value it came from.
+    /// </remarks>
+    public static string WriteSlots(IEnumerable<ContentSlot> slots)
+    {
+        ArgumentNullException.ThrowIfNull(slots);
+
+        return Write(slots.Select((slot, index) => (slot.Key, slot.Name, slot.FieldTypeKey,
+            slot.ConfigurationJson, slot.IsRequired, SortOrder: index)));
+    }
+
     private static ContentPropertySchema ReadSlot(JsonElement entry, int index)
     {
         if (entry.ValueKind is not JsonValueKind.Object)

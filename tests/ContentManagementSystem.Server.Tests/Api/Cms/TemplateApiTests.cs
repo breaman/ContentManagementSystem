@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 
 using ContentManagementSystem.Server.Api.Cms;
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Contracts.Structure;
 using ContentManagementSystem.TestSupport;

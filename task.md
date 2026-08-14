@@ -1,9 +1,9 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 sections 1.1–1.4 done, 1.5 started (`P1-21` done,
-`P1-22` next)
+**Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-30` registration that
+waits on Phase 2 and the `P1-32` guard that waits on the `Page` table
 **Version:** 1.0
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -50,7 +50,7 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 21 | 28.0 | In progress — 1.1 to 1.4 complete; structure admin (1.5) under way | — |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 31 | 28.0 | In progress — 1.1 to 1.5 built; `P1-30` and `P1-32` finish in Phase 2 | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 0 | 27.0 | Not started | — |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
@@ -59,7 +59,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **40** | **203.5** | | |
+| **v1 total** | **281** | **50** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -587,24 +587,205 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   its key yet, which is what the flag means, and `P1-25`'s reconciler clears it when one does.
   17 API integration tests plus `Structure/ContentKeysTests`; the list endpoint is deliberately
   unpaged, since templates are written one per page shape.*
-- [ ] **P1-22** `/api/cms/v1/templates/{id}/zones` — CRUD with key immutability enforced [§8.5]. — 0.5 ed
+- [x] **P1-22** `/api/cms/v1/templates/{id}/zones` — CRUD with key immutability enforced [§8.5]. — 0.5 ed
   *`P1-12` built `IFieldConfigurationValidator` and registered it; this is the call site [§7.2].
   Block-type property writes in `P1-23` and the schema sync in `P1-26` are the other two.*
-- [ ] **P1-23** `/api/cms/v1/block-types` and `/block-types/{id}/properties`. — 0.5 ed
-- [ ] **P1-24** `/api/cms/v1/compositions` and `/field-types` (read-only registry introspection). — 0.5 ed
+  *2026-08-14 — five endpoints (list, read, create, update, delete) over an `IZoneService`, nested
+  under the template because a zone key is unique within a template and meaningless outside one.
+  This closes the zone half of `P1-32`: **add is free, remove keeps the payload data, a key rename
+  is refused, and a field-type change is refused.** Removal is deliberately unguarded — the payload
+  is not rewritten, `P1-15` already reports the leftover value as an orphaned-zone **warning**, and
+  blocking it while content exists would make a content model unchangeable the moment anyone used
+  it.*
+  ***What "cuts a revision" means had to be decided here, and it is the task's real content.*** A
+  change cuts a `TemplateRevision` when it alters how a stored value is read or judged — add,
+  remove, `IsRequired`, configuration — and does not when it only changes a label, matching
+  `P1-21`'s rule that a template rename cuts nothing. The consequence worth knowing: the snapshot
+  captures `name` and `sortOrder` too, so a revision's copy of them can lag the live zone. That is
+  the right trade, since a revision exists to pin **validation**, and cutting one per typo
+  correction would bury the changes revisions exist to record.
+  ***A field-type change is refused rather than half-implemented.*** [§8.5] wants an explicit
+  converter choice plus a background job rewriting drafts; there are no drafts and no job until
+  Phase 2, and a "change accepted, values dealt with later" path would be a hole with a date on it —
+  the same reasoning that kept template delete out of `P1-21`. `StructureCodes.FieldTypeImmutable`
+  is separate from `KeyImmutable` because the remedy differs and a client should be able to offer
+  it. The available path today (remove the zone, add it again) is named in the message.
+  ***Warnings had to survive a successful save, which the API could not previously express.***
+  `P1-12` accepts a `NotEnforcedUntil` setting with a warning naming its phase; `CmsProblems` only
+  carries diagnostics on a **failure**, so that warning was being dropped and the setting would have
+  gone quiet for months. `ZoneSaveResult` now carries `warnings` beside the zone, which moved
+  `ApiDiagnostic` from `Server` into `Shared/Contracts/Api/` (the backoffice runs in WebAssembly and
+  reads both shapes) and put the projection behind one `ApiDiagnostics.Project` that `CmsProblems`
+  now calls too. Errors block, warnings do not — so the result is judged on `HasErrors`, not on
+  whether anything was said.
+  *Three smaller decisions. **An empty configuration object is stored as no configuration**, so
+  `{}` stays out of every revision snapshot where it would read as a change on a `P1-28` structure
+  diff. **Configuration is replaced, not patched** — a merge would leave no way to remove a setting.
+  And **a zone id belonging to another template answers 404, not 400**: the pair is the address.*
+  ***Concurrency is a real case here, unlike on templates.*** A zone write touches two unique
+  indexes, and they mean different things: `(TemplateId, Key)` is a duplicate zone key, while
+  `(TemplateId, RevisionNumber)` is someone else changing the same template's structure between
+  this request reading it and writing it. The second is a lost update and returns the new
+  `StructureCodes.ConcurrentChange` for the client to retry; anything else still rethrows, so an
+  unrelated fault is never reported as a conflict a client will retry forever.
+  ***One bug the tests caught, which would have corrupted every snapshot.*** Attaching the new zone
+  through `context.Zones.Add` sets the foreign key and EF's relationship fixup then appends it to
+  the loaded `template.Zones` as well, so a snapshot built from "the collection plus this zone"
+  captured it **twice** — every page created afterwards would have validated against a schema with
+  a duplicated slot. The zone is now attached through `template.Zones` and the snapshot taken from
+  that collection alone. 16 API integration tests; `Core.Tests` 959 and `Data.Tests` 14 still green
+  after `TemplateService` moved onto the shared `StructureJson` reader.*
+- [x] **P1-23** `/api/cms/v1/block-types` and `/block-types/{id}/properties`. — 0.5 ed
+  *2026-08-14 — eleven endpoints over one `IBlockTypeService`: the block type, its revisions, its
+  properties, and the compositions composed into it. One service rather than three because every
+  one of those writes cuts the same artefact — a `BlockTypeRevision` whose snapshot is the
+  **flattened** property set — and splitting them would put the flattening rule in three places and
+  let the revision number be computed twice against one block type.*
+  ***The property rules are the zone rules, and they are now literally the same code.*** `SlotRules`
+  holds what a zone and a block-type property share (labels, the field type binding, key and
+  field-type immutability) because `P1-15` already reads them into one `ContentPropertySchema`; two
+  copies of "a key is immutable" would drift, and the copy that drifted is the one nobody wrote a
+  test for. `ZoneService` was moved onto it, along with a shared `StructureJson.CountSlots` and
+  `SlotRules.Clean`.*
+  ***Compositions forced the one genuinely new decision*** — recorded as
+  [`ADR-0018` (D18)](./docs/adr/0018-compositions-flattened-into-block-type-revisions.md). A block
+  instance names a block type and a revision, never a composition, so resolving groups at read time
+  would let an edit to a shared group retroactively change every published block. The snapshot
+  therefore **flattens** them, own properties first and each group after, and
+  `ContentSchemaSnapshot.WriteSlots` records each slot's *effective* index rather than its raw
+  `SortOrder` — the two sort orders come from different tables and merging on the number would
+  shuffle a group into the middle of a host's own properties.
+  *Key collisions are checked in **both** directions, which is the part that would have been missed:
+  adding a property that a composed group already contributes, composing a group whose keys the host
+  declares, and — the one that matters — adding a property *to a group* that would collide on any
+  block type composing it. That last collision is not where the edit is made, and without the check
+  it surfaces as a broken editor on a block type nobody was looking at.*
+  ***`IsBuiltIn` earned its keep.*** A built-in's property set is frozen: adds, edits, and removals
+  are refused with `StructureCodes.BuiltInImmutable`, because the code that renders `rawHtml` expects
+  exactly those properties and no editor can repair a renderer. Its **metadata stays editable** —
+  renaming "Raw HTML" is nobody's dependency. **There is still no block type delete**, for the reason
+  there is no template delete: it must be blocked while content references the type, and there is no
+  page table to ask until `P2-01`.*
+- [x] **P1-24** `/api/cms/v1/compositions` and `/field-types` (read-only registry introspection). — 0.5 ed
   *`/field-types` serves each field type's configuration JSON Schema via
   `FieldConfigurationSchemaWriter` (`P1-12`), which is what `P1-29`'s configuration form builds its
   controls from.*
-- [ ] **P1-25** `TemplateReconciler` in `Core/Structure/`: scan assemblies for `[CmsTemplate]` /
+  *2026-08-14 — seven composition endpoints plus two read-only field-type ones. **A composition is
+  not revisioned** — nothing in a payload addresses it — so every write here recuts every block type
+  composing the group, in one transaction, and returns `AffectedBlockTypeKeys` instead of a revision
+  number. That is the honest answer to "what did that do", and it is the blast radius a developer
+  needs before editing a shared group; the list endpoint carries `BlockTypeCount` for the same
+  reason.*
+  ***The one delete this phase can honestly ship.*** A composition delete is refused while any block
+  type composes it, and the refusal names them (`StructureCodes.InUse`). Unlike a template delete,
+  its guard is a join table that exists.*
+  ***`/field-types` is read-only with no write verbs at all***, rather than write verbs that refuse:
+  a field type arrives with a deployment and there is no state here for a client to change. Backed by
+  a singleton `IFieldTypeCatalog` that builds every JSON Schema document once — the registry cannot
+  change without a restart, and regenerating a dozen documents per request to describe something
+  constant is waste on the one screen a developer refreshes while iterating. Capabilities are sent as
+  **names**, not as the enum's numeric value, so inserting a flag cannot silently change what a
+  client thinks a field type can do.*
+- [x] **P1-25** `TemplateReconciler` in `Core/Structure/`: scan assemblies for `[CmsTemplate]` /
   `[CmsBlockType]`, insert code-only records, mark DB-only records `IsOrphaned`, **never delete**, log a
   diff in Development [§8.4]. — 1 ed
-- [ ] **P1-26** `SchemaSyncService`: idempotent, additive-only apply of
+  *2026-08-14 — the two attributes had to be written first. They live in
+  `Shared/Contracts/Structure/` rather than beside the component base class in `Rendering`, because
+  `Core` sits below `Rendering` in the reference graph and cannot read an attribute declared there.
+  They carry only what code owns — the key, and a name and description used as **initial values**.
+  Zone definitions stay out of them deliberately [§8.1]: those are data a developer edits in the
+  backoffice and promotes as JSON.*
+  ***The rule that looks like a bug and is not: name and description are applied on creation only.***
+  They are editable in the backoffice, and rewriting them from the attribute on every startup would
+  silently undo an editor's rename after each deploy. Asserted by a test that renames a template and
+  reconciles again.*
+  ***Two things the spec's wording had to be narrowed on.*** [§8.4] says "scans loaded assemblies";
+  doing that literally makes the scan depend on whatever the CLR happened to fault in, includes every
+  framework assembly, and answers differently under a trimmed publish. `CmsStructureAssemblies` names
+  them instead, which also lets a test reconcile against exactly its own fixtures. And **a built-in
+  block type is never orphaned** — it is declared by the system, not by a scanned attribute, so
+  marking it would degrade the health check on every fresh install.*
+  *Two components declaring one key throws at startup rather than picking a winner: a key is written
+  into stored payloads, and choosing silently would render half a site with the wrong markup. A
+  partially loadable assembly is tolerated the other way — the loadable types are reconciled and the
+  rest logged, because an unrelated broken type should not stop a site from starting.*
+- [x] **P1-26** `SchemaSyncService`: idempotent, additive-only apply of
   `Server/CmsSchema/*.json` zone/property definitions at startup [§27.1]. — 0.5 ed
-- [ ] **P1-27** `cms-templates` health check — degrades when an `IsOrphaned` template has non-deleted
+  *2026-08-14 — recorded as
+  [`ADR-0019` (D19)](./docs/adr/0019-schema-sync-is-additive-and-non-destructive.md), because
+  "additive-only" is ambiguous and the reading decides whether a promotion can corrupt content.
+  Read strictly it may only insert, and a structure promotion could never promote a change; read
+  loosely it may retype a zone, which makes every stored value under that key unreadable **in an
+  environment nobody is watching**. The pass therefore creates what is missing, updates labels and
+  validation settings, **refuses** a field-type change or a configuration the field type rejects, and
+  never removes.*
+  *One file per record rather than one manifest — the reason the format exists is source control, and
+  a single file makes every structural change a conflict against every other one. The `key` inside
+  the document is authoritative, not the filename. The whole pass is one transaction, and files are
+  applied compositions → block types → templates so one commit can add a group and the block type
+  that composes it.*
+  ***Two bugs the tests caught, both of which would have shipped quietly.*** A block type file naming
+  a composition the **same pass** had just created was refused, because the lookup queried the
+  database and the composition was added but not yet saved — the dependency ordering existed and did
+  nothing. And `export` was writing a file for the seeded `rawHtml` block type, which `apply` then
+  refused on every subsequent run: permanent drift in the CI check, from a record nobody can change.
+  Built-ins are now excluded from export, and the export→diff round trip is asserted to settle to
+  nothing.*
+- [x] **P1-27** `cms-templates` health check — degrades when an `IsOrphaned` template has non-deleted
   pages [§24.2]. — 0.25 ed
-- [ ] **P1-28** CLI verbs in `Server/Cli/`: `cms schema export | diff | apply` [§27.1]. — 0.25 ed
-- [ ] **P1-29** Plain admin screens under `/admin/structure` in `Client/Components/Admin/Structure/`:
+  *2026-08-14 — **`Degraded`, never `Unhealthy`**, which is the whole point per [§8.4]: a bad
+  deployment must be visible without taking down a site whose other pages render perfectly well. It
+  names the offending keys in its description and its `data`, because a count alone tells an operator
+  nothing actionable.*
+  ***It is deliberately broader than [§24.2] words it, and this will tighten in Phase 2.*** The spec's
+  condition is "an `IsOrphaned` template **has non-deleted pages**", which is the right condition to
+  end at — an orphan nobody uses is housekeeping, not an operational matter. There is no page table
+  to ask until `P2-01`, so today it fires on orphan existence alone. Worth knowing before someone
+  reports it: a template created in the backoffice ahead of its markup is orphaned **by design**
+  (`P1-21`), so a developer building a content model early will see this degrade. That is not a false
+  positive — such a template cannot render — but narrowing it is the first thing `P2-01` should do.*
+- [x] **P1-28** CLI verbs in `Server/Cli/`: `cms schema export | diff | apply` [§27.1]. — 0.25 ed
+  *2026-08-14 — `dotnet run -- cms schema export|diff|apply [directory]`, handled after `Build()` so
+  the verbs use exactly the services the site uses, and before anything is mapped so no request
+  pipeline and no startup pass ever runs. A promotion tool that reimplemented the sync would be a
+  second definition of what "apply" means; all three verbs are one `ISchemaSyncService`.*
+  ***`diff` exits 2 when the files and the database disagree***, distinct from 1 for a command that
+  failed — it is the CI drift check, and a check that always succeeds is not a check. **A refusal
+  counts as drift** even though nothing is pending: a file asking for something that will never be
+  applied should leave the repository rather than be reported on every future run. **A kept-unlisted
+  slot does not**, or the check would be impossible to keep green while anyone edits structure in the
+  backoffice. Those two judgements are `SchemaSyncReport.HasPendingWork` / `HasProblems` and have
+  their own unit tests, since getting either backwards produces a gate that never fires or never
+  passes.*
+- [x] **P1-29** Plain admin screens under `/admin/structure` in `Client/Components/Admin/Structure/`:
   template list, create, edit zone, edit block type. — 2 ed
+  *2026-08-14 — four screens (`/admin/structure/templates`, `…/templates/{id}`,
+  `…/block-types`, `…/block-types/{id}`) plus a `SlotForm` shared by zones and properties, since the
+  two are one thing at validation time and would otherwise be two copies of one screen. Bootstrap
+  classes and `form-floating` per `.claude/rules/blazor.instructions.md`; every screen is
+  `InteractiveWebAssembly` with code-behind and no `@code` block.*
+  ***The pre-rendering pattern needed a service seam, and that seam is `IStructureClient`.***
+  `HttpStructureClient` calls the API from the browser; `ServerStructureClient` calls the structure
+  services directly while pre-rendering, so a screen arrives with its content in the HTML instead of
+  a spinner the developer watches. The server half deliberately does **not** loop back through its
+  own HTTP API — a request to itself would need a cookie it does not have and an antiforgery token
+  that has not been issued. Authorization is unaffected: every one of those services checks
+  permissions itself, which is exactly why `CONTRIBUTING.md` puts the check in the service layer.*
+  *Two moves this forced, both to `Shared`: `AntiforgeryTokenResponse` / `CmsAntiforgeryDefaults`
+  (the WASM client cannot reference `Server`, and without them it cannot save anything at all), and
+  a `StructureClientResult<T>` that is deliberately **not** `StructureResult<T>` — that type lives in
+  `Core`, which the client cannot see, and carries an outcome enum whose only consumer is the HTTP
+  status mapping.*
+  ***The screens offer no control for the changes [§8.5] forbids, and do not rely on that.*** Key and
+  field-type inputs go **read-only** rather than hidden once a slot exists — hiding an immutable field
+  makes it look like a missing one — and the service refuses both regardless, with the refusal
+  rendered as a diagnostic. Composed properties are listed with their group and given no edit button,
+  because editing one there would fork a shared definition into many. The field-type picker and the
+  per-field settings hint are built from the `P1-24` JSON Schema, so an extension author's field type
+  documents itself here with no change to this screen.*
+  *One framework rule learned the hard way: a `[PersistentState]` property **must not** have an
+  initializer (`BL0009`) — the initializer runs after the restored state is applied and throws it
+  away.*
 - [~] **P1-30** Register CMS services and the field type registry in `Server/Program.cs`.
   *(Existing-code change.)* — 0.25 ed
   *2026-08-13 — sanitization, the field types and their registry, the structure services, the
@@ -615,23 +796,89 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   endpoints in Phase 2 — an empty catalog would make a deployment start up validating every payload
   against nothing and reporting success. Finish this task there. The markdown renderer rides on the
   same call, so nothing resolves `IMarkdownRenderer` until then either.*
-- [ ] **P1-31** Wire axe-core accessibility checks into CI against the structure screens — the
+  *2026-08-14 — 1.5 added the rest: the block type, composition, and field-type-catalog services;
+  `AddCmsStructureReconciliation(...)` naming the assemblies scanned for `[CmsTemplate]` /
+  `[CmsBlockType]`; `SchemaSyncOptions` bound from `Cms:SchemaSync`; the `cms-templates` health
+  check; `CmsStructureStartupService`, which reconciles and then syncs, in that order; and
+  `ServerStructureClient` for the pre-rendered admin screens. `Program` now returns an exit code so
+  `dotnet run -- cms schema …` can fail a CI job. **`AddCmsContent()` is still not called**, for the
+  reason above — this task stays open until `P2` supplies a real `IContentSchemaCatalog`.*
+- [x] **P1-31** Wire axe-core accessibility checks into CI against the structure screens — the
   continuous a11y gate starts here, not in P9. — 0.25 ed
-- [ ] **P1-32** Template evolution rules enforced in the service layer [§8.5]: add zone free; remove
+  *2026-08-14 — its own CI job (`Accessibility (axe)`), separate for the reason `migrations` and
+  `xss-corpus` are separate: an a11y regression should not be one red test among many, because the
+  usual response to that is to disable the rule. WCAG 2.1 AA plus axe's best-practice pack, which is
+  where heading order and landmark structure live — exactly what goes wrong on a screen assembled
+  from tables and forms.*
+  ***It renders the components rather than driving the running site, which is a real trade.*** A
+  browser journey through `/admin` needs a database, a migrated schema, a seeded user, and a login,
+  which makes it a nightly job — and a gate that does not run on every push is not a gate. What axe
+  inspects is the DOM, so `PrerenderingHtmlRenderer` renders each screen statically and hands the
+  markup to a real Chromium. That is also the *right* markup to judge: it is what a user sees before
+  the WebAssembly runtime finishes downloading, and a screen that is only accessible after hydration
+  is not accessible. **What this leaves for P9** is everything needing the compiled stylesheet —
+  colour contrast above all — and focus order across a real navigation.*
+  ***Two traps, both closed.*** The renderer must await `QuiescenceTask` or the gate inspects a page
+  reading "Loading templates…", finds no violations, and goes green having checked nothing; each case
+  therefore asserts a string the loaded screen must contain. And the gate was mutation-tested:
+  removing a `<label>` alone does **not** fail it, because `placeholder` supplies an accessible name
+  under accname — removing both correctly fails with `label (critical) … #slot-name`.*
+- [~] **P1-32** Template evolution rules enforced in the service layer [§8.5]: add zone free; remove
   zone retains payload data as orphaned; **rename key forbidden**; field-type change requires an
   explicit converter choice; template delete blocked while pages reference it. — included above
-- [ ] **P1-33** ADRs for any Phase 1 decision not already covered by D1–D12.
+  *2026-08-14 — the **zone** rules landed with `P1-22`: add free, remove retains, rename refused,
+  field-type change refused until the converter and the drafts it rewrites exist. What is left is
+  the same set for block-type properties (`P1-23`) and the template delete guard, which cannot be
+  written until `Page` exists in `P2-01`.*
+  *2026-08-14 — `P1-23` closed the **block-type property** half on the same terms, and `P1-26` made
+  the schema sync obey them too. **What is left is one rule**: template delete blocked while a
+  non-deleted page references it. It stays open until `P2-01`. The composition delete guard, which
+  is the same shape against a join table that already exists, shipped in `P1-24`.*
+- [x] **P1-33** ADRs for any Phase 1 decision not already covered by D1–D12.
+  *2026-08-14 — Phase 1 produced seven: `D13`–`D16` during 1.1–1.4, and three from 1.5.
+  [`D17`](./docs/adr/0017-revisions-cut-only-when-content-is-read-differently.md) — a revision is cut
+  only when content would be read differently, which [§8.5] leaves undefined and the API cannot avoid
+  answering on every write.
+  [`D18`](./docs/adr/0018-compositions-flattened-into-block-type-revisions.md) — compositions are
+  flattened into block type revisions and editing one recuts every host, because a block instance
+  names a block type and never a composition.
+  [`D19`](./docs/adr/0019-schema-sync-is-additive-and-non-destructive.md) — the schema sync refuses
+  rather than applies, since a promotion runs where nobody is watching.*
 
 ### Acceptance criteria — Phase 1
 
-- [ ] **P1 #1** A `Developer` creates a template with four zones of differing field types through the
+- [~] **P1 #1** A `Developer` creates a template with four zones of differing field types through the
   admin UI, and the definitions persist.
-- [ ] **P1 #2** `ContentSchemaValidator` accepts a valid payload and rejects an invalid one with errors
+  *2026-08-14 — every part of this exists and is asserted **except the words "through the admin UI"**.
+  `Api/Cms/ZoneApiTests` drives create-template-then-add-zones of differing field types end to end
+  against a real database, and `P1-29` ships the screens that call exactly those endpoints. What is
+  not covered is a browser actually driving the form, which needs the E2E harness pointed at a
+  running site with a login — deliberately deferred with the rest of the full-journey suite (see
+  `P1-31` for why the a11y gate does not wait for it). Closing this honestly is one Playwright
+  journey once `P2` stands the site up with seeded users.*
+- [x] **P1 #2** `ContentSchemaValidator` accepts a valid payload and rejects an invalid one with errors
   identifying the exact zone, block id, and property.
-- [ ] **P1 #3** Renaming a zone key is refused; renaming a display name succeeds.
-- [ ] **P1 #4** Removing a zone leaves existing payload data intact and reachable as orphaned content.
-- [ ] **P1 #5** A template defined in code but absent from the database is created at startup; a
+  *2026-08-13 — `Content/ContentSchemaValidatorTests` asserts `ZoneKey`, `BlockId`, and `PropertyKey`
+  on the diagnostics themselves, not just the rendered path. The backoffice addresses a block by GUID
+  rather than by index, which is what makes this a literal assertion rather than a string match.*
+- [x] **P1 #3** Renaming a zone key is refused; renaming a display name succeeds.
+  *2026-08-14 — `Api/Cms/ZoneApiTests.RenamingAZoneKeyIsRefusedAndRenamingItsLabelIsNot`, through
+  the API rather than against the service: a rule that holds in `ZoneService` and is bypassable by
+  an endpoint is not enforced. The same suite asserts the neighbouring rule the criterion does not
+  name — a field-type change is refused too.*
+- [~] **P1 #4** Removing a zone leaves existing payload data intact and reachable as orphaned content.
+  *2026-08-14 — half of this is asserted. `P1-22` proves the definition goes while the revision that
+  captured it stays, and `P1-15` already reports an orphaned zone as a **warning** rather than an
+  error, which is what makes the value reachable. The literal criterion — a stored payload survives
+  the removal and the editor can still see the value — needs a page to store one, so it closes in
+  Phase 2 against `ContentSchemaValidator` and the obsolete-content panel.*
+- [x] **P1 #5** A template defined in code but absent from the database is created at startup; a
   database template with no code component is marked orphaned and degrades `cms-templates`.
+  *2026-08-14 — `Structure/StructureStartupTests`, all three halves: a `[CmsTemplate]` fixture with no
+  row is created with revision 1, a row no attribute declares is marked orphaned (and **not**
+  deleted), and `HealthCheckService` then reports `cms-templates` as `Degraded` naming that key.
+  Also asserted: the pass is idempotent, an editor's rename survives it, a template adopted back by a
+  returning component clears its flag, and the built-in block type is never orphaned.*
 - [x] **P1 #6** Every payload in the XSS corpus is neutralized under each sanitization profile, with the
   stripped content reported.
   *2026-08-13 — `Security/XssCorpusTests`, 52 payloads × 3 profiles, green, running as its own CI
@@ -647,6 +894,13 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
 
 **Exit gate:** structure can be defined and a payload validated against it; XSS corpus green in CI.
 — [ ] met on ____
+*2026-08-14 — the gate's own wording is satisfied: structure is definable through the API and the
+admin screens, `ContentSchemaValidator` validates a payload against it (`P1 #2`), and the XSS corpus
+runs as its own CI job (`P1 #6`). It is left open because two acceptance criteria are only partly
+met, and closing the gate over them would lose the distinction: **`P1 #1`** needs a browser driving
+the admin form rather than the API beneath it, and **`P1 #4`** needs a stored payload to survive a
+zone removal — which needs a page to store one. Both close early in Phase 2; neither blocks starting
+it, since `P2-01` is the thing that unblocks them.*
 
 **Risks:** R2 (runtime-schema complexity), R3 (sanitizer over-stripping).
 
@@ -658,6 +912,16 @@ pinning; the Testcontainers suites were re-run against real SQL Server to confir
 harmless. Remove the pin when Testcontainers resolves a patched version itself. **A NuGet advisory
 published against any transitive dependency will break the build the same way** — worth knowing
 before it happens on a Friday.
+
+**Also raised during Phase 1 — the RZ1021 trap.** Editing any `.razor` file can poison the Razor
+compilation server on SDK 10.0.301: it then misparses component tags inside code blocks
+(`@if { <SomeComponent /> }`) and reports dozens of bogus errors in files nobody touched, including
+untouched template code. The remedy is `dotnet build-server shutdown` and nothing else — it is
+already written up in
+[`.claude/rules/blazor.instructions.md`](./.claude/rules/blazor.instructions.md). It cost real time
+in 1.5 before that note was read, and it is worth reading first, because every dead end it sends you
+down (clean `obj/`, edit the markup, change the SDK pin in `global.json`) looks plausible and the
+last one appears to work — switching SDKs happens to start a fresh build server.
 
 ---
 

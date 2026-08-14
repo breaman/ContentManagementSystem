@@ -10,4 +10,11 @@
     <PackageReference Include="Microsoft.Playwright" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The structure screens are rendered here with the framework's static HtmlRenderer, so the
+         a11y gate needs the components themselves and the ASP.NET Core component runtime. -->
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Client\ContentManagementSystem.Client.csproj" />
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
 </Project>

@@ -10,10 +10,13 @@ using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Server.Authorization;
+using ContentManagementSystem.Server.Cli;
+using ContentManagementSystem.Server.HealthChecks;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
 using ContentManagementSystem.Server.Components.Email;
 using ContentManagementSystem.Server.Services;
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.ServiceDefaults;
 using ContentManagementSystem.Shared.Services;
 
@@ -102,6 +105,23 @@ try
     builder.Services.AddCmsStructure();
     builder.Services.AddCmsAuthorization();
 
+    // Which assemblies declare [CmsTemplate] and [CmsBlockType] (task P1-25). Named rather than
+    // discovered from the loaded assembly list: the scan has to give the same answer under a trimmed
+    // publish as it does under `dotnet run`, and it should not walk every framework assembly.
+    builder.Services.AddCmsStructureReconciliation(
+        typeof(ContentManagementSystem.Rendering.RenderingAssemblyMarker).Assembly,
+        typeof(Program).Assembly);
+
+    builder.Services.Configure<SchemaSyncOptions>(
+        builder.Configuration.GetSection(SchemaSyncOptions.SectionName));
+
+    // The cms-templates check of spec section 24.2. Degraded, never unhealthy: a bad deployment must
+    // be visible without taking down a site whose pages still render.
+    builder.Services.AddHealthChecks()
+        .AddCheck<CmsTemplatesHealthCheck>(
+            CmsTemplatesHealthCheck.Name,
+            tags: ["ready", "cms"]);
+
     // AddCmsContent() is deliberately not called yet. The payload validator it registers needs an
     // IContentSchemaCatalog, and the only honest implementation is the cached, database-backed one
     // that arrives with the endpoints that validate payloads in Phase 2. Registering an empty
@@ -113,8 +133,15 @@ try
     // default configuration only reads the token from a form field.
     builder.Services.AddAntiforgery(options => options.HeaderName = CmsAntiforgeryDefaults.HeaderName);
 
+    // Runs the reconciliation and then the schema sync, in that order, once at startup.
+    builder.Services.AddHostedService<CmsStructureStartupService>();
+
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
+
+    // Backs the structure admin screens while they pre-render, calling the services directly rather
+    // than looping back through the HTTP API (task P1-29).
+    builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
     // Add route configuration to enforce lowercase URLs for better SEO
@@ -126,6 +153,13 @@ try
     });
 
     var app = builder.Build();
+
+    // `dotnet run -- cms schema ...` (task P1-28). Handled after Build so the verbs use exactly the
+    // services the site uses, and before anything is mapped so no request pipeline is ever started.
+    if (CmsCommandLine.Handles(args))
+    {
+        return await CmsCommandLine.RunAsync(app, args);
+    }
 
     app.MapDefaultEndpoints();
 
@@ -166,11 +200,16 @@ try
     app.MapCmsApi();
 
     app.Run();
+
+    return 0;
 }
 catch (Exception ex) when (ex.GetType().Name is not "StopTheHostException" &&
                            ex.GetType().Name is not "HostAbortedException")
 {
     Log.Fatal(ex, "Unhandled exception.");
+
+    // A non-zero code so a container orchestrator, and `dotnet run -- cms …`, both see the failure.
+    return 1;
 }
 finally
 {

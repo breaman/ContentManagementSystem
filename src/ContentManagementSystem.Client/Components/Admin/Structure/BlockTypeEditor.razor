@@ -1,0 +1,109 @@
+@page "/admin/structure/block-types/{Id:int}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.StructureEditors)]
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Detail?.BlockType.Name ?? "Block type")</PageTitle>
+
+<p><a href="/admin/structure/block-types">Back to block types</a></p>
+
+@if (Detail is null)
+{
+    <p role="status">Loading block type…</p>
+}
+else
+{
+    <h1>@Detail.BlockType.Name</h1>
+    <dl class="row">
+        <dt class="col-sm-3">Key</dt>
+        <dd class="col-sm-9"><code>@Detail.BlockType.Key</code></dd>
+        <dt class="col-sm-3">Current revision</dt>
+        <dd class="col-sm-9">@Detail.BlockType.CurrentRevision</dd>
+    </dl>
+
+    @if (Detail.BlockType.IsBuiltIn)
+    {
+        <div class="alert alert-info" role="status">
+            This is a built-in block type. Its property set is fixed: the code that renders it expects
+            exactly these properties, so structural changes are refused. Its name and help text are
+            still yours to change.
+        </div>
+    }
+
+    <DiagnosticList Diagnostics="Errors" Heading="The change was refused" />
+    <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Saved, with warnings" />
+
+    <h2 class="h5">Properties</h2>
+
+    @if (Detail.EffectiveProperties.Count == 0)
+    {
+        <p>No properties yet.</p>
+    }
+    else
+    {
+        <table class="table">
+            <caption>
+                @Detail.EffectiveProperties.Count propert(ies), in the order an editor sees them
+            </caption>
+            <thead>
+                <tr>
+                    <th scope="col">Key</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Field type</th>
+                    <th scope="col">Required</th>
+                    <th scope="col">From</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var property in Detail.EffectiveProperties)
+                {
+                    <tr>
+                        <th scope="row"><code>@property.Key</code></th>
+                        <td>@property.Name</td>
+                        <td>@property.FieldTypeKey</td>
+                        <td>@(property.IsRequired ? "Yes" : "No")</td>
+                        <td>
+                            @if (property.CompositionKey is null)
+                            {
+                                <text>This block type</text>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">@property.CompositionKey</span>
+                            }
+                        </td>
+                        <td>
+                            @if (property.CompositionKey is null && !Detail.BlockType.IsBuiltIn)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => Edit(property)">
+                                    Edit<span class="visually-hidden"> property @property.Key</span>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        @onclick="() => RemoveAsync(property)" disabled="@IsBusy">
+                                    Remove<span class="visually-hidden"> property @property.Key</span>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <p class="text-body-secondary">
+            A composed property is edited on its composition, not here — editing it here would fork one
+            definition into many.
+        </p>
+    }
+
+    @if (!Detail.BlockType.IsBuiltIn)
+    {
+        <SlotForm Model="Form"
+                  FieldTypes="FieldTypes ?? []"
+                  Noun="property"
+                  IsBusy="IsBusy"
+                  OnSubmit="SaveAsync"
+                  OnCancel="Reset" />
+    }
+}

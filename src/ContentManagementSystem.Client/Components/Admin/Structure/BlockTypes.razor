@@ -1,0 +1,99 @@
+@page "/admin/structure/block-types"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.StructureEditors)]
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Block types</PageTitle>
+
+<h1>Block types</h1>
+<p class="text-body-secondary">
+    A block type is the shape of a repeatable item placed inside a <code>blocks</code> zone. It is
+    never published on its own — it is published with whatever page hosts it.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The block type was not created" />
+
+@if (Items is null)
+{
+    <p role="status">Loading block types…</p>
+}
+else
+{
+    <table class="table">
+        <caption>@Items.Count block type(s)</caption>
+        <thead>
+            <tr>
+                <th scope="col">Key</th>
+                <th scope="col">Name</th>
+                <th scope="col">Properties</th>
+                <th scope="col">Revision</th>
+                <th scope="col">State</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var blockType in Items)
+            {
+                <tr>
+                    <th scope="row">
+                        <a href="@($"/admin/structure/block-types/{blockType.Id}")">@blockType.Key</a>
+                    </th>
+                    <td>@blockType.Name</td>
+                    <td>@blockType.PropertyCount</td>
+                    <td>@blockType.CurrentRevision</td>
+                    <td>
+                        @if (blockType.IsBuiltIn)
+                        {
+                            <span class="badge text-bg-info">Built in — property set is fixed</span>
+                        }
+                        else if (blockType.IsOrphaned)
+                        {
+                            <span class="badge text-bg-warning">Orphaned — no deployed component</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">Ready</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2 class="h5 mt-4">Create a block type</h2>
+
+<EditForm Model="Form" OnValidSubmit="CreateAsync" FormName="create-block-type">
+    <DataAnnotationsValidator />
+
+    <fieldset disabled="@IsBusy">
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Form.Key" id="block-type-key" class="form-control" placeholder="hero-banner" />
+            <label for="block-type-key">Key</label>
+            <ValidationMessage For="() => Form.Key" class="text-danger" />
+            <div class="form-text">Written into every block instance of this type. Chosen once.</div>
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Form.Name" id="block-type-name" class="form-control" placeholder="Hero banner" />
+            <label for="block-type-name">Display name</label>
+            <ValidationMessage For="() => Form.Name" class="text-danger" />
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Form.Description" id="block-type-description" class="form-control"
+                       placeholder="A full-width headline and image." />
+            <label for="block-type-description">Help text</label>
+            <ValidationMessage For="() => Form.Description" class="text-danger" />
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Form.SummaryTemplate" id="block-type-summary" class="form-control"
+                       placeholder="{headline}" />
+            <label for="block-type-summary">Collapsed summary template</label>
+            <ValidationMessage For="() => Form.SummaryTemplate" class="text-danger" />
+            <div class="form-text">Tokens name properties, such as <code>{headline}</code>.</div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create block type</button>
+    </fieldset>
+</EditForm>

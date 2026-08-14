@@ -17,4 +17,8 @@ builder.Services.AddScoped(sp =>
 
 builder.Services.AddScoped<IToastService, ToastService>();
 
+// The structure admin screens talk to the management API from the browser. Its server-side twin,
+// ServerStructureClient, backs the same screens during pre-render.
+builder.Services.AddScoped<IStructureClient, HttpStructureClient>();
+
 await builder.Build().RunAsync();

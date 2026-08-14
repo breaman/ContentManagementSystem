@@ -8,6 +8,18 @@ namespace ContentManagementSystem.Shared.Contracts.Security;
 /// </remarks>
 public static class CmsRoles
 {
+    /// <summary>
+    /// The roles that may change the content model, as an <c>[Authorize(Roles = …)]</c> list.
+    /// </summary>
+    /// <remarks>
+    /// A convenience for the backoffice screens, which run in WebAssembly where the server's
+    /// permission policies do not exist — the client can only check roles, and the authoritative
+    /// check is the one the service layer makes on every call anyway. Kept beside the role names so
+    /// it cannot fall out of step with <c>CmsPermissionMap</c>'s entry for
+    /// <see cref="CmsPermissions.StructureEdit"/>.
+    /// </remarks>
+    public const string StructureEditors = $"{Administrator},{Developer}";
+
     /// <summary>Everything, including user and role management.</summary>
     public const string Administrator = "Administrator";
 

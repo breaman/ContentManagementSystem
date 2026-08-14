@@ -34,3 +34,6 @@ holds, without reading `spec.md` end to end.
 | [0014](0014-field-type-components-resolved-by-the-hosting-layer.md) | D14 — Field type components resolved by the hosting layer, not declared by the field type | Accepted |
 | [0015](0015-field-configuration-declared-in-code-json-schema-generated.md) | D15 — Field configuration declared in code; the JSON Schema generated from it | Accepted |
 | [0016](0016-markdown-extensions-bounded-by-the-sanitization-allowlist.md) | D16 — Markdown extensions are bounded by the sanitization allowlist | Accepted |
+| [0017](0017-revisions-cut-only-when-content-is-read-differently.md) | D17 — A revision is cut only when content would be read differently | Accepted |
+| [0018](0018-compositions-flattened-into-block-type-revisions.md) | D18 — Compositions flattened into block type revisions; editing one recuts every host | Accepted |
+| [0019](0019-schema-sync-is-additive-and-non-destructive.md) | D19 — The schema sync is additive and non-destructive; it refuses rather than applies | Accepted |

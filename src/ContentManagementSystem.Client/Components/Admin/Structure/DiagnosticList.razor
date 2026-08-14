@@ -1,0 +1,19 @@
+@if (Diagnostics is { Count: > 0 })
+{
+    <div class="alert @AlertClass" role="@Role">
+        <h3 class="h6">@Heading</h3>
+        <ul class="mb-0">
+            @foreach (var diagnostic in Diagnostics)
+            {
+                <li>
+                    @if (!string.IsNullOrWhiteSpace(diagnostic.Property))
+                    {
+                        <strong>@diagnostic.Property:</strong>
+                    }
+                    @diagnostic.Message
+                    <code class="ms-1 small">@diagnostic.Code</code>
+                </li>
+            }
+        </ul>
+    </div>
+}

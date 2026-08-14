@@ -1,0 +1,104 @@
+<EditForm Model="Model" OnValidSubmit="SubmitAsync" FormName="@FormName">
+    <DataAnnotationsValidator />
+
+    <fieldset disabled="@IsBusy">
+        <legend class="h6">@(Model.IsNew ? "Add" : "Edit") @Noun</legend>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Model.Key" id="slot-key" class="form-control"
+                       placeholder="heroTitle" readonly="@(!Model.IsNew)" />
+            <label for="slot-key">Key</label>
+            <ValidationMessage For="() => Model.Key" class="text-danger" />
+            <div class="form-text">
+                @if (Model.IsNew)
+                {
+                    <text>Written into every payload. Cannot be changed afterwards.</text>
+                }
+                else
+                {
+                    <text>Immutable: stored content addresses this @Noun by this key.</text>
+                }
+            </div>
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Model.Name" id="slot-name" class="form-control" placeholder="Hero title" />
+            <label for="slot-name">Display name</label>
+            <ValidationMessage For="() => Model.Name" class="text-danger" />
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Model.Description" id="slot-description" class="form-control"
+                       placeholder="Shown as the page heading." />
+            <label for="slot-description">Help text</label>
+            <ValidationMessage For="() => Model.Description" class="text-danger" />
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputSelect @bind-Value="Model.FieldTypeKey" id="slot-field-type" class="form-select"
+                         disabled="@(!Model.IsNew)">
+                <option value="">Choose a field type</option>
+                @foreach (var fieldType in FieldTypes)
+                {
+                    <option value="@fieldType.Key">@fieldType.DisplayName (@fieldType.Key)</option>
+                }
+            </InputSelect>
+            <label for="slot-field-type">Field type</label>
+            <ValidationMessage For="() => Model.FieldTypeKey" class="text-danger" />
+            @if (!Model.IsNew)
+            {
+                <div class="form-text">
+                    Immutable: changing what a @Noun holds is a content migration, not an edit.
+                </div>
+            }
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputTextArea @bind-Value="Model.ConfigurationJson" id="slot-configuration"
+                           class="form-control" style="height: 8rem" placeholder="{ }" />
+            <label for="slot-configuration">Configuration (JSON)</label>
+            <ValidationMessage For="() => Model.ConfigurationJson" class="text-danger" />
+            @if (SelectedSchema is not null)
+            {
+                <div class="form-text">
+                    Settings: @string.Join(", ", SelectedSchema)
+                </div>
+            }
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputText @bind-Value="Model.Group" id="slot-group" class="form-control" placeholder="Hero" />
+            <label for="slot-group">Editor group</label>
+            <ValidationMessage For="() => Model.Group" class="text-danger" />
+        </div>
+
+        <div class="form-floating mb-3">
+            <InputNumber @bind-Value="Model.SortOrder" id="slot-sort-order" class="form-control" placeholder="0" />
+            <label for="slot-sort-order">Sort order</label>
+            <ValidationMessage For="() => Model.SortOrder" class="text-danger" />
+        </div>
+
+        <div class="form-check mb-2">
+            <InputCheckbox @bind-Value="Model.IsRequired" id="slot-required" class="form-check-input" />
+            <label class="form-check-label" for="slot-required">
+                Required — an empty value blocks publishing, never a draft save
+            </label>
+        </div>
+
+        @if (ShowInlineEditable)
+        {
+            <div class="form-check mb-3">
+                <InputCheckbox @bind-Value="Model.IsInlineEditable" id="slot-inline" class="form-check-input" />
+                <label class="form-check-label" for="slot-inline">
+                    Inline editable (in-context editing, v2)
+                </label>
+            </div>
+        }
+
+        <button type="submit" class="btn btn-primary">
+            @(Model.IsNew ? "Add" : "Save") @Noun
+        </button>
+
+        <button type="button" class="btn btn-link" @onclick="OnCancel">Cancel</button>
+    </fieldset>
+</EditForm>
