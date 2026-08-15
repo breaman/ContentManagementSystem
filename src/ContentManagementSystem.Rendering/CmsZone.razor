@@ -1,0 +1,7 @@
+@* Spec section 8.2: the template declares placement, and everything else is looked up at render
+   time. A zone that resolved to no renderer emits nothing at all — no wrapper, no marker — so a
+   template's own markup decides what an empty zone looks like. *@
+@if (RendererType is not null)
+{
+    <DynamicComponent Type="RendererType" Parameters="RendererParameters" />
+}

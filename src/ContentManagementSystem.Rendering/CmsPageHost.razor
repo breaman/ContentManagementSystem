@@ -1,0 +1,10 @@
+@* The root of every page render, public or preview: cascade the context, then hand off to the
+   template component the payload's templateKey names. IsFixed because the context is created per
+   render and never replaced — without it every descendant subscribes to change notifications that
+   can never fire. *@
+<CascadingValue Value="Context" IsFixed="true">
+    @if (TemplateType is not null)
+    {
+        <DynamicComponent Type="TemplateType" />
+    }
+</CascadingValue>

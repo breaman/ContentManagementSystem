@@ -474,7 +474,9 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
     private ITemplateReconciler Reconciler(ApplicationDbContext context) =>
         new TemplateReconciler(
             context,
-            new CmsStructureAssemblies(typeof(ReconciledTemplateComponent).Assembly),
+            new CmsComponentScanner(
+                new CmsStructureAssemblies(typeof(ReconciledTemplateComponent).Assembly),
+                NullLogger<CmsComponentScanner>.Instance),
             NullLogger<TemplateReconciler>.Instance);
 
     private async Task WriteAsync(string fileName, SchemaDocument document)

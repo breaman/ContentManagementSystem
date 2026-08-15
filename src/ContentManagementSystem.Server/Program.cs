@@ -10,6 +10,7 @@ using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Common;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
+using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Cli;
@@ -136,6 +137,11 @@ try
     builder.Services.AddCmsStructureReconciliation(
         typeof(ContentManagementSystem.Rendering.RenderingAssemblyMarker).Assembly,
         typeof(Program).Assembly);
+
+    // The rendering pipeline (task P3-08). Its component catalog reads the same scan the line above
+    // configures, which is what keeps the key a page stores, the row the reconciler writes, and the
+    // component that renders it from ever being three different answers.
+    builder.Services.AddCmsRendering();
 
     builder.Services.Configure<SchemaSyncOptions>(
         builder.Configuration.GetSection(SchemaSyncOptions.SectionName));

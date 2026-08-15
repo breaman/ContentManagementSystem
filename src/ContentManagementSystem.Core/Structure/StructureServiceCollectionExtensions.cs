@@ -57,9 +57,33 @@ public static class StructureServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddSingleton(new CmsStructureAssemblies(assemblies));
+        services.AddCmsComponentScanning(assemblies);
         services.TryAddScoped<ITemplateReconciler, TemplateReconciler>();
         services.TryAddScoped<ISchemaSyncService, SchemaSyncService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Names the assemblies declaring <c>[CmsTemplate]</c> and <c>[CmsBlockType]</c> components and
+    /// registers the scanner that reads them.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="assemblies">The assemblies to scan.</param>
+    /// <returns>The service collection, for chaining.</returns>
+    /// <remarks>
+    /// Its own method because two unrelated features consume the same answer: reconciliation, which
+    /// creates and orphans rows from it, and rendering, which turns a stored <c>templateKey</c> back
+    /// into a component. A host wanting only one of the two still names its assemblies exactly once.
+    /// </remarks>
+    public static IServiceCollection AddCmsComponentScanning(
+        this IServiceCollection services,
+        params System.Reflection.Assembly[] assemblies)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton(new CmsStructureAssemblies(assemblies));
+        services.TryAddSingleton<CmsComponentScanner>();
 
         return services;
     }

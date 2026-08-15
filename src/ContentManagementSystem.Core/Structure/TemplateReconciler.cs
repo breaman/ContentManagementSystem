@@ -1,9 +1,6 @@
-using System.Reflection;
-
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
-using ContentManagementSystem.Shared.Contracts.Structure;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -49,7 +46,7 @@ public interface ITemplateReconciler
 
 /// <inheritdoc />
 /// <param name="context">The application database context.</param>
-/// <param name="assemblies">The assemblies declaring templates and block types.</param>
+/// <param name="scanner">Reads what the deployed assemblies declare.</param>
 /// <param name="logger">Log for the startup diff.</param>
 /// <remarks>
 /// The four rules of spec section 8.4, and the reasoning behind the one that looks like a bug:
@@ -72,13 +69,15 @@ public interface ITemplateReconciler
 /// </remarks>
 public sealed class TemplateReconciler(
     ApplicationDbContext context,
-    CmsStructureAssemblies assemblies,
+    CmsComponentScanner scanner,
     ILogger<TemplateReconciler> logger) : ITemplateReconciler
 {
     /// <inheritdoc />
     public async Task<ReconciliationReport> ReconcileAsync(CancellationToken cancellationToken = default)
     {
-        var declarations = Scan();
+        // The same scan the rendering pipeline resolves components through, so a key the render path
+        // would refuse to resolve is a key this refuses to reconcile.
+        var declarations = scanner.Scan();
 
         var templates = await ReconcileTemplatesAsync(declarations.Templates, cancellationToken);
         var blockTypes = await ReconcileBlockTypesAsync(declarations.BlockTypes, cancellationToken);
@@ -97,77 +96,9 @@ public sealed class TemplateReconciler(
         return report;
     }
 
-    /// <summary>
-    /// Finds every template and block type declared by an attribute in the registered assemblies.
-    /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// Two components declare the same key. Left to throw at startup rather than resolved: two
-    /// components claiming one key has no defensible winner, and picking one silently would render
-    /// half a site with the wrong markup.
-    /// </exception>
-    private ScanResult Scan()
-    {
-        var templates = new Dictionary<string, TemplateDeclaration>(StringComparer.Ordinal);
-        var blockTypes = new Dictionary<string, BlockTypeDeclaration>(StringComparer.Ordinal);
-
-        foreach (var type in assemblies.Assemblies.SelectMany(GetTypes))
-        {
-            if (type.GetCustomAttribute<CmsTemplateAttribute>() is { } template)
-            {
-                Add(templates, template.Key, new TemplateDeclaration(template, type), type, "template");
-            }
-
-            if (type.GetCustomAttribute<CmsBlockTypeAttribute>() is { } blockType)
-            {
-                Add(blockTypes, blockType.Key, new BlockTypeDeclaration(blockType, type), type, "block type");
-            }
-        }
-
-        return new ScanResult(templates, blockTypes);
-    }
-
-    private static void Add<T>(
-        Dictionary<string, T> declarations,
-        string key,
-        T declaration,
-        Type type,
-        string noun)
-    {
-        if (!declarations.TryAdd(key, declaration))
-        {
-            throw new InvalidOperationException(
-                $"Two components declare the {noun} key '{key}'; '{type.FullName}' is the second. " +
-                "Keys are written into stored payloads and must identify exactly one component.");
-        }
-    }
-
-    /// <summary>Reads an assembly's types, tolerating one that cannot be fully loaded.</summary>
-    /// <remarks>
-    /// A <see cref="ReflectionTypeLoadException"/> here means one type in the assembly references
-    /// something missing. Taking the loadable types and carrying on is right: the alternative is
-    /// that an unrelated broken type stops every template in the assembly from being reconciled,
-    /// which turns a rendering bug into a site that cannot start.
-    /// </remarks>
-    private IEnumerable<Type> GetTypes(Assembly assembly)
-    {
-        try
-        {
-            return assembly.GetTypes();
-        }
-        catch (ReflectionTypeLoadException exception)
-        {
-            logger.LogWarning(
-                exception,
-                "Some types in {Assembly} could not be loaded; reconciling the rest.",
-                assembly.GetName().Name);
-
-            return exception.Types.OfType<Type>();
-        }
-    }
-
     private async Task<(List<string> Created, List<string> Adopted, List<string> Orphaned)>
         ReconcileTemplatesAsync(
-            IReadOnlyDictionary<string, TemplateDeclaration> declared,
+            IReadOnlyDictionary<string, CmsTemplateDeclaration> declared,
             CancellationToken cancellationToken)
     {
         var stored = await context.Templates.ToListAsync(cancellationToken);
@@ -226,7 +157,7 @@ public sealed class TemplateReconciler(
 
     private async Task<(List<string> Created, List<string> Adopted, List<string> Orphaned)>
         ReconcileBlockTypesAsync(
-            IReadOnlyDictionary<string, BlockTypeDeclaration> declared,
+            IReadOnlyDictionary<string, CmsBlockTypeDeclaration> declared,
             CancellationToken cancellationToken)
     {
         var stored = await context.BlockTypes.ToListAsync(cancellationToken);
@@ -320,22 +251,6 @@ public sealed class TemplateReconciler(
                 string.Join(", ", report.TemplatesOrphaned),
                 string.Join(", ", report.BlockTypesOrphaned));
         }
-    }
-
-    private sealed record ScanResult(
-        IReadOnlyDictionary<string, TemplateDeclaration> Templates,
-        IReadOnlyDictionary<string, BlockTypeDeclaration> BlockTypes);
-
-    private sealed record TemplateDeclaration(CmsTemplateAttribute Attribute, Type ComponentType)
-    {
-        /// <summary>Assembly-qualified name, minus version, of the declaring component.</summary>
-        public string ComponentTypeName => ComponentTypeNames.Of(ComponentType);
-    }
-
-    private sealed record BlockTypeDeclaration(CmsBlockTypeAttribute Attribute, Type ComponentType)
-    {
-        /// <summary>Assembly-qualified name, minus version, of the declaring component.</summary>
-        public string ComponentTypeName => ComponentTypeNames.Of(ComponentType);
     }
 }
 

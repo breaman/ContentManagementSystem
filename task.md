@@ -4,8 +4,10 @@
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3 is
 under way**: section 3.1 routing is finished — `PageRoute`, `Redirect`, `NotFoundLog`, and
 `PreviewToken` with migration #4, `UrlService`, `RedirectService`, `IRouteResolver`, `ILinkResolver`,
-the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2), delivery,
-and preview (3.3) are next.
+the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2) has
+started: `P3-08` put the pipeline's spine in place — `RenderContext` with its accumulating cache
+tags, `CmsZone`, `CmsPageHost`, the component base classes, and the component catalog. Field
+renderers (`P3-09`), reference templates, delivery, and preview are next.
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -56,14 +58,14 @@ and record the date in the progress table.
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
-| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 10 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering, delivery, and preview next | — |
+| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 11 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering under way (`P3-08`) | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **91** | **203.5** | | |
+| **v1 total** | **281** | **92** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1794,13 +1796,57 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 
 ### 3.2 Rendering — 10 ed
 
-- [ ] **P3-08** `ContentManagementSystem.Rendering` infrastructure: `CmsTemplateBase`, `CmsZone`,
+- [x] **P3-08** `ContentManagementSystem.Rendering` infrastructure: `CmsTemplateBase`, `CmsZone`,
   `RenderContext` (with the accumulating `CacheTags` set), `[CmsTemplate]` and `[CmsBlockType]`
   attributes [§15.2]. — 2 ed
   *From [S2](./docs/spikes/s2-dynamic-ssr.md): name the render-mode enum **`CmsRenderMode`** — the
   spec's `RenderMode` collides with `Microsoft.AspNetCore.Components.Web.RenderMode` in every .razor
   file. Keep `CacheTags` per render, never shared across requests. Markers and structural hints must
   be elements or attributes: the Razor compiler strips HTML comments from .razor markup.*
+  *2026-08-14 — the S2 shapes, plus `CmsBlockBase` and `CmsFieldRendererBase` (the parameter
+  contracts `CmsZone` and `P3-09`'s renderers are written against) and `CmsPageHost`, the root that
+  cascades the context and resolves the template. The two attributes already existed — `P1-25` needed
+  them before anything could render — so what this adds is the other half of them: a
+  `CmsComponentCatalog` that turns a stored `templateKey` or `blockTypeKey` back into a component.
+  All four `CmsRenderMode` / per-render / attribute-marker constraints from the spike are honoured.*
+  ***The scan is now one scan.*** `TemplateReconciler` had a private copy; the catalog would have
+  been a second, and the duplicate-key rule would then have lived in two places — with the render
+  path free to pick a winner the reconciler had refused. Both now go through
+  `CmsComponentScanner` in `Core/Structure/`, registered by the new `AddCmsComponentScanning(...)`
+  that `AddCmsStructureReconciliation` calls. The catalog additionally **refuses a declaration on a
+  type that is not a component**, at startup: rendering it would fail one page at a time, in
+  production, on whichever request first reached that content.
+  ***Two deviations from the [§15.2] record, both deliberate.*** `RenderContext.Page` is a
+  **`RenderPage`**, not the spec's `PublishedPage`: preview renders *any* version through this same
+  pipeline [§12.1], so a type whose name asserts its contents are published would be a lie on every
+  preview request — and the kind someone eventually leans on by skipping a check the name already
+  seemed to make. Whether a version is live is the explicit `IsPublished` flag; the guarantee that
+  anonymous delivery never loads a draft stays in the query, where [§20.1] puts it. And `CacheTags`
+  is a **`CacheTagSet`** rather than a bare `ISet<string>`, so a renderer adds a dependency through
+  `CacheTags.Media(id)` instead of concatenating a string — a hand-built tag that disagrees with the
+  eviction side by one character is exactly the failure the tag scheme exists to prevent, and the two
+  sides ship phases apart. The set also **seeds `page:{id}` and `tpl:{id}` in its constructor**: a
+  tag that has to be remembered is one that gets forgotten on some path and leaves a stale page live.
+  ***`RenderContext` also carries the captured `ContentSchema`, which the spec's four members do
+  not.*** Without it a renderer cannot see its own configuration, and `P3-09` would have had to
+  reshape the context one task later. The rule it introduced is worth knowing: **the renderer is
+  chosen by the payload's stored `type` discriminator, never by the schema** — a value has to be read
+  by whatever wrote it — and the schema supplies configuration *only when the two agree on the field
+  type*. Configuration belonging to a different field type is worse than none: it parses, and the
+  value renders under bounds nobody chose for it. A mutation that dispatched on the schema instead
+  fails two tests.
+  *23 bUnit and unit tests in `Core.Tests/Rendering/`, written against `RenderTreeBuilder` because
+  the unit project is a plain library rather than a Razor one — which costs nothing here, since what
+  is under test is the dispatch rather than the markup. The composition is asserted four levels deep
+  (host → template → zone → renderer), along with the [§15.3] non-events this task can already
+  reach: an unknown template key logs an error and renders nothing, an unknown field type key logs a
+  warning and renders nothing, and neither throws. **The empty render for an unknown template is
+  temporary** — `P3-11` replaces it with the fallback layout carrying the page's text content, and
+  no endpoint serves any of this until `P3-13`.*
+  ***One build-time trap, already documented in `.claude/rules/blazor.instructions.md`.*** The first
+  build of these components failed with a wall of `RZ1021` and bogus `CS` errors in untouched files;
+  it is a poisoned Razor build server on SDK 10.0.301, not the markup. `dotnet build-server shutdown`
+  and rebuild.*
 - [ ] **P3-09** Field renderer components in `Rendering/Fields/` for every Phase 1 field type. — 2 ed
   *Carries the renderer half of [`ADR-0014`](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md):
   built-in field types answer null for `RendererComponent`, so this task builds the catalog that maps
