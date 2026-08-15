@@ -17,6 +17,25 @@ public class ApplicationDbContext : AuthDbContext
     {
     }
 
+    /// <summary>
+    /// The constructor the container uses, carrying the clock every stamped timestamp is read from.
+    /// </summary>
+    /// <param name="options">Context options.</param>
+    /// <param name="userService">Who the caller is, for fingerprints and audit rows.</param>
+    /// <param name="clock">
+    /// The registered <see cref="TimeProvider"/>. Greedily preferred over the two-parameter
+    /// constructor whenever one is registered, which in the application and in the test host is
+    /// always — see <c>AuthDbContext</c>'s clock field for why the stamp must not read the wall
+    /// clock directly.
+    /// </param>
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        IUserService userService,
+        TimeProvider clock) :
+        base(options, userService, clock)
+    {
+    }
+
     /// <summary>Page shapes a developer defines and editors create pages from.</summary>
     public DbSet<Template> Templates => Set<Template>();
 

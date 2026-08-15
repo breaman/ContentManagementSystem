@@ -1921,6 +1921,20 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   green; `Server.Tests` 216 of 217, the one failure being `VersionAndDiffTests.RetentionKeepsWhat
   AnEditorWouldBeUpsetToLose`, **which fails identically on a clean checkout of `main`** and is
   unrelated to rendering.*
+  ***That failure is now understood and fixed — it was never a retention defect, and it was never
+  ours to blame on rendering.*** Entity timestamps were stamped from `DateTimeOffset.UtcNow` inside
+  `AuthDbContext`'s `SaveChanges` interceptor, while `RetentionPolicy` computed its cutoff from the
+  registered `TimeProvider`. Two clocks, so a suite that advanced the fake one moved the cutoff and
+  left the rows where they were, and **whether the test passed depended on the real calendar date it
+  ran on** — it was green until 2026-08-15 09:00 UTC and red from that minute. `AuthDbContext` now
+  reads every stamp it writes (`CreatedOn`, `ModifiedOn`, `DeletedOn`, and the `AuditLog` row) from
+  the injected clock, and `FakeTimeProvider` starts at the real current instant so the offset cannot
+  reopen. Recorded in [Changes to existing code](#changes-to-existing-code). Worth knowing for the
+  next phase that ages a row out: scheduling (`P7`) and purging need exactly this seam.
+  ***And it was hiding a second test.*** `NothingIsPrunedFromAPageInTheRecycleBin` asserts
+  `after == before`, which passed for free while nothing anywhere was prunable. It only began
+  testing the recycle-bin exclusion once the clocks agreed — a green test proving nothing, kept
+  honest by the red one beside it.*
 - [x] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
   `Rendering/Blocks/`, between them exercising every field type. — 2 ed
   *2026-08-15 — `marketing-landing` and `article`; `hero-banner`, `rich-text`, and `feature-grid`.
@@ -3107,6 +3121,9 @@ reviewer.
 | `Data/Models/AuthDbContext.cs` | Exclude high-churn tables from `AddLogging()` audit capture | 1 | P1-05 | [x] |
 | `Data/Models/AuthDbContext.cs` | Implement `ApplySoftDeletes()` — the virtual hook exists, is empty, and is never called | 2 | P2-04 | [x] |
 | `Data/Models/AuthDbContext.cs` | Defer cascade and orphan timing to `SaveChanges`, without which the soft-delete net is bypassed whenever the dependents happen to be loaded | 2 | P2-04 | [x] |
+| `Data/Models/AuthDbContext.cs` | Read every stamped timestamp (`CreatedOn`, `ModifiedOn`, `DeletedOn`) from the injected `TimeProvider` rather than `DateTimeOffset.UtcNow`. **The retention sweep compares its cutoff to these columns**, so while the two clocks were independent no test could move one without the other, and the result turned on the real calendar date | 3 | P3-09 | [x] |
+| `Data/Models/AuditEntry.cs` | `ToAuditLog` takes the clock, so an audit row and the fingerprints on the entity it describes carry one instant | 3 | P3-09 | [x] |
+| `Data/Models/ApplicationDbContext.cs` | Constructor overload carrying `TimeProvider`, greedily selected by the container. The existing overloads stay and default to `TimeProvider.System`, so a host that registers no clock is unchanged | 3 | P3-09 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Suppress EF warning 10622: `PageVersion` deliberately carries no soft-delete filter, so a deleted page's history stays retrievable | 2 | P2-03 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [x] |
 | `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–8 | P1-30, P3-13 | [ ] |

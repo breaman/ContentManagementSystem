@@ -42,6 +42,25 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 
     private readonly IUserService? _userService;
 
+    /// <summary>
+    /// The clock every timestamp this context stamps is read from.
+    /// </summary>
+    /// <remarks>
+    /// <b>Injected rather than read from <see cref="DateTimeOffset.UtcNow"/>, because a stamp that
+    /// ignores the container's clock cannot be tested against anything that honours it.</b> The
+    /// retention sweep computes its cutoff from the registered <see cref="TimeProvider"/> and
+    /// compares it to <c>CreatedOn</c> written here; when the two came from different clocks, a
+    /// suite that advanced the fake one moved the cutoff and left the rows behind, so whether a test
+    /// passed depended on the real calendar date it ran on. Anything that later ages a row out —
+    /// scheduled publishing, recycle-bin purging, audit retention — needs the same seam.
+    /// <para>
+    /// Defaults to <see cref="TimeProvider.System"/> so the constructor that takes no services
+    /// behaves exactly as it did; in the application the container supplies the same instance the
+    /// services read.
+    /// </para>
+    /// </remarks>
+    private readonly TimeProvider _clock = TimeProvider.System;
+
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected AuthDbContext(DbContextOptions options) : base(options)
@@ -53,6 +72,14 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
         base(options)
     {
         _userService = userService;
+        DeferCascadesToSaveChanges();
+    }
+
+    protected AuthDbContext(DbContextOptions options, IUserService userService, TimeProvider clock) :
+        base(options)
+    {
+        _userService = userService;
+        _clock = clock;
         DeferCascadesToSaveChanges();
     }
 
@@ -123,7 +150,7 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 
             entry.State = EntityState.Modified;
             entry.Entity.IsDeleted = true;
-            entry.Entity.DeletedOn = DateTimeOffset.UtcNow;
+            entry.Entity.DeletedOn = _clock.GetUtcNow();
             entry.Entity.DeletedBy = _userService?.UserId;
         }
     }
@@ -153,7 +180,7 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
     {
         var modified = ChangeTracker.Entries().Where(e => e.State == EntityState.Modified);
         var added = ChangeTracker.Entries().Where(e => e.State == EntityState.Added);
-        var now = DateTimeOffset.UtcNow;
+        var now = _clock.GetUtcNow();
 
         foreach (var entry in added)
         {
@@ -230,6 +257,6 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
             }
         }
 
-        foreach (var auditEntry in auditEntries) AuditLogs.Add(auditEntry.ToAuditLog());
+        foreach (var auditEntry in auditEntries) AuditLogs.Add(auditEntry.ToAuditLog(_clock));
     }
 }

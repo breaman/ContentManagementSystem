@@ -20,13 +20,21 @@ public class AuditEntry
         Entry = entry;
     }
 
-    public AuditLog ToAuditLog()
+    /// <summary>Builds the row this entry is written to the audit table as.</summary>
+    /// <param name="clock">
+    /// Clock the timestamp is read from. Supplied by the context so an audit row and the
+    /// fingerprints on the entity it describes carry the same instant, and so a suite running on a
+    /// fake clock sees audit rows dated to match it.
+    /// </param>
+    public AuditLog ToAuditLog(TimeProvider clock)
     {
+        ArgumentNullException.ThrowIfNull(clock);
+
         var auditLog = new AuditLog();
         auditLog.UserId = UserId;
         auditLog.Type = AuditType.ToString();
         auditLog.TableName = TableName;
-        auditLog.DateTime = DateTimeOffset.UtcNow;
+        auditLog.DateTime = clock.GetUtcNow();
         auditLog.PrimaryKey = JsonSerializer.Serialize(KeyValues);
         auditLog.OldValues = OldValues.Count == 0 ? null : JsonSerializer.Serialize(OldValues);
         auditLog.NewValues = NewValues.Count == 0 ? null! : JsonSerializer.Serialize(NewValues);

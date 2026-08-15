@@ -282,10 +282,23 @@ public sealed class PageWorkbench : IAsyncDisposable
 /// Hand-rolled rather than pulled from <c>Microsoft.Extensions.TimeProvider.Testing</c>: the two
 /// things these suites need from it are "what time is it" and "move forward", and adding a package
 /// to central package management for that is more moving parts than the code it replaces.
+/// <para>
+/// <b>It starts at the real current instant rather than at a fixed date, and that is not a
+/// convenience.</b> A hard-coded start drifts further from the wall clock every day the repository
+/// exists, so any comparison between a stored timestamp and this clock silently changes meaning
+/// with the calendar — a suite that is green on the day it is written and red some weeks later,
+/// with nothing in between to blame. That is exactly what happened to
+/// <c>RetentionKeepsWhatAnEditorWouldBeUpsetToLose</c>, which passed until 2026-08-15 09:00 UTC and
+/// failed from that minute on. Starting from now keeps the offset at zero on every run.
+/// </para>
+/// <para>
+/// Tests must therefore only ever assert on time <em>relatively</em> — advance the clock and check
+/// what changed. Nothing here may be pinned to a literal date, because there no longer is one.
+/// </para>
 /// </remarks>
 public sealed class FakeTimeProvider : TimeProvider
 {
-    private DateTimeOffset _now = new(2026, 8, 14, 9, 0, 0, TimeSpan.Zero);
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
 
     /// <inheritdoc />
     public override DateTimeOffset GetUtcNow() => _now;
