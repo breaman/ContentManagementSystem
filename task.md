@@ -1,8 +1,8 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-32` template-delete
-guard; Phase 2 complete through 2.3 (data, services, API, and admin UI), with four unit and
-telemetry test tasks outstanding
+**Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
+`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete** — data, services,
+API, admin UI, and every test task, with all eleven acceptance criteria met. Next up is Phase 3.
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -51,8 +51,8 @@ and record the date in the progress table.
 | Phase | Tasks | Done | ed | Status | Exit gate met |
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
-| [1 — Content structure](#phase-1--content-structure) | 33 | 32 | 28.0 | In progress — `P1-30` closed by `P2-10`; only `P1-32`'s template-delete guard left | — |
-| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 25 | 27.0 | In progress — 2.1, 2.2, and 2.3 complete; four unit and telemetry test tasks left | 2026-08-14 |
+| [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
+| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
@@ -60,7 +60,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **76** | **203.5** | | |
+| **v1 total** | **281** | **81** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -842,7 +842,7 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   therefore asserts a string the loaded screen must contain. And the gate was mutation-tested:
   removing a `<label>` alone does **not** fail it, because `placeholder` supplies an accessible name
   under accname — removing both correctly fails with `label (critical) … #slot-name`.*
-- [~] **P1-32** Template evolution rules enforced in the service layer [§8.5]: add zone free; remove
+- [x] **P1-32** Template evolution rules enforced in the service layer [§8.5]: add zone free; remove
   zone retains payload data as orphaned; **rename key forbidden**; field-type change requires an
   explicit converter choice; template delete blocked while pages reference it. — included above
   *2026-08-14 — the **zone** rules landed with `P1-22`: add free, remove retains, rename refused,
@@ -856,6 +856,27 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   *2026-08-14 — **the blocker is cleared**: `P2-01` landed `Page`, so the delete verb and its guard
   can now be written against a real query. Still open because the verb itself does not exist yet —
   it lands with the template endpoints' next revision, alongside `P2-16`.*
+  *2026-08-14 — **closed.** `ITemplateService.DeleteAsync` and `DELETE /api/cms/v1/templates/{id}`,
+  behind `Structure.Edit` and antiforgery like every other structural write. The template's zones and
+  captured revisions go with it, removed explicitly because every structural foreign key is
+  `Restrict` — cascading would take the only record of what stored content was validated against.*
+  ***The guard is wider than [§8.5]'s wording, and deliberately.*** The spec says a *non-deleted*
+  page blocks the delete; this refuses while **any** page references the template, counting the
+  recycled ones separately in the message. Two reasons, either of which is sufficient: a page in the
+  recycle bin keeps its `TemplateId` and can be restored, so the narrow reading turns a restore into
+  a page whose schema no longer exists; and `Page.TemplateId` and `PageVersion.TemplateId` are both
+  `Restrict`, so the narrow guard would pass the check and then hand the caller a foreign-key error
+  in place of an answer. Emptying the bin is a remedy, so the refusal names it.*
+  *The refusal **names the pages** rather than counting them — capped at five plus "and N more",
+  since "12 pages use this template" leaves a developer to go and find them and twelve hundred names
+  is a wall nobody reads. `Api/Cms/TemplateDeleteApiTests`, six cases: an unused template goes with
+  its revisions, a used one is refused by name and is still there afterwards, a recycled page blocks
+  it until purged and then does not, an Editor is refused where a Developer is not, a missing
+  template is 404, and a delete with no antiforgery token is refused.*
+  ***Still no block type delete***, and it is not this task's wording: guarding it means finding
+  block *instances* of a type inside stored payloads, and a block type is not a
+  `ContentReference` target, so there is no index to ask. It needs either a payload scan or a
+  projection that does not exist yet — worth raising when Phase 4 or 8 builds one.*
 - [x] **P1-33** ADRs for any Phase 1 decision not already covered by D1–D12.
   *2026-08-14 — Phase 1 produced seven: `D13`–`D16` during 1.1–1.4, and three from 1.5.
   [`D17`](./docs/adr/0017-revisions-cut-only-when-content-is-read-differently.md) — a revision is cut
@@ -888,12 +909,22 @@ validate a content payload against them. **28 ed** · Entry: Phase 0 exit.
   the API rather than against the service: a rule that holds in `ZoneService` and is bypassable by
   an endpoint is not enforced. The same suite asserts the neighbouring rule the criterion does not
   name — a field-type change is refused too.*
-- [~] **P1 #4** Removing a zone leaves existing payload data intact and reachable as orphaned content.
+- [x] **P1 #4** Removing a zone leaves existing payload data intact and reachable as orphaned content.
   *2026-08-14 — half of this is asserted. `P1-22` proves the definition goes while the revision that
   captured it stays, and `P1-15` already reports an orphaned zone as a **warning** rather than an
   error, which is what makes the value reachable. The literal criterion — a stored payload survives
   the removal and the editor can still see the value — needs a page to store one, so it closes in
   Phase 2 against `ContentSchemaValidator` and the obsolete-content panel.*
+  ***Closed 2026-08-14*** — `Api/Cms/OrphanedZoneApiTests`, three cases through the API now that
+  Phase 2 supplies the page. The value survives the removal byte for byte; once the page **adopts
+  the new revision** the leftover comes back as a `zone.orphaned` warning naming the zone, and is
+  still stored after that save; and a page carrying one can still be published, because a warning
+  does not block.
+  *The revision timing is the part worth knowing, and it is why the first two cases are separate. A
+  payload is judged against the revision it **captured**, so a draft that has not moved forward is
+  still being validated against a schema in which the zone exists and reports nothing. The orphan
+  appears exactly when an editor adopts the structural change — which is also exactly when they are
+  in a position to do something about it.*
 - [x] **P1 #5** A template defined in code but absent from the database is created at startup; a
   database template with no code component is marked orphaned and degrades `cms-templates`.
   *2026-08-14 — `Structure/StructureStartupTests`, all three halves: a `[CmsTemplate]` fixture with no
@@ -923,6 +954,11 @@ met, and closing the gate over them would lose the distinction: **`P1 #1`** need
 the admin form rather than the API beneath it, and **`P1 #4`** needs a stored payload to survive a
 zone removal — which needs a page to store one. Both close early in Phase 2; neither blocks starting
 it, since `P2-01` is the thing that unblocks them.*
+*2026-08-14 — **`P1 #4` is now closed** (`OrphanedZoneApiTests`), and all 33 tasks are done including
+`P1-32`'s template delete. **`P1 #1` is the only thing left**, and it is one Playwright journey: a
+browser signing in and driving the zone form, rather than the API the form calls. It waits on the
+full-journey E2E suite with seeded users — deliberately, per `P1-31` — so the gate stays open on a
+single, named, non-architectural item rather than being ticked over it.*
 
 **Risks:** R2 (runtime-schema complexity), R3 (sanitizer over-stripping).
 
@@ -1430,8 +1466,57 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 ### Tests — Phase 2
 
-- [ ] **P2-24** Unit: draft save concurrency, version numbering, retention policy selection.
-- [ ] **P2-25** Unit: diff algorithm — reorder, insert, delete, nested block change.
+- [x] **P2-24** Unit: draft save concurrency, version numbering, retention policy selection.
+  *2026-08-14 — three suites, and **two of the three rules had to be lifted out of the service that
+  ran them before they could be tested at all**, which is the substance of this task rather than a
+  side effect of it. `RetentionPolicy` now holds the [§11.7] clauses as a pure decision returning
+  **why** a version was spared (`RetentionReason`), and `VersionNumbers` holds "the highest ever
+  issued plus one" — previously duplicated verbatim in `DraftService` and `PublishingService`, which
+  is two chances to write "the count plus one" and reissue a number the moment history is pruned.
+  `VersionService.PruneAsync` and both mint sites now call them.*
+  ***Carrying the reason is what makes the retention clauses assertable one at a time.*** Arranging a
+  version protected by exactly one clause and no other takes ninety days of history per case, so the
+  database suite can only ever show that the sweep as a whole kept the right rows — not that it kept
+  them for the right reason, which is the difference between a policy and a coincidence.
+  `RetentionPolicyTests` includes the control the integration suite cannot state either: an ordinary
+  old version **is** prunable, without which every other case passes for a sweep that deletes
+  nothing. Three clauses caught something worth having: a superseded publish is `Archived` and keeps
+  its `PublishedOn`, so reading only the status would prune the entire published history of any page
+  published twice; a `CreatedOn` of null means the row's age is unknown, which fails safe; and a
+  label of blanks is not a name.*
+  *`VersionNumbersTests` pins the join between the two rules — **retention never prunes the newest
+  version**, which is the only reason numbering may read `MAX` rather than keep a monotonic counter.
+  Both halves of that are asserted, in the file that would break if either moved.*
+  ***Draft-save concurrency is `RowVersionsTests`, and it needs no database on purpose.*** The race
+  itself is arbitrated by SQL Server and is already asserted there (`PageSchemaTests`,
+  `PageApiTests`). What those cannot show is the decision made before any statement is sent: that a
+  **malformed** token is refused rather than quietly treated as no precondition, since both spellings
+  of that bug produce a successful save on an uncontended row. Also pinned: the token is applied as
+  the entry's *original* value and never compared in code, an over-long token is refused rather than
+  truncated to its first eight bytes (which would have matched), and absent stays distinguishable
+  from unreadable — the draft save insists on one and the metadata patch does not.*
+- [x] **P2-25** Unit: diff algorithm — reorder, insert, delete, nested block change.
+  *2026-08-14 — the comparison moved into `Core/Publishing/PayloadDiff.cs`, leaving
+  `ContentDiffService` with what actually needs a database: the permission check, the two rows, and
+  the metadata list. `PayloadDiffTests` drives the algorithm over two payload documents with no page,
+  no template, and no publish — 13 cases for what would otherwise be 13 containers spent to reach the
+  same method.*
+  *All four named cases, and each is asserted at the thing that distinguishes it from its neighbour:
+  a rotation is three `Moved` entries carrying before and after indexes; an insertion in the middle
+  is one `Added` **plus a `Moved` for what it pushed down and silence for what it did not touch**; a
+  deletion is one `Removed` at the index it held and explicitly not a removal-plus-addition; and a
+  change inside a block reports that block alone, word-segmented, with its siblings quiet.*
+  *Four cases beyond the task's list, all of them things the integration suite has no cheap way to
+  arrange. **A block that both moved and changed reports `Changed`** — hiding an edit behind a
+  reorder is the wrong way round to be wrong. **Member order is not a change**, so a save that
+  happened to re-serialise a block does not read to an editor as an edit. **A cleared zone is
+  `Changed` and an absent one is `Removed`**, which is [§6.2]'s absent-vs-null surviving into the
+  diff. And **a value whose field type this build no longer has still diffs**, as its raw document —
+  reporting "no change" there is the worst of the three available answers.*
+  *One behaviour this documented rather than changed: two blocks sharing an id produce a `Changed`
+  zone with an **empty** block list, because the second occurrence is dropped and the first is
+  identical. It is a malformed payload the `blocks` field type already reports on, and the diff's job
+  is to still render — the editor is looking at it to work out what broke.*
 - [x] **P2-26** Data integration: filtered unique indexes behave; query filters exclude deleted rows;
   `rowversion` conflicts surface as `DbUpdateConcurrencyException`.
   *2026-08-14 — `Data.Tests/Cms/PageSchemaTests`, eight cases against real SQL Server: the creating
@@ -1456,8 +1541,47 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
   anonymous caller gets **401 and not 403**. Concurrency is asserted at all three of its statuses —
   428 for a draft save with no precondition, 409 for one that lost a race, 409 for a metadata patch
   with a stale `If-Match`.*
-- [ ] **P2-28** API integration: publish transactionality under fault injection.
-- [ ] **P2-29** Telemetry: `cms.publish.count` / `.duration` metrics and publish trace spans [§24.1].
+- [x] **P2-28** API integration: publish transactionality under fault injection.
+  *2026-08-14 — `Api/Cms/PublishFaultInjectionApiTests`, the same four steps `P2-12` forces but
+  driven through `POST /pages/{id}/publish`. **Not a duplicate of the service-layer suite**: the
+  endpoint runs in ASP.NET Core's request scope, with its own `ApplicationDbContext`, the audit
+  interceptor's saves, and a connection the pipeline disposes on the way out — a transaction that
+  rolls back correctly when a test calls the service can still be committed in halves by a request
+  that ends differently.*
+  ***What the client sees is asserted alongside what the database keeps.*** A failed publish answers
+  **500**, not a 2xx and not a problem-details refusal: this is not the editor being told the page is
+  unfit to publish, it is the server failing to do what it was asked, and a 2xx over a rolled-back
+  transaction produces a page everybody believes is live. The before-and-after state is read **back
+  through the API** — the page, its version list, and its draft — because "nothing changed" has to
+  mean nothing a client can see, and a row that rolled back while a response still carries a stale
+  pointer is a broken page either way. The successful control case is here too, for the reason
+  `P2-12` needed one: an interceptor that broke publishing outright would make every roll-back
+  assertion pass for the wrong reason.*
+- [x] **P2-29** Telemetry: `cms.publish.count` / `.duration` metrics and publish trace spans [§24.1].
+  *2026-08-14 — `Core/Telemetry/`: `CmsTelemetry` holds the names ([§24.1]'s meter, the activity
+  source, the `cms.publish` span) and `CmsMetrics` the two instruments, built from `IMeterFactory`
+  rather than a bare `Meter` so they are scoped to the container. `PublishingService.PublishAsync`
+  is now a wrapper over `PublishCoreAsync` that starts the span, times the attempt, and records both
+  instruments with one `result` tag. Registered by `AddCmsPages()`, and — the half that is easy to
+  forget — **listed with OpenTelemetry in `Program.cs`**, since an unregistered meter records
+  measurements no exporter ever collects, which is indistinguishable from code that was never
+  instrumented.*
+  ***The measurement is taken in a `finally`, and that is the case worth having.*** A publish that
+  threw is counted as `failed` rather than not counted at all: an operation that vanishes from its
+  own counter when it breaks is worse than no counter, because the graph stays flat and healthy while
+  publishing is down — risk R4 arriving invisibly. `refused` is kept distinct from `failed` for the
+  same reason in reverse; an editor being told their required zone is empty is not an incident, and
+  tagging it as one buries the real thing under ordinary editing noise. The tag values are a closed
+  set (`published` / `refused` / `forbidden` / `not-found` / `failed`), never an exception message,
+  which is how a metrics bill and a collector both fall over.*
+  *`Content/PublishTelemetryTests` asserts all five outcomes and both instruments through **real
+  publishes**, since what can go wrong is not the counter but the counter never being reached — an
+  early return that skips it, a name that drifted from the one the dashboard queries — and every one
+  of those passes a test that records a measurement by hand. Measurements are filtered by the meter's
+  `Scope`, so one host cannot count another's. The span case pins the tags and that a refusal sets
+  `ActivityStatusCode.Error`: a trace is read to find out why a request did not do what was asked.
+  One trap found in writing it — `Activity.Tags` enumerates only string-valued tags, so the integer
+  page id and version number are invisible there and must be read through `GetTagItem`.*
 
 ### Acceptance criteria — Phase 2
 
@@ -1522,6 +1646,14 @@ publishing snapshots the draft into a separate row, and no operation in `DraftSe
 status codes, and `2.3`'s endpoints closed both. `P2 #4` is additionally re-asserted through the API
 in `PageLifecycleApiTests`, so the promise holds at the surface an editor actually touches and not
 only at the service beneath it.*
+*2026-08-14 — **the phase is closed**: `P2-24`, `P2-25`, `P2-28`, and `P2-29` were the last four, and
+all 29 tasks are done. Suite totals at close: `Core.Tests` 1054, `Server.Tests` 169, `Data.Tests` 23,
+`E2E.Tests` 9 — 1255 green, zero build warnings. Two of those tasks changed production code rather
+than only adding tests, both because the rule under test was unreachable where it lived:
+`RetentionPolicy` and `VersionNumbers` came out of `VersionService` and the two mint sites (`P2-24`),
+and `PayloadDiff` came out of `ContentDiffService` (`P2-25`). `P2-29` added `Core/Telemetry/` and the
+OpenTelemetry registration outright, which is Phase 2's only new production surface — the rest of
+[§24.1] arrives with the phases that own the operations it measures.*
 
 **Risks:** R4 (publish transaction correctness), R5 (diff complexity).
 

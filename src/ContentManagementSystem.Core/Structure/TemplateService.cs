@@ -206,6 +206,62 @@ public sealed class TemplateService(
     }
 
     /// <inheritdoc />
+    public async Task<CmsResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default)
+    {
+        if (!authorization.HasPermission(CmsPermissions.StructureEdit))
+        {
+            return CmsResult<bool>.Forbidden("Managing templates is not permitted.");
+        }
+
+        var template = await context.Templates
+            .Include(candidate => candidate.Zones)
+            .Include(candidate => candidate.Revisions)
+            .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+
+        if (template is null)
+        {
+            return CmsResult<bool>.NotFound($"No template has id {id}.");
+        }
+
+        // IgnoreQueryFilters, so a page in the recycle bin counts. It keeps its TemplateId and can
+        // be restored, and a restore that produces a page with no schema to render against is not
+        // one — the foreign key would refuse the delete regardless (spec section 8.5).
+        var users = await context.Pages
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(page => page.TemplateId == id)
+            .OrderBy(page => page.Id)
+            .Select(page => new
+            {
+                Title = page.DraftVersion == null ? page.Slug : page.DraftVersion.Title,
+                page.IsDeleted,
+            })
+            .ToListAsync(cancellationToken);
+
+        if (users.Count > 0)
+        {
+            return InUse(template.Key, users.Count(page => !page.IsDeleted), [.. users.Select(page => page.Title)]);
+        }
+
+        // Removed explicitly because every structural foreign key is Restrict: cascading would take
+        // zone definitions and captured revisions with a template deleted by accident, and those are
+        // the only record of what stored content was validated against.
+        context.Zones.RemoveRange(template.Zones);
+        context.TemplateRevisions.RemoveRange(template.Revisions);
+        context.Templates.Remove(template);
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Template {TemplateKey} deleted with {ZoneCount} zones and {RevisionCount} revisions.",
+            template.Key,
+            template.Zones.Count,
+            template.Revisions.Count);
+
+        return CmsResult<bool>.Success(true);
+    }
+
+    /// <inheritdoc />
     public async Task<CmsResult<IReadOnlyList<TemplateRevisionSummary>>> ListRevisionsAsync(
         int id,
         CancellationToken cancellationToken = default)
@@ -279,6 +335,36 @@ public sealed class TemplateService(
     /// <summary>Checks the key the way the unique index will, under the database's collation.</summary>
     private Task<bool> KeyExistsAsync(string key, CancellationToken cancellationToken) =>
         context.Templates.AnyAsync(template => template.Key == key, cancellationToken);
+
+    /// <summary>
+    /// Refuses a delete and says which pages stopped it.
+    /// </summary>
+    /// <param name="key">Key of the template.</param>
+    /// <param name="live">How many of the pages are not in the recycle bin.</param>
+    /// <param name="titles">Every page's title, of which a few are named.</param>
+    /// <remarks>
+    /// Named, not merely counted, and capped. "12 pages use this template" leaves the developer to
+    /// go and find them; naming a handful is what makes the refusal actionable, and naming all
+    /// twelve hundred would make it a wall of text nobody reads.
+    /// </remarks>
+    private static CmsResult<bool> InUse(string key, int live, IReadOnlyList<string> titles)
+    {
+        const int Named = 5;
+
+        var named = string.Join(", ", titles.Take(Named).Select(title => $"'{title}'"));
+        var rest = titles.Count > Named ? $", and {titles.Count - Named} more" : string.Empty;
+        var recycled = titles.Count - live;
+
+        var where = recycled == 0
+            ? $"{titles.Count} page(s) use template '{key}'"
+            : $"{titles.Count} page(s) use template '{key}', {recycled} of them in the recycle bin";
+
+        return CmsResult<bool>.Conflict(
+            StructureCodes.InUse,
+            $"{where}: {named}{rest}. Move those pages to another template, and empty the recycle " +
+            "bin of any that are in it, before deleting this one — content whose template row is " +
+            "gone has no schema left to validate or render against.");
+    }
 
     private static CmsResult<TemplateDetail> DuplicateKey(string key) =>
         CmsResult<TemplateDetail>.Conflict(

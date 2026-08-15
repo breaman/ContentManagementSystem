@@ -84,10 +84,10 @@ public sealed class VersionService(
     ILogger<VersionService> logger) : IVersionService
 {
     /// <summary>Versions kept per page beyond the retention window (spec section 11.7).</summary>
-    public const int KeepPerPage = 20;
+    public const int KeepPerPage = RetentionPolicy.KeepPerPage;
 
     /// <summary>Retention window used when <c>SiteSettings</c> does not name one.</summary>
-    public const int DefaultRetentionDays = 90;
+    public const int DefaultRetentionDays = RetentionPolicy.DefaultRetentionDays;
 
     /// <inheritdoc />
     public async Task<CmsResult<IReadOnlyList<PageVersionSummary>>> ListAsync(
@@ -261,8 +261,7 @@ public sealed class VersionService(
             .Select(settings => (int?)settings.VersionRetentionDays)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var window = retentionDays is > 0 ? retentionDays.Value : DefaultRetentionDays;
-        var cutoff = clock.GetUtcNow().AddDays(-window);
+        var cutoff = RetentionPolicy.CutoffFrom(clock.GetUtcNow(), retentionDays);
 
         // Deleted pages are excluded outright rather than filtered later: a page in the recycle bin
         // keeps every version it had, because a restore that came back with no history is not one
@@ -297,18 +296,21 @@ public sealed class VersionService(
             {
                 rank++;
 
-                var isPointedAt = version.Id == page.DraftVersionId || version.Id == page.PublishedVersionId;
-                var wasPublished = version.PublishedOn is not null ||
-                    version.Status is PageVersionStatus.Published;
-                var isCheckpoint = !string.IsNullOrWhiteSpace(version.Label);
-                var insideWindow = (version.CreatedOn ?? DateTimeOffset.MaxValue) >= cutoff;
+                // Which clause spared a version is decided by RetentionPolicy, so the rules can be
+                // asserted one at a time without arranging ninety days of history first (P2-24).
+                var candidate = new RetentionCandidate(
+                    version.Id,
+                    rank,
+                    version.Status,
+                    version.Label,
+                    version.PublishedOn,
+                    version.CreatedOn,
+                    version.Id == page.DraftVersionId || version.Id == page.PublishedVersionId);
 
-                if (isPointedAt || wasPublished || isCheckpoint || insideWindow || rank <= KeepPerPage)
+                if (RetentionPolicy.Decide(candidate, cutoff) is RetentionReason.Prunable)
                 {
-                    continue;
+                    removed.Add(version.Id);
                 }
-
-                removed.Add(version.Id);
             }
         }
 

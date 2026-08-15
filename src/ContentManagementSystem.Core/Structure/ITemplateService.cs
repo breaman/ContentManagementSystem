@@ -10,10 +10,9 @@ namespace ContentManagementSystem.Core.Structure;
 /// is the door and this is the lock — a service reached from a CLI verb or a hosted job is subject
 /// to the same rules (spec section 20.4).
 /// <para>
-/// Nothing here deletes a template. Deletion is blocked while any non-deleted page references the
-/// template (spec section 8.5), and there is no page table to ask until Phase 2; shipping a delete
-/// that cannot yet enforce its own guard would be a hole with a date on it. It arrives with
-/// <c>P1-32</c>'s remaining rules once <c>Page</c> exists.
+/// The delete arrived with <c>P1-32</c>, once <c>Page</c> existed for its guard to ask. It was
+/// deliberately not shipped before that: a delete that cannot enforce its own rule is a hole with a
+/// date on it.
 /// </para>
 /// </remarks>
 public interface ITemplateService
@@ -58,6 +57,30 @@ public interface ITemplateService
         int id,
         UpdateTemplateRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes a template, its zone definitions, and its revision history.
+    /// </summary>
+    /// <param name="id">Identity of the template.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>
+    /// Success, a not-found result, or a conflict naming the pages that stopped it (task P1-32,
+    /// spec section 8.5).
+    /// </returns>
+    /// <remarks>
+    /// <strong>Refused while any page references the template, including one in the recycle bin.</strong>
+    /// Spec section 8.5 words the rule as non-deleted pages, and that reading is a page that cannot
+    /// be restored: a recycled page keeps its <c>TemplateId</c>, so deleting its template turns a
+    /// restore into an unrenderable page whose schema no longer exists — and the foreign key is
+    /// <c>Restrict</c> in both directions anyway, so the narrower guard would hand the caller a
+    /// database error instead of an answer. The two cases are counted separately in the refusal,
+    /// because emptying the recycle bin is a remedy the caller can act on.
+    /// <para>
+    /// A hard delete, like a composition's. Templates carry no soft-delete flag, and once nothing
+    /// references one there is no content whose schema its revisions still pin.
+    /// </para>
+    /// </remarks>
+    Task<CmsResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>Lists a template's structural revisions, newest first.</summary>
     /// <param name="id">Identity of the template.</param>

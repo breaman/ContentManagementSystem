@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
@@ -272,7 +273,7 @@ public sealed class DraftService(
         if (page?.DraftVersion is null) return NotFound<DraftState>(pageId);
 
         var draft = page.DraftVersion;
-        var checkpoint = Copy(draft, await NextVersionNumberAsync(pageId, cancellationToken));
+        var checkpoint = Copy(draft, await VersionNumbers.NextAsync(context, pageId, cancellationToken));
 
         // Archived rather than a status of its own: it is a frozen copy nobody will publish from
         // directly, which is exactly what Archived means, and the Label is what tells it apart from
@@ -360,12 +361,6 @@ public sealed class DraftService(
             .Include(page => page.DraftVersion)
             .Include(page => page.PublishedVersion)
             .FirstOrDefaultAsync(page => page.Id == pageId, cancellationToken);
-
-    private async Task<int> NextVersionNumberAsync(int pageId, CancellationToken cancellationToken) =>
-        (await context.PageVersions
-            .Where(version => version.PageId == pageId)
-            .Select(version => (int?)version.VersionNumber)
-            .MaxAsync(cancellationToken) ?? 0) + 1;
 
     /// <summary>Copies a version's content and metadata into a new, unsaved row.</summary>
     internal static PageVersion Copy(PageVersion source, int versionNumber)

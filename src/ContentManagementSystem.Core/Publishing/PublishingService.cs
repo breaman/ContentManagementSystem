@@ -1,4 +1,7 @@
+using System.Diagnostics;
+
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
@@ -80,6 +83,7 @@ public interface IPublishingService
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
 /// <param name="clock">Source of the current time.</param>
+/// <param name="metrics">Counter and histogram of publish attempts (spec section 24.1).</param>
 /// <param name="logger">Log for every publish and every failure to publish.</param>
 public sealed class PublishingService(
     ApplicationDbContext context,
@@ -89,6 +93,7 @@ public sealed class PublishingService(
     ICmsAuthorization authorization,
     IUserService users,
     TimeProvider clock,
+    CmsMetrics metrics,
     ILogger<PublishingService> logger) : IPublishingService
 {
     /// <inheritdoc />
@@ -119,10 +124,72 @@ public sealed class PublishingService(
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Wrapped in the span and the two instruments of spec section 24.1. The measurement is taken in
+    /// a <c>finally</c> so a publish that threw is recorded as <c>failed</c> rather than not recorded
+    /// at all: an operation that vanishes from the counter when it breaks is worse than no counter,
+    /// because the graph stays flat and healthy while publishing is down.
+    /// </remarks>
     public async Task<CmsResult<PublishResult>> PublishAsync(
         int pageId,
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default)
+    {
+        using var activity = CmsTelemetry.Source.StartActivity(
+            CmsTelemetry.PublishActivityName,
+            ActivityKind.Internal);
+
+        activity?.SetTag(CmsTelemetry.PageIdTag, pageId);
+
+        var started = Stopwatch.GetTimestamp();
+        var outcome = CmsTelemetry.PublishResults.Failed;
+
+        try
+        {
+            var result = await PublishCoreAsync(pageId, acknowledgeWarnings, cancellationToken);
+
+            outcome = Outcome(result);
+
+            activity?.SetTag(CmsMetrics.ResultTag, outcome);
+
+            if (result.IsSuccess)
+            {
+                activity?.SetTag(CmsTelemetry.VersionNumberTag, result.Value!.VersionNumber);
+            }
+            else
+            {
+                // A refusal is an error for the span even though it is an ordinary outcome for the
+                // editor: a trace is read to find out why a request did not do what was asked.
+                activity?.SetStatus(ActivityStatusCode.Error, outcome);
+            }
+
+            return result;
+        }
+        catch (Exception exception)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, exception.Message);
+
+            throw;
+        }
+        finally
+        {
+            metrics.RecordPublish(outcome, Stopwatch.GetElapsedTime(started));
+        }
+    }
+
+    /// <summary>How a finished attempt is tagged (spec section 24.1).</summary>
+    private static string Outcome(CmsResult<PublishResult> result) => result.Outcome switch
+    {
+        CmsOutcome.Success => CmsTelemetry.PublishResults.Published,
+        CmsOutcome.Forbidden => CmsTelemetry.PublishResults.Forbidden,
+        CmsOutcome.NotFound => CmsTelemetry.PublishResults.NotFound,
+        _ => CmsTelemetry.PublishResults.Refused,
+    };
+
+    private async Task<CmsResult<PublishResult>> PublishCoreAsync(
+        int pageId,
+        bool acknowledgeWarnings,
+        CancellationToken cancellationToken)
     {
         if (!authorization.HasPermission(CmsPermissions.ContentPublish))
         {
@@ -246,7 +313,9 @@ public sealed class PublishingService(
 
             // Step 1 — snapshot the draft into a new immutable row. Copied rather than promoted:
             // promoting would make the live row the one an editor keeps typing into.
-            var published = DraftService.Copy(draft, await NextVersionNumberAsync(page.Id, cancellationToken));
+            var published = DraftService.Copy(
+                draft,
+                await VersionNumbers.NextAsync(context, page.Id, cancellationToken));
             published.Status = PageVersionStatus.Published;
             published.PublishedOn = now;
             published.PublishedBy = users.UserId;
@@ -405,10 +474,4 @@ public sealed class PublishingService(
 
         return await query.FirstOrDefaultAsync(page => page.Id == pageId, cancellationToken);
     }
-
-    private async Task<int> NextVersionNumberAsync(int pageId, CancellationToken cancellationToken) =>
-        (await context.PageVersions
-            .Where(version => version.PageId == pageId)
-            .Select(version => (int?)version.VersionNumber)
-            .MaxAsync(cancellationToken) ?? 0) + 1;
 }

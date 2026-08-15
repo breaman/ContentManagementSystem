@@ -12,8 +12,8 @@ namespace ContentManagementSystem.Server.Api.Cms.Structure;
 /// <see cref="ITemplateService"/>, which is also where the permission check runs; an endpoint that
 /// decided anything for itself would be a rule the CLI verbs and the schema sync do not get.
 /// <para>
-/// There is deliberately no delete. See <see cref="ITemplateService"/> for why it waits for the page
-/// table it must guard against.
+/// The delete landed with <c>P1-32</c>, once <c>Page</c> existed for its guard to ask; see
+/// <see cref="ITemplateService"/> for why it did not ship before that.
 /// </para>
 /// </remarks>
 public static class TemplateEndpoints
@@ -52,6 +52,12 @@ public static class TemplateEndpoints
             .RequireAuthorization(CmsPermissions.StructureEdit)
             .RequireCmsAntiforgery();
 
+        templates.MapDelete("/{id:int}", DeleteAsync)
+            .WithName("DeleteTemplate")
+            .WithSummary("Deletes a template. Refused while any page still uses it.")
+            .RequireAuthorization(CmsPermissions.StructureEdit)
+            .RequireCmsAntiforgery();
+
         templates.MapGet("/{id:int}/revisions", ListRevisionsAsync)
             .WithName("ListTemplateRevisions")
             .WithSummary("Lists a template's structural revisions, newest first.")
@@ -80,6 +86,12 @@ public static class TemplateEndpoints
         ITemplateService templates,
         CancellationToken cancellationToken) =>
         (await templates.GetAsync(id, cancellationToken)).ToHttpResult(value => Results.Ok(value));
+
+    private static async Task<IResult> DeleteAsync(
+        int id,
+        ITemplateService templates,
+        CancellationToken cancellationToken) =>
+        (await templates.DeleteAsync(id, cancellationToken)).ToHttpResult(_ => Results.NoContent());
 
     private static async Task<IResult> CreateAsync(
         CreateTemplateRequest request,

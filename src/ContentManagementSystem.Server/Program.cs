@@ -5,6 +5,7 @@ using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
+using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Common;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
@@ -22,6 +23,9 @@ using ContentManagementSystem.Shared.Services;
 
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
 
 using Serilog;
 
@@ -113,6 +117,13 @@ try
     // Pages, drafts, versions, publishing, and the recycle bin (tasks P2-05 to P2-15). Scoped,
     // unlike the stateless halves of the payload engine, because these hold a database context.
     builder.Services.AddCmsPages();
+
+    // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
+    // instruments is not enough on its own: an unlisted meter records measurements that no exporter
+    // ever collects, which looks identical to code that was never instrumented.
+    builder.Services.AddOpenTelemetry()
+        .WithMetrics(metrics => metrics.AddMeter(CmsTelemetry.MeterName))
+        .WithTracing(tracing => tracing.AddSource(CmsTelemetry.ActivitySourceName));
 
     // Which assemblies declare [CmsTemplate] and [CmsBlockType] (task P1-25). Named rather than
     // discovered from the loaded assembly list: the scan has to give the same answer under a trimmed

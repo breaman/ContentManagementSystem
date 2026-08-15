@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
@@ -512,7 +513,7 @@ public sealed class PageService(
             var draft = new PageVersion
             {
                 PageId = page.Id,
-                VersionNumber = 1,
+                VersionNumber = VersionNumbers.First,
                 Status = PageVersionStatus.Draft,
                 Title = request.Title!.Trim(),
                 // Empty and schema-valid whatever the template requires: every zone is absent rather

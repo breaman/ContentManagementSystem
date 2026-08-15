@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Publishing;
+using ContentManagementSystem.Core.Telemetry;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -43,6 +44,12 @@ public static class PageServiceCollectionExtensions
         // The clock is a dependency rather than a static call so edit-lock expiry and the retention
         // window can be tested without waiting two minutes or ninety days.
         services.TryAddSingleton(TimeProvider.System);
+
+        // The publish instruments of spec section 24.1. AddMetrics is what supplies IMeterFactory,
+        // and calling it here rather than relying on the host means a console tool or a test that
+        // builds this graph by hand gets a working PublishingService rather than a resolution error.
+        services.AddMetrics();
+        services.TryAddSingleton<CmsMetrics>();
 
         return services;
     }
