@@ -97,6 +97,17 @@ public static class FieldValidationCodes
     /// </remarks>
     public const string ReferenceId = "field.reference.id";
 
+    /// <summary>
+    /// A reference names an entity of a kind the property does not accept.
+    /// </summary>
+    /// <remarks>
+    /// The <c>allowedTemplates</c> restriction on <c>pageReference</c>, and the equivalent
+    /// <c>allowedTypes</c> restriction on <c>media</c> when P5 lands. Reported by the publish checks
+    /// rather than by the field type: answering "what template does page 44 use" needs the database,
+    /// and a field type is a stateless singleton without one (spec section 7).
+    /// </remarks>
+    public const string NotAllowed = "field.reference.notAllowed";
+
     /// <summary>A <c>media</c> focal point is not a point inside the image.</summary>
     public const string MediaFocalPoint = "field.media.focalPoint";
 

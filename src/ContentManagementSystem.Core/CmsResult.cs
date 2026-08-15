@@ -118,6 +118,15 @@ public sealed class CmsResult<T>
     public static CmsResult<T> Conflict(string code, string message, string? path = null, T? value = default) =>
         new(CmsOutcome.Conflict, value, ValidationResult.Error(code, message, path));
 
+    /// <summary>The request collides with several things already stored.</summary>
+    /// <param name="diagnostics">Every collision, not just the first.</param>
+    /// <remarks>
+    /// A subtree rebuild can find more than one taken URL in a single operation, and reporting them
+    /// one at a time would make an editor fix a five-page collision in five round trips.
+    /// </remarks>
+    public static CmsResult<T> Conflict(ValidationResult diagnostics) =>
+        new(CmsOutcome.Conflict, default, diagnostics);
+
     /// <summary>The caller may not perform this operation.</summary>
     /// <param name="message">What was refused. Never names what the caller would need to hold.</param>
     /// <param name="code">Stable code for the surface reporting it. See <see cref="NotFound"/>.</param>

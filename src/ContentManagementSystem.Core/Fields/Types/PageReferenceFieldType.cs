@@ -55,8 +55,7 @@ public sealed class PageReferenceFieldType : FieldTypeBase
                 minimum: 0),
             FieldConfigurationSetting.TextList(
                 "allowedTemplates",
-                "Keys of the templates a referenced page may use. An empty list allows any page.",
-                notEnforcedUntil: "P3"),
+                "Keys of the templates a referenced page may use. An empty list allows any page."),
         ],
         [new FieldSettingRange("min", "max")]);
 

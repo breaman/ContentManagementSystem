@@ -40,6 +40,16 @@ public static class ColumnTypes
     public const string SitemapPriority = "decimal(2,1)";
 
     /// <summary>
+    /// A SHA-256 digest, used to carry a unique index over a column too wide to index directly.
+    /// </summary>
+    /// <remarks>
+    /// Fixed-width <c>binary</c> rather than <c>varbinary</c>: every value is exactly 32 bytes, so
+    /// the length prefix a variable column carries would be storage and comparison cost bought for
+    /// nothing. See <c>SiteUrls.Hash</c> for why URL columns need this at all (spec section 23.5).
+    /// </remarks>
+    public const string Sha256Hash = "binary(32)";
+
+    /// <summary>
     /// Unbounded free text with no imposed structure, such as the body of <c>robots.txt</c>.
     /// </summary>
     /// <remarks>

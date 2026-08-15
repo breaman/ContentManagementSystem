@@ -2,6 +2,7 @@ using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Content;
@@ -491,6 +492,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         new(
             context,
             scope.ServiceProvider.GetRequiredService<IPageTreeService>(),
+            // Resolved rather than stubbed. It shares this scope's ApplicationDbContext — the same
+            // instance the test asserts against — so the route rows it writes are committed by the
+            // page service's own SaveChanges, which is the arrangement production runs.
+            scope.ServiceProvider.GetRequiredService<IUrlService>(),
             new StubAuthorization(permissions),
             NullLogger<PageService>.Instance);
 

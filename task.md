@@ -1,8 +1,11 @@
 # Content Management System — Implementation Task List
 
 **Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
-`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete** — data, services,
-API, admin UI, and every test task, with all eleven acceptance criteria met. Next up is Phase 3.
+`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3 is
+under way**: section 3.1 routing is finished — `PageRoute`, `Redirect`, `NotFoundLog`, and
+`PreviewToken` with migration #4, `UrlService`, `RedirectService`, `IRouteResolver`, `ILinkResolver`,
+the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2), delivery,
+and preview (3.3) are next.
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -53,14 +56,14 @@ and record the date in the progress table.
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
-| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
+| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 10 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering, delivery, and preview next | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **81** | **203.5** | | |
+| **v1 total** | **281** | **91** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1666,22 +1669,128 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 
 ### 3.1 Routing — 7.5 ed
 
-- [ ] **P3-01** `PageRoute`, `Redirect`, `NotFoundLog` entities + configurations, with `binary(32)` URL
+- [x] **P3-01** `PageRoute`, `Redirect`, `NotFoundLog` entities + configurations, with `binary(32)` URL
   hash columns carrying the unique indexes (URLs exceed SQL Server's 900-byte key limit) [§23.5]. — 0.5 ed
-- [ ] **P3-02** Migration `AddCmsRouting` — migration #4, also adding `PreviewToken`. — 0.5 ed
-- [ ] **P3-03** `SlugService` in `Core/Routing/` — generation from title, normalization, Unicode/NFC
+  *2026-08-14 — four entities, not three: `PreviewToken` ships here too so migration #4 is one
+  migration rather than two against the same tables. **`SiteUrls` in `Shared/Common/` is the piece
+  worth knowing about.** Normalization and hashing live in one class and `Hash` normalizes first,
+  because a hash taken over an unnormalized string indexes a URL nobody will ever ask for —
+  `/About/` and `/about` would occupy two rows and defeat the very index they carry. Added
+  `ColumnTypes.Sha256Hash` (`binary(32)`, fixed-width rather than `varbinary`: every value is
+  exactly 32 bytes).*
+  ***One EF behaviour cost a regenerated migration.*** `PageRoute` needs two indexes on `UrlHash` —
+  the filtered unique one for published routes and a plain one preview resolves draft routes
+  through — and EF Core hands back the **same index builder** for a repeated property set, so the
+  second unnamed `HasIndex` silently reconfigured the first instead of adding anything. Caught by
+  reading the generated migration; the plain index is now named explicitly. A missed index is
+  invisible until somebody reads a query plan.*
+  *Delete behaviour differs per table and each one is a decision: routes and preview tokens
+  **cascade** (derived data with no life of their own, and Restrict would make a purge fail on rows
+  it would only have had to delete), `Redirect.ToPageId` is **Restrict** so a missed rewrite in the
+  purge path is a loud failure rather than an administrator's rule quietly vanishing, and
+  `PreviewToken.PageVersionId` is **Restrict** so version retention cannot strand a shared link.
+  `Cms/RoutingSchemaTests` asserts all of it against real SQL Server — 7 tests.*
+- [x] **P3-02** Migration `AddCmsRouting` — migration #4, also adding `PreviewToken`. — 0.5 ed
+  *2026-08-14 — reviewed statement by statement: four `CreateTable`s, no drop-plus-add, nine
+  indexes, `Down` drops all four. `Up` and `Down` are both asserted from empty by
+  `MigrationsApplyFromEmptyTests`, which now covers four migrations;
+  `dotnet ef migrations has-pending-model-changes` is clean.*
+- [x] **P3-03** `SlugService` in `Core/Routing/` — generation from title, normalization, Unicode/NFC
   handling with homograph warning, reserved-prefix checks (`/admin`, `/api`, `/media`, `/_blazor`,
   `/_framework`, `/account`, `/health`, `/alive`, `/sitemap.xml`, `/robots.txt`, `/preview`) [§10.2–10.3].
   — 1.5 ed
-- [ ] **P3-04** `UrlService` in `Core/Routing/` — route materialization, `UseExplicitUrl` support,
+  ***Already landed, in P2, as `Core/Content/Slugs.cs`*** — `Generate` (accent folding, NFC,
+  truncation that will not split a surrogate pair), `Validate` (format, length, reserved first
+  segments, the homograph **warning** rather than an error), and `Normalize`. Sibling-uniqueness is
+  in `PageService`, and explicit-URL format and reserved-prefix checking are there too. **No second
+  service was written**: a `SlugService` in `Core/Routing/` would be a second copy of rules that
+  already have one home, and the copy that drifts is the one nobody wrote a test for. Covered by
+  `Core.Tests/Content/SlugsTests`.*
+- [x] **P3-04** `UrlService` in `Core/Routing/` — route materialization, `UseExplicitUrl` support,
   cascade to all descendants on move/rename, single transaction, emits redirects for each old URL
   [§10.4]. — 2 ed
-- [ ] **P3-05** `RedirectService` in `Core/Routing/` — automatic creation on URL change, loop detection
+  *2026-08-14 — `SyncAsync` rebuilds a whole subtree in one pass: ancestors resolved from the
+  materialized path in a single query, descendants walked in depth order so each parent's URL is
+  computed before its children need it. **Nothing here calls `SaveChanges`**, following
+  `PageTreeService` — a move, its route rebuild, and the redirects it emits are one atomic act and
+  the caller owns the transaction. `IUrlService.Build` is a static: a page with `UseExplicitUrl`
+  ignores its ancestor, and its descendants still build on it, so opting out relocates a branch
+  rather than detaching what is under it.*
+  ***Two routes per page, not one.*** A draft route (`IsPublished = 0`) exists from the moment a
+  page is created, so preview can address it by URL before it is ever published; the published route
+  exists only while it is, and is the one the filtered unique index governs. That is what lets an
+  editor prepare a replacement at the URL a live page is still serving — asserted at both the schema
+  and the service level.*
+  ***Collisions are checked rather than left to the index***, for two reasons: a constraint violation
+  reaches the client as a 500 naming nothing actionable, and a collision *inside* the subtree being
+  rebuilt never reaches the database at all — two descendants computing one URL would be written in
+  a single batch the index rejects wholesale. The refusal names the page holding the URL.
+  `PublishingService` asks the same question on its shared check path so the dry run reports it too.
+  *Wired into every path that can move a URL: `PageService.CreateAsync` (inside the creating
+  transaction) and `PatchMetadataAsync` (only when a slug or explicit URL actually changed — a
+  review-date patch must not walk a subtree), `PublishingService` publish and unpublish, and
+  `RecycleBinService` delete, restore, and purge. A recycled page keeps its **draft** route and
+  loses its published one; a restore refreshes the draft route, because a page restored at the root
+  has a different URL from the one it had under its old parent and a stale draft route is a preview
+  link that opens somebody else's page.*
+- [x] **P3-05** `RedirectService` in `Core/Routing/` — automatic creation on URL change, loop detection
   at write and resolve time (max depth 10), chain flattening (`A→B` then `B→C` ⇒ `A→C`), manual
   overrides automatic, **live page wins over a redirect at the same URL**, hit counting [§10.5]. — 1.5 ed
-- [ ] **P3-06** Redirect CSV import/export for bulk legacy-site migration. — 0.5 ed
-- [ ] **P3-07** Complete the `link` and `pageReference` field types — internal links stored as `pageId`,
+  *2026-08-14 — all six behaviours, plus `IRouteResolver`, which is where "a live page wins" actually
+  lives: routes are asked first, then a canonical-form correction, then redirects. **That ordering is
+  the task's real content** — reversed, retiring a page and later reusing its URL would be impossible
+  forever and nothing would report why.*
+  ***Loop detection walks forward from the destination*** rather than checking only for the trivial
+  self-reference, because the case that happens is `A→B` and `B→C` already stored and somebody adding
+  `C→A`. Bounded by `MaxChainDepth` so a cycle already in the data cannot make the check itself run
+  forever. At resolve time a cycle returns **null**, not the last hop before it closed: serving
+  somewhere arbitrary is worse than the 404, and the cycle is logged for whoever has to fix it.*
+  *`RecordHitAsync` is a single relative `ExecuteUpdate`, so concurrent hits add up rather than
+  overwriting each other, and any failure is logged and swallowed — a redirect must never be less
+  reliable than the page it points at. `RecordAutomaticAsync` leaves a **manual** redirect at the
+  same source exactly as it is: a person made a decision about that URL and a tree move is not an
+  argument against it.*
+  *Also added the `IRouteResolver` canonical-form answer: `/About/` resolves to the page **and**
+  reports the canonical URL, so P3-13 can 301 rather than serve the same content at two addresses.*
+- [x] **P3-06** Redirect CSV import/export for bulk legacy-site migration. — 0.5 ed
+  *2026-08-14 — service plus six endpoints under `/api/cms/v1/redirects` (list, create, patch,
+  delete, import, export). Writes require **`Content.Publish`**, not `Content.Edit`: a redirect
+  reaches anonymous visitors the instant it is saved, with no draft, no preview, and no publish step
+  in between. There is deliberately no PATCH of `fromUrl` — a redirect *is* its source URL, and an
+  edit that quietly deleted one rule and created another would leave the original URL serving
+  nothing with no record it ever did. The import body is read as raw text, since what an operator
+  has is a file.*
+  ***A skipped row is a warning, never a failed file.*** A legacy list is thousands of rows and always
+  has a handful of bad ones; refusing the document leaves somebody editing a spreadsheet with no
+  report of what was wrong. Each skip carries its line number, and those warnings survive the 200.
+  *The CSV reader is hand-written (four columns of URLs; a CSV package in `Core` for one method is
+  not worth the dependency) and handles quoted cells and doubled quotes.*
+  ***The round-trip test caught a real defect.*** The first version refused to update a **manual**
+  redirect on import, meaning an export of this table could not be re-imported — which is the one
+  thing the pair exists for. The rule is now that an import updates a row whatever its origin: an
+  operator uploading a file has the same authority as the person who typed the row. Imported rows are
+  marked manual, so a later tree move still leaves them alone.*
+- [x] **P3-07** Complete the `link` and `pageReference` field types — internal links stored as `pageId`,
   **never as a URL string**, resolved to the current URL at render [D6, §7.1]. — 1 ed
+  *2026-08-14 — `ILinkResolver` is the resolution half of D6, and it is **batched**: a page with a
+  related-articles list and a navigation block resolves dozens of ids, and one query per link is the
+  classic N+1 that only shows up under real content. It answers `Url`, `IsPublished`, and `Title`.*
+  ***`IsPublished` and "has a URL" are deliberately different questions.*** Inside preview an
+  unpublished target resolves to its draft URL and is badged; on the public site the same target
+  resolves to nothing and the link degrades to text. Collapsing the two would either leak a draft URL
+  to an anonymous visitor or make preview useless for walking an unreleased section [§12.3]. The
+  title comes from whichever version the audience is looking at, for the same reason.*
+  ***The two `notEnforcedUntil: "P3"` settings are now enforced, in two different places, and that
+  split is structural.*** `allowedKinds` is a pure value check and lives in `LinkFieldType`.
+  `allowedTemplates` cannot: answering "what template does page 44 use" needs the database, and a
+  field type is a stateless singleton without one [§7]. It is a **publish check** in
+  `PublishingService`, on the same seam that already checks a link target still exists — so the draft
+  still saves (an editor must be able to store work in progress) and the publish is refused with the
+  new `field.reference.notAllowed`. Zone-level references only; a reference inside a block needs the
+  block's own captured revision resolved, which is P4's walk.*
+  *An id naming no page is **absent from the resolver's result**, not an error — delivery renders
+  plain text and logs [§15.3]. Throwing would take a whole page down because one card points at
+  something somebody deleted.*
 
 ### 3.2 Rendering — 10 ed
 
@@ -1741,10 +1850,29 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 
 ### Tests — Phase 3
 
-- [ ] **P3-22** Unit: slug generation, URL construction, redirect chain flattening and loop detection.
+- [x] **P3-22** Unit: slug generation, URL construction, redirect chain flattening and loop detection.
+  *2026-08-14 — slug generation was already covered by `Core.Tests/Content/SlugsTests` (P2). Added
+  `Core.Tests/Routing/SiteUrlsTests` for normalization, hashing, joining, and segment-aware
+  containment — 27 cases, almost all of them one assertion said several ways: two spellings of an
+  address must produce one hash, because a normalizer that misses a case does not fail loudly, it
+  produces a second route row the index accepts and no request ever resolves to. The one that would
+  be got wrong by a plain `StartsWith` is pinned explicitly: `/new` does not contain `/news`.*
+  *Chain flattening and loop detection are in `Server.Tests/Routing/RedirectServiceTests` rather
+  than here — both are database facts (a unique index on a hash, a chain assembled across rows), and
+  asserting them against a fake would be asserting that the fake works. 15 tests.*
 - [ ] **P3-23** bUnit: field renderers, block components, template composition, unknown-type fallbacks.
 - [ ] **P3-24** Integration: anonymous delivery of a published page; 404 for an unpublished page.
-- [ ] **P3-25** Integration: URL change 301s the page and every descendant.
+- [x] **P3-25** Integration: URL change 301s the page and every descendant.
+  *2026-08-14 — `Server.Tests/Routing/UrlServiceTests`, 11 tests driven through the real page,
+  publishing, and recycle-bin services against SQL Server. The headline one renames a grandparent
+  and asserts all three published URLs moved **and** that all three old ones resolve to redirects
+  with a 301. Also here: the criteria P3 #6 (a live page reusing a vacated URL outranks the redirect
+  the vacating created) and the half of P3 #7 that is about a page-target redirect following its
+  page through a second move in one hop.*
+  *Two of these tests initially failed because the scenarios collided on P2's sibling-slug rule
+  before ever reaching a URL collision — which is itself worth recording: **the only way two pages
+  can collide on a URL without being siblings is an explicit URL**, so that is the case the URL
+  check exists for and the case the tests now use.*
 - [ ] **P3-26** Integration: preview-token expiry, revocation, and non-recoverability from the database.
 - [ ] **P3-27** Performance benchmark harness for page render, with CI regression thresholds (starts
   here per the plan's cross-cutting performance workstream).
@@ -1766,10 +1894,22 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 - [ ] **P3 #3** **After publishing, further draft edits do not change the anonymous response.**
 - [ ] **P3 #4** Changing a published page's slug 301s the old URL to the new one, for the page and all
   descendants.
-- [ ] **P3 #5** A redirect chain `A→B`, then `B→C`, is flattened to `A→C`; a cycle is refused at write
+- [x] **P3 #5** A redirect chain `A→B`, then `B→C`, is flattened to `A→C`; a cycle is refused at write
   time.
-- [ ] **P3 #6** A live page at a URL takes precedence over a redirect with the same `FromUrl`.
-- [ ] **P3 #7** An internal link renders the target's *current* URL even after that target has moved.
+  *2026-08-14 — `RedirectServiceTests.AChainIsFlattenedOnWriteRatherThanWalkedOnEveryRequest` asserts
+  the stored row, not just the resolution, so a resolver that merely walked the chain would fail it.
+  Cycles are covered twice: the trivial self-reference, and the one that actually happens — `C→A`
+  closing a loop through two flattened rows neither of which mentions `C`.*
+- [x] **P3 #6** A live page at a URL takes precedence over a redirect with the same `FromUrl`.
+  *2026-08-14 — `UrlServiceTests.ALivePageAtAUrlOutranksARedirectWithTheSameSource` does the whole
+  sequence: publish at `/offers`, move away leaving a redirect, then publish new content back at
+  `/offers` and assert the resolver answers with the new page.*
+- [x] **P3 #7** An internal link renders the target's *current* URL even after that target has moved.
+  *2026-08-14 — `LinkResolutionTests.AStoredPageIdResolvesToThatPagesCurrentUrlAfterItHasMovedTwice`.
+  Twice rather than once on purpose: one move can be passed by a resolver that happens to read a
+  redirect, two cannot. Nothing rewrote the payload — the id was always the stored value.
+  **Rendering this through a component is P3-09**; what is asserted here is the resolution the
+  renderer will call.*
 - [ ] **P3 #8** A template throwing inside one block renders the rest of the page and logs the failure
   with page id, zone key, and version id.
 - [ ] **P3 #9** An unknown field type key renders nothing, logs a warning, and does not throw.
@@ -2452,7 +2592,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 1 | `InitialDatabase` | — | P0-01 | Existing Identity + `AuditLog` schema | [x] |
 | 2 | `AddCmsStructure` | 1 | P1-06 | `Template`, `TemplateRevision`, `Zone`, `BlockType`, `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`, `BlockTypeComposition`, `SiteSettings` | [x] |
 | 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` (+ the `SiteSettings` home / not-found FKs deferred from P1-01) | [x] |
-| 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [ ] |
+| 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [x] |
 | 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [ ] |
 | 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [ ] |
 | 7 | `AddCmsWorkflow` | 7 | P7-08 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob` | [ ] |

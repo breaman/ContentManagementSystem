@@ -3,6 +3,7 @@ using System.Diagnostics;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Telemetry;
@@ -117,6 +118,10 @@ try
     // Pages, drafts, versions, publishing, and the recycle bin (tasks P2-05 to P2-15). Scoped,
     // unlike the stateless halves of the payload engine, because these hold a database context.
     builder.Services.AddCmsPages();
+    // URLs, redirects, and route resolution (tasks P3-04 and P3-05). Registered beside the page
+    // services rather than with delivery, because it is the write path that depends on it: creating,
+    // renaming, publishing, and recycling a page all rebuild routes inside their own transactions.
+    builder.Services.AddCmsRouting();
 
     // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
     // instruments is not enough on its own: an unlisted meter records measurements that no exporter

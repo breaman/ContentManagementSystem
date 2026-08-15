@@ -1,14 +1,18 @@
 using System.Diagnostics;
 
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
+using ContentManagementSystem.Shared.Common;
 using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
+using ContentManagementSystem.Shared.Contracts.Routing;
 using ContentManagementSystem.Shared.Contracts.Security;
 
 using Microsoft.EntityFrameworkCore;
@@ -80,6 +84,8 @@ public interface IPublishingService
 /// <param name="validator">Checks a payload against the schema it was authored against.</param>
 /// <param name="references">Rewrites the published version's reference rows from its payload.</param>
 /// <param name="indexer">Walks a payload to check the entities it points at still exist.</param>
+/// <param name="schemas">Supplies the property configuration the allowed-templates check reads.</param>
+/// <param name="urls">Materializes the public route a publish creates and withdraws it on unpublish.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
 /// <param name="clock">Source of the current time.</param>
@@ -90,6 +96,8 @@ public sealed class PublishingService(
     IContentSchemaValidator validator,
     IContentReferenceProjector references,
     IReferenceIndexer indexer,
+    IContentSchemaCatalog schemas,
+    IUrlService urls,
     ICmsAuthorization authorization,
     IUserService users,
     TimeProvider clock,
@@ -267,15 +275,19 @@ public sealed class PublishingService(
         page.PublishedVersionId = null;
         page.PublishedVersion = null;
 
+        // The published routes of this page and every descendant go with it, in the same save. No
+        // redirect is left behind: an unpublished page has not moved anywhere, and the URL becoming
+        // a 404 is what puts it in the NotFoundLog report where somebody decides what should
+        // actually happen to it (spec section 10.6).
+        var withdrawn = await urls.WithdrawAsync(pageId, cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
 
-        // The public route rows and the redirect that replaces them arrive with PageRoute in P3-01.
-        // Until then a page's URL is derived from the tree at request time, so retiring the pointer
-        // is the whole of what "unpublished" means and delivery has nothing left to find.
         logger.LogInformation(
-            "Page {PageId} was unpublished; version {VersionNumber} is archived.",
+            "Page {PageId} was unpublished; version {VersionNumber} is archived and {UrlCount} URL(s) withdrawn.",
             pageId,
-            retired.VersionNumber);
+            retired.VersionNumber,
+            withdrawn.Count);
 
         return CmsResult<int>.Success(retired.VersionNumber);
     }
@@ -333,6 +345,26 @@ public sealed class PublishingService(
             page.PublishedVersionId = published.Id;
             await context.SaveChangesAsync(cancellationToken);
 
+            // Step 2b — materialize the public route. The page now has a published version, so the
+            // rebuild adds the row the filtered unique index governs; before this statement the page
+            // had only its draft route and was unreachable anonymously (spec section 10.4).
+            //
+            // A collision here is refused by throwing rather than returned, which is deliberate: the
+            // publish checks in CheckAsync already asked whether the URL was free, so reaching this
+            // with a taken URL means somebody published the other page in between. Rolling the
+            // transaction back is the only correct answer, and a caught DbUpdateException would say
+            // less about why.
+            var sync = await urls.SyncAsync(page.Id, cancellationToken);
+
+            if (sync.HasErrors)
+            {
+                throw new InvalidOperationException(
+                    "Publishing was rolled back because the page's URL is served by another page: " +
+                    string.Join(" ", sync.Diagnostics.Diagnostics.Select(diagnostic => diagnostic.Message)));
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
             // Step 3 — project the reference rows for the version that is now live. Cache
             // invalidation, where-used, and the delete guards all read these, and a live version
             // with none of them is stale content waiting to happen (spec section 7.3).
@@ -388,6 +420,7 @@ public sealed class PublishingService(
             DraftService.ToValidationResult(report).Diagnostics);
 
         diagnostics.AddRange(await CheckReferencedPagesAsync(payload, cancellationToken));
+        diagnostics.AddRange(await CheckUrlAvailableAsync(page, cancellationToken));
 
         if (!page.Template.IsEnabled)
         {
@@ -398,6 +431,42 @@ public sealed class PublishingService(
         }
 
         return ValidationResult.From(diagnostics);
+    }
+
+    /// <summary>
+    /// Checks that no other published page already serves the URL this page would take.
+    /// </summary>
+    /// <remarks>
+    /// Asked here, on the shared check path, so the dry run reports it rather than letting an editor
+    /// discover it as a failed publish. The filtered unique index is still the guarantee — this is a
+    /// question about a moment, and two publishes racing can both pass it — but a check that catches
+    /// it ninety-nine times out of a hundred and names the offending page is worth the query.
+    /// </remarks>
+    private async Task<IReadOnlyList<ValidationDiagnostic>> CheckUrlAvailableAsync(
+        Page page,
+        CancellationToken cancellationToken)
+    {
+        var url = await urls.ComputeAsync(page.Id, cancellationToken);
+
+        if (url is null) return [];
+
+        var hash = SiteUrls.Hash(url);
+
+        var holder = await context.PageRoutes
+            .AsNoTracking()
+            .Where(route => route.IsPublished && route.UrlHash == hash && route.PageId != page.Id)
+            .Select(route => (int?)route.PageId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return holder is null
+            ? []
+            : [
+                new ValidationDiagnostic(
+                    RoutingCodes.UrlTaken,
+                    $"Page {holder} is already published at '{url}'. Change this page's slug, or " +
+                    "unpublish the other page first.",
+                    ValidationSeverity.Error),
+            ];
     }
 
     /// <summary>
@@ -417,22 +486,23 @@ public sealed class PublishingService(
         ContentPayload payload,
         CancellationToken cancellationToken)
     {
-        var targets = new HashSet<int>();
+        var references = indexer.Extract(payload)
+            .Where(reference => reference.TargetType is ContentReferenceTargetType.Page)
+            .ToList();
 
-        foreach (var reference in indexer.Extract(payload))
-        {
-            if (reference.TargetType is ContentReferenceTargetType.Page)
-            {
-                targets.Add(reference.TargetId);
-            }
-        }
+        var targets = references.Select(reference => reference.TargetId).ToHashSet();
 
         if (targets.Count == 0) return [];
 
         var live = await context.Pages
             .AsNoTracking()
             .Where(candidate => targets.Contains(candidate.Id))
-            .Select(candidate => new { candidate.Id, IsPublished = candidate.PublishedVersionId != null })
+            .Select(candidate => new
+            {
+                candidate.Id,
+                IsPublished = candidate.PublishedVersionId != null,
+                TemplateKey = candidate.Template.Key,
+            })
             .ToListAsync(cancellationToken);
 
         var diagnostics = new List<ValidationDiagnostic>();
@@ -457,6 +527,76 @@ public sealed class PublishingService(
                     "will not resolve until it is.",
                     ValidationSeverity.Warning));
             }
+        }
+
+        diagnostics.AddRange(CheckAllowedTemplates(payload, references, live.ToDictionary(
+            row => row.Id,
+            row => row.TemplateKey)));
+
+        return diagnostics;
+    }
+
+    /// <summary>
+    /// Checks each page reference against the <c>allowedTemplates</c> its property declares.
+    /// </summary>
+    /// <remarks>
+    /// Enforced here rather than inside <c>PageReferenceFieldType</c> for a structural reason: a
+    /// field type is a stateless singleton with no database, and the question "what template does
+    /// page 44 use" cannot be answered from the stored value alone (spec section 7). This is the
+    /// same seam that checks a link target still exists.
+    /// <para>
+    /// An error rather than a warning. A property restricted to article templates and filled with a
+    /// landing page renders through a component that was written for the other shape, and the
+    /// failure surfaces on the public site rather than here.
+    /// </para>
+    /// </remarks>
+    private IReadOnlyList<ValidationDiagnostic> CheckAllowedTemplates(
+        ContentPayload payload,
+        IReadOnlyList<Shared.Contracts.Fields.ContentReference> references,
+        Dictionary<int, string> templateKeysByPageId)
+    {
+        // A payload with no template key or no captured revision has already been reported by the
+        // schema walk, which refuses an unknown revision outright — there is no schema to read a
+        // configuration out of, and a second diagnostic about it would say nothing further.
+        if (payload.TemplateKey is not { } templateKey ||
+            payload.TemplateRevision is not { } revision ||
+            !schemas.TryGetTemplate(templateKey, revision, out var schema))
+        {
+            // The walk already reported the unknown revision as an error of its own; adding a second
+            // complaint about a schema nobody can load says nothing further.
+            return [];
+        }
+
+        var diagnostics = new List<ValidationDiagnostic>();
+
+        foreach (var reference in references)
+        {
+            var location = ReferencePath.Parse(reference.Path, payload);
+
+            if (location.ZoneKey is not { } zoneKey) continue;
+
+            // Only zone-level references are checked. A reference inside a block belongs to a block
+            // type property, and reaching its schema means resolving the block's own captured
+            // revision — which is P4's business, since that is where nested structure is walked for
+            // anything other than validation.
+            if (location.BlockId is not null) continue;
+
+            if (schema.FindZone(zoneKey) is not { } property) continue;
+
+            var allowed = property.Configuration.GetStringArray("allowedTemplates");
+
+            if (allowed.Length == 0) continue;
+
+            if (!templateKeysByPageId.TryGetValue(reference.TargetId, out var targetTemplate)) continue;
+
+            if (Array.IndexOf(allowed, targetTemplate) >= 0) continue;
+
+            diagnostics.Add(new ValidationDiagnostic(
+                FieldValidationCodes.NotAllowed,
+                $"'{property.Name}' accepts pages using {string.Join(", ", allowed)}, but page " +
+                $"{reference.TargetId} uses '{templateKey}'.",
+                ValidationSeverity.Error,
+                reference.Path));
         }
 
         return diagnostics;

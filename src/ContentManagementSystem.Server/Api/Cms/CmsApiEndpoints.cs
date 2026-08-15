@@ -1,4 +1,5 @@
 using ContentManagementSystem.Server.Api.Cms.Pages;
+using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 
@@ -54,6 +55,8 @@ public static class CmsApiEndpoints
         group.MapPageLifecycleEndpoints();
         group.MapPageVersionEndpoints();
         group.MapPageLockEndpoints();
+
+        group.MapRedirectEndpoints();
 
         return group;
     }

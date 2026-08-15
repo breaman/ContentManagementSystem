@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using ContentManagementSystem.Core.Publishing;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
@@ -18,11 +19,13 @@ namespace ContentManagementSystem.Core.Content;
 /// <inheritdoc cref="IPageService" />
 /// <param name="context">The application database context.</param>
 /// <param name="tree">Owns the materialized path; nothing else may write it.</param>
+/// <param name="urls">Owns the route table; every change to a slug or an explicit URL goes through it.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="logger">Log for page creation and for saves that lost a race.</param>
 public sealed class PageService(
     ApplicationDbContext context,
     IPageTreeService tree,
+    IUrlService urls,
     ICmsAuthorization authorization,
     ILogger<PageService> logger) : IPageService
 {
@@ -415,6 +418,14 @@ public sealed class PageService(
             return DuplicateSlug(slug, page.ParentId);
         }
 
+        // Captured before the assignment, because a rebuild is only worth its queries when one of
+        // the three things a URL is made of actually moved. A patch that changes a review date must
+        // not walk the page's whole subtree.
+        var urlAffecting =
+            !string.Equals(slug, page.Slug, StringComparison.Ordinal) ||
+            useExplicitUrl != page.UseExplicitUrl ||
+            (useExplicitUrl && !string.Equals(explicitUrl, page.ExplicitUrl, StringComparison.Ordinal));
+
         page.Slug = slug;
         page.UseExplicitUrl = useExplicitUrl;
         page.ExplicitUrl = useExplicitUrl ? explicitUrl : null;
@@ -435,6 +446,25 @@ public sealed class PageService(
                 PageCodes.ConcurrentChange,
                 "The supplied row version is not a value this server issued.",
                 nameof(PageDetail.RowVersion));
+        }
+
+        // The route rebuild reads the page back from the change tracker, so it sees the slug and
+        // explicit URL just assigned. It writes route rows and redirects into the same change
+        // tracker, which the SaveChanges below commits alongside the page itself — a slug that
+        // changed while its URL did not is the defect this ordering exists to prevent.
+        if (urlAffecting)
+        {
+            var sync = await urls.SyncAsync(page.Id, cancellationToken);
+
+            if (sync.HasErrors) return CmsResult<PageDetail>.Conflict(sync.Diagnostics);
+
+            if (sync.Changes.Count > 0)
+            {
+                logger.LogInformation(
+                    "Page {PageId} moved {Count} URL(s) including its descendants.",
+                    page.Id,
+                    sync.Changes.Count);
+            }
         }
 
         try
@@ -529,6 +559,13 @@ public sealed class PageService(
             await context.SaveChangesAsync(cancellationToken);
 
             page.DraftVersionId = draft.Id;
+            await context.SaveChangesAsync(cancellationToken);
+
+            // The page is not published, so this materializes only its draft route — which is what
+            // lets preview address the page by URL from the moment it exists, rather than from the
+            // moment it is first published (spec section 10.4). It cannot collide with anything:
+            // the filtered unique index governs published routes alone.
+            await urls.SyncAsync(page.Id, cancellationToken);
             await context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);

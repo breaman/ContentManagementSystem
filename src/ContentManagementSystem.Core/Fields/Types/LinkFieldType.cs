@@ -74,8 +74,7 @@ public sealed class LinkFieldType : FieldTypeBase
             FieldConfigurationSetting.TextList(
                 "allowedKinds",
                 "The link kinds an editor may pick. An empty list allows all of them.",
-                allowedValues: [PageKind, ExternalKind, MediaKind, AnchorKind, EmailKind],
-                notEnforcedUntil: "P3"),
+                allowedValues: [PageKind, ExternalKind, MediaKind, AnchorKind, EmailKind]),
         ]);
 
 
@@ -92,6 +91,19 @@ public sealed class LinkFieldType : FieldTypeBase
         List<ValidationDiagnostic>? diagnostics = null;
 
         var kind = value.ValueKind is JsonValueKind.String ? value.GetString() : null;
+
+        // Checked before the kind's own rules rather than after, so a link of a kind the property
+        // forbids reports that one fact instead of that fact plus every complaint about the members
+        // it carries.
+        var allowed = configuration.GetStringArray("allowedKinds");
+
+        if (kind is not null && allowed.Length > 0 && Array.IndexOf(allowed, kind) < 0)
+        {
+            return ValidationResult.Error(
+                FieldValidationCodes.LinkKind,
+                $"This property accepts only {string.Join(", ", allowed)} links.",
+                KindMember);
+        }
 
         switch (kind)
         {

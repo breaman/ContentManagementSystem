@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Contracts.Api;
@@ -71,10 +72,12 @@ public interface IRecycleBinService
 
 /// <inheritdoc cref="IRecycleBinService" />
 /// <param name="context">The application database context.</param>
+/// <param name="urls">Withdraws the public routes a delete retires, and refreshes them on restore.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="logger">Log for every delete, restore, and purge.</param>
 public sealed class RecycleBinService(
     ApplicationDbContext context,
+    IUrlService urls,
     ICmsAuthorization authorization,
     ILogger<RecycleBinService> logger) : IRecycleBinService
 {
@@ -161,18 +164,24 @@ public sealed class RecycleBinService(
             node.IsDeleted = true;
         }
 
+        // The published routes go with the pages, in the same save. The draft routes stay, because
+        // the recycle bin's whole promise is that this is reversible and a restore must not have to
+        // rebuild a page's explicit URL from nothing.
+        var withdrawn = await urls.WithdrawAsync(pageId, cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
             "Page {PageId} and {DescendantCount} descendants were moved to the recycle bin; " +
-            "{UnpublishedCount} were live.",
+            "{UnpublishedCount} were live and {UrlCount} URL(s) were withdrawn.",
             pageId,
             subtree.Count - 1,
-            unpublished);
+            unpublished,
+            withdrawn.Count);
 
-        // The public route rows and the optional redirect to the parent land with PageRoute in
-        // P3-01. Until then a URL is derived from the tree at request time, and a page the query
-        // filter hides is already unreachable, so retiring the pointer is the whole of the job.
+        // No redirect is left behind. Deleting is not moving, and a redirect to the parent would be
+        // this service inventing an editorial decision — spec section 10.6 puts the vacated URL in
+        // the NotFoundLog report instead, where somebody can see whether it still receives traffic.
         return CmsResult<SubtreeResult>.Success(new SubtreeResult(
             pageId,
             subtree.Select(node => node.Id).ToList(),
@@ -250,6 +259,12 @@ public sealed class RecycleBinService(
 
             RepositionDescendants(page, subtree);
         }
+
+        // Draft routes are refreshed because a page restored at the root has a different URL from
+        // the one it had under its old parent, and a stale draft route is a preview link that opens
+        // somebody else's page. No published route is written: every restored page came back as a
+        // draft two blocks above.
+        await urls.SyncAsync(pageId, cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -345,6 +360,23 @@ public sealed class RecycleBinService(
                 .Where(row => row.PageId == pageId)
                 .ExecuteDeleteAsync(cancellationToken);
 
+            // A preview token names a version by foreign key, and that one is Restrict so version
+            // retention cannot silently strand a shared link. Here the versions really are going, so
+            // the tokens go with them — a link pointing at a purged page has nothing left to show.
+            await context.PreviewTokens
+                .Where(token => token.PageId == pageId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            // Redirects pointing at this page are rewritten to the URL it last served rather than
+            // deleted, which is the whole reason Redirect.ToPageId is Restrict. Deleting them would
+            // silently drop rules an administrator entered, and leaving them would fail the purge on
+            // a foreign key with no explanation an operator could act on.
+            await RewriteInboundRedirectsAsync(pageId, cancellationToken);
+
+            await context.PageRoutes
+                .Where(route => route.PageId == pageId)
+                .ExecuteDeleteAsync(cancellationToken);
+
             var versions = await context.PageVersions
                 .Where(version => version.PageId == pageId)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -363,6 +395,43 @@ public sealed class RecycleBinService(
 
             return CmsResult<int>.Success(versions + pages);
         });
+    }
+
+    /// <summary>
+    /// Points every redirect that targets a page at the URL that page last served.
+    /// </summary>
+    /// <remarks>
+    /// Run inside the purge transaction, before the routes are deleted, because the URL being
+    /// preserved is read out of those very rows. A redirect whose target had no route at all is
+    /// removed: it was pointing at nothing already, and keeping it would occupy its source URL
+    /// against a rule somebody might want to write later.
+    /// </remarks>
+    private async Task RewriteInboundRedirectsAsync(int pageId, CancellationToken cancellationToken)
+    {
+        var lastUrl = await context.PageRoutes
+            .AsNoTracking()
+            .Where(route => route.PageId == pageId)
+            .OrderByDescending(route => route.IsPublished)
+            .ThenByDescending(route => route.IsPrimary)
+            .Select(route => route.Url)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (lastUrl is null)
+        {
+            await context.Redirects
+                .Where(redirect => redirect.ToPageId == pageId)
+                .ExecuteDeleteAsync(cancellationToken);
+
+            return;
+        }
+
+        await context.Redirects
+            .Where(redirect => redirect.ToPageId == pageId)
+            .ExecuteUpdateAsync(
+                updates => updates
+                    .SetProperty(redirect => redirect.ToPageId, (int?)null)
+                    .SetProperty(redirect => redirect.ToUrl, lastUrl),
+                cancellationToken);
     }
 
     /// <summary>

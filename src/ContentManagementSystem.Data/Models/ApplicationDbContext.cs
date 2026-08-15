@@ -59,6 +59,18 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>Advisory notes that an editor has a page open.</summary>
     public DbSet<EditLock> EditLocks => Set<EditLock>();
 
+    /// <summary>Materialized page URLs, resolved against on every public request.</summary>
+    public DbSet<PageRoute> PageRoutes => Set<PageRoute>();
+
+    /// <summary>Standing instructions to send one URL to another.</summary>
+    public DbSet<Redirect> Redirects => Set<Redirect>();
+
+    /// <summary>Unresolved URLs and how often they are asked for.</summary>
+    public DbSet<NotFoundLog> NotFoundLogs => Set<NotFoundLog>();
+
+    /// <summary>Bearer capabilities to view one unpublished page version.</summary>
+    public DbSet<PreviewToken> PreviewTokens => Set<PreviewToken>();
+
     /// <inheritdoc />
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

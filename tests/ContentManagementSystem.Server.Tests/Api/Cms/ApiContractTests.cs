@@ -213,13 +213,24 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
     /// explicit binding attribute comes from the body. The container is asked rather than guessed at,
     /// because the alternative — matching on namespace or on "is an interface" — would quietly stop
     /// covering a handler the day somebody injects a concrete service.
+    /// <para>
+    /// The framework's own request abstractions are not bound from the body — they <em>are</em> the
+    /// request. A handler taking one is reading the body itself, which the redirect CSV import does
+    /// because what an operator has is a file rather than a JSON document. That escapes the DTO
+    /// shape check below, and legitimately so: there is no contract type for this rule to inspect,
+    /// and a handler that parses CSV cannot bind a lifecycle column by accident. What still covers
+    /// it is the antiforgery and permission assertions above, which every write endpoint faces
+    /// whatever it binds.
+    /// </para>
     /// </remarks>
     private bool IsBoundFromBody(ParameterInfo parameter)
     {
         var type = Nullable.GetUnderlyingType(parameter.ParameterType) ?? parameter.ParameterType;
 
         if (type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal) ||
-            type == typeof(CancellationToken) || typeof(HttpContext).IsAssignableFrom(type))
+            type == typeof(CancellationToken) ||
+            typeof(HttpContext).IsAssignableFrom(type) ||
+            typeof(HttpRequest).IsAssignableFrom(type))
         {
             return false;
         }
