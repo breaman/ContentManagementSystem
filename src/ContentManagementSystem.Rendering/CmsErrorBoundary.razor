@@ -1,0 +1,21 @@
+@inherits ErrorBoundaryBase
+@* A caught exception renders the marker and nothing else — never the child, and never a half-written
+   subtree: Blazor discards the failing tree rather than flushing what it had built, so a renderer
+   that throws part-way cannot leak markup onto the page.
+
+   The marker is an element with attributes rather than an HTML comment, because the Razor compiler
+   strips comments out of .razor markup before they reach a response. It carries no message: an
+   editor reading the page source can see exactly which zone or block failed, and a visitor sees an
+   empty span and the rest of the page. *@
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else if (ErrorContent is not null)
+{
+    @ErrorContent(CurrentException)
+}
+else
+{
+    <span data-cms-render-failed="@ScopeMarker" data-cms-zone="@ZoneKey" data-cms-block="@BlockId"></span>
+}

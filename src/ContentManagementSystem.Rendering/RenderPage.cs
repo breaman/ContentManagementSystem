@@ -1,3 +1,5 @@
+using ContentManagementSystem.Core.Delivery;
+
 namespace ContentManagementSystem.Rendering;
 
 /// <summary>
@@ -43,4 +45,36 @@ public sealed record RenderPage(
     int TemplateRevision,
     bool IsPublished,
     DateTimeOffset? PublishedOn = null,
-    DateTimeOffset? ModifiedOn = null);
+    DateTimeOffset? ModifiedOn = null)
+{
+    /// <summary>
+    /// Narrows a loaded delivery result to the facts a renderer may read.
+    /// </summary>
+    /// <param name="content">What <c>IPublishedContentService</c> loaded.</param>
+    /// <returns>The page facts.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="content"/> is null.</exception>
+    /// <remarks>
+    /// The narrowing is the point. <c>PublishedContent</c> also carries the payload, the captured
+    /// schema, and the SEO metadata the document head is built from — none of which a template,
+    /// block, or field renderer has any business reaching, and all of which it could reach if the
+    /// delivery result were cascaded whole.
+    /// </remarks>
+    public static RenderPage From(PublishedContent content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        return new RenderPage(
+            content.PageId,
+            content.PublicId,
+            content.VersionId,
+            content.VersionNumber,
+            content.Title,
+            content.Url,
+            content.TemplateId,
+            content.TemplateKey,
+            content.TemplateRevision,
+            content.IsPublished,
+            content.PublishedOn,
+            content.ModifiedOn);
+    }
+}

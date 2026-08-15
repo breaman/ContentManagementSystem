@@ -42,14 +42,14 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             BlockTypes,
-            new CreateBlockTypeRequest("hero-banner", "Hero banner", "A full-width headline.", "image", "{headline}"),
+            new CreateBlockTypeRequest("promo-banner", "Hero banner", "A full-width headline.", "image", "{headline}"),
             cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var created = await response.Content.ReadFromJsonAsync<BlockTypeDetail>(cancellationToken);
 
-        created!.BlockType.Key.Should().Be("hero-banner");
+        created!.BlockType.Key.Should().Be("promo-banner");
         created.BlockType.CurrentRevision.Should().Be(1);
         created.BlockType.IconKey.Should().Be("image");
         created.BlockType.SummaryTemplate.Should().Be("{headline}");

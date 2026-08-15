@@ -63,8 +63,20 @@ internal sealed class FieldRendererHarness : IDisposable
         _bunit.Services.AddSingleton<IFieldRendererCatalog>(new FieldRendererCatalog(Registry));
         _bunit.Services.AddSingleton<ILinkResolver>(Links);
         _bunit.Services.AddSingleton<IContentSchemaCatalog>(provider => Schemas);
+        _bunit.Services.AddSingleton<IFieldTypeRegistry>(Registry);
+
+        // The test components plus everything the Rendering assembly ships — the two reference
+        // templates and three reference block types of task P3-10. Scanned together through the real
+        // scanner, so the duplicate-key rule a deployment enforces is enforced here too: a test
+        // component that claimed a reference key would fail loudly rather than shadow it.
         _bunit.Services.AddSingleton<ICmsComponentCatalog>(new CmsComponentCatalog(
-            CmsComponentScanner.ScanTypes([typeof(TestTemplate), typeof(TestBlock), typeof(QuoteBlock)])));
+            CmsComponentScanner.ScanTypes(
+                [
+                    typeof(TestTemplate),
+                    typeof(TestBlock),
+                    typeof(QuoteBlock),
+                    .. typeof(RenderingAssemblyMarker).Assembly.GetTypes(),
+                ])));
     }
 
     /// <summary>Log entries, so a test can assert a fallback was reported and not only taken.</summary>
@@ -95,6 +107,18 @@ internal sealed class FieldRendererHarness : IDisposable
         RenderIn(
             RenderingHarness.Context(RenderingHarness.Payload((zoneKey, zoneJson)), schema, mode),
             zoneKey);
+
+    /// <summary>Renders a whole page from the host down, the way delivery does.</summary>
+    /// <param name="context">The render context.</param>
+    /// <remarks>
+    /// The difference from <see cref="RenderIn"/> is what is under test: this exercises template
+    /// resolution and zone placement as well as the renderers, which is what the reference template
+    /// and error boundary suites need and what a single-zone render cannot show.
+    /// </remarks>
+    public string RenderPage(RenderContext context) =>
+        _bunit.Render<CmsPageHost>(parameters => parameters
+                .Add(host => host.Context, context))
+            .Markup;
 
     /// <summary>
     /// Renders a zone of a context the caller built, so it can read the cache tags afterwards.

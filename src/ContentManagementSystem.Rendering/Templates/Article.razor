@@ -1,0 +1,53 @@
+@attribute [CmsTemplate(
+    "article",
+    "Article",
+    Description = "A long-form editorial page with a standfirst, a block body, and the metadata a news site needs.",
+    SortOrder = 20)]
+@inherits CmsTemplateBase
+@* The metadata-heavy counterpart of the landing page: most of its zones hold a single value, which
+   is what makes it the template the value-shaped field renderers are exercised through. The <h1> is
+   the page's own title rather than a zone — a title is a property of the version (spec section 11.1),
+   not content an editor places. *@
+<article class="cms-page cms-article" data-template="article" data-page="@Page.PublicId">
+    <header class="cms-article-header">
+        <p class="cms-article-kicker"><CmsZone Name="kicker" /></p>
+        <h1 class="cms-article-title">@Page.Title</h1>
+        <p class="cms-article-standfirst"><CmsZone Name="standfirst" /></p>
+
+        <dl class="cms-article-meta">
+            <dt>Published</dt>
+            <dd><CmsZone Name="publishedAt" /></dd>
+            <dt>Reviewed</dt>
+            <dd><CmsZone Name="reviewedOn" /></dd>
+            <dt>Reading time</dt>
+            <dd><CmsZone Name="readingMinutes" /></dd>
+            <dt>Featured</dt>
+            <dd><CmsZone Name="isFeatured" /></dd>
+            <dt>Layout</dt>
+            <dd><CmsZone Name="layout" /></dd>
+        </dl>
+    </header>
+
+    <figure class="cms-article-poster">
+        <CmsZone Name="poster" />
+    </figure>
+
+    <div class="cms-article-body">
+        <CmsZone Name="body" />
+        <CmsZone Name="embed" />
+    </div>
+
+    <section class="cms-article-gallery">
+        <CmsZone Name="gallery" />
+    </section>
+
+    <aside class="cms-article-aside">
+        <CmsZone Name="tags" />
+        <CmsZone Name="related" />
+    </aside>
+
+    @* A json zone renders nothing by design — it is configuration for the markup around it, never
+       content for a reader (see JsonRenderer). Placed here so the reference set covers every field
+       type, and so the "renders nothing, silently" rule has a zone it is actually exercised on. *@
+    <CmsZone Name="analytics" />
+</article>

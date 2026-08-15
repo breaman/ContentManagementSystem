@@ -1,0 +1,30 @@
+@attribute [CmsBlockType(
+    "hero-banner",
+    "Hero Banner",
+    Description = "A full-width banner: an image, a headline, a short introduction, and one call to action.",
+    IconKey = "bi-image",
+    SummaryTemplate = "{headline}")]
+@inherits CmsBlockBase
+@* Two ways of reading a property, both on purpose. 'headline' comes through Text() because it is
+   text going straight into an element this markup owns; everything structured — the image, the link,
+   the colour — goes through CmsBlockProperty so the field type's own renderer draws it. Reading an
+   image out of the JSON by hand here would be a second, worse copy of MediaRenderer. *@
+<section class="cms-block cms-hero" data-block-type="hero-banner" data-block="@BlockId">
+    <div class="cms-hero-background">
+        <CmsBlockProperty Name="background" />
+        <CmsBlockProperty Name="image" />
+    </div>
+
+    <div class="cms-hero-copy">
+        <h2 class="cms-hero-headline">@Text("headline")</h2>
+        <p class="cms-hero-standfirst"><CmsBlockProperty Name="standfirst" /></p>
+        <p class="cms-hero-cta"><CmsBlockProperty Name="cta" /></p>
+    </div>
+
+    @* Rendered rather than branched on, which is worth being explicit about: BooleanRenderer emits
+       the words and the machine-readable data-value together, and a real site that wanted the switch
+       — a class on the section, say — would read the raw property through Property("isFullBleed")
+       instead of asking a renderer for markup. It is rendered here because a reference block exists
+       to give every renderer somewhere it actually runs. *@
+    <p class="cms-hero-full-bleed"><CmsBlockProperty Name="isFullBleed" /></p>
+</section>

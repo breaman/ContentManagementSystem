@@ -14,6 +14,7 @@ using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Cli;
+using ContentManagementSystem.Server.Delivery;
 using ContentManagementSystem.Server.HealthChecks;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
@@ -123,6 +124,9 @@ try
     // services rather than with delivery, because it is the write path that depends on it: creating,
     // renaming, publishing, and recycling a page all rebuild routes inside their own transactions.
     builder.Services.AddCmsRouting();
+    // The read-only public delivery path (tasks P3-12 and P3-13): the published-content service and
+    // the component renderer the catch-all endpoint serves pages through.
+    builder.Services.AddCmsDeliveryEndpoint();
 
     // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
     // instruments is not enough on its own: an unlisted meter records measurements that no exporter
@@ -228,6 +232,13 @@ try
 
     app.MapAdditionalIdentityEndpoints();
     app.MapCmsApi();
+
+    // Last, and it must stay last (task P3-13, spec section 15.1). This is the catch-all that serves
+    // every content URL, and anything mapped after it is a route a visitor could shadow with a page
+    // slug. The P3-15 route-ordering tests assert the outcome — /api, /admin, /account, /health, and
+    // the Blazor framework paths all still reach their own endpoints — so a reshuffle fails loudly
+    // rather than quietly (risk R6).
+    app.MapCmsDelivery();
 
     app.Run();
 

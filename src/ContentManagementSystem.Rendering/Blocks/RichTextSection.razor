@@ -1,0 +1,29 @@
+@attribute [CmsBlockType(
+    "rich-text",
+    "Rich Text",
+    Description = "A prose section, with an optional hand-written HTML embed beneath it.",
+    IconKey = "bi-text-paragraph",
+    SummaryTemplate = "{body}")]
+@inherits CmsBlockBase
+@* Every property here goes through its own renderer, and for rich text and HTML that is not a
+   stylistic preference: RichTextRenderer and RawHtmlRenderer re-run the sanitizer on the way out
+   (ADR-0008), and markup that interpolated the stored string itself would emit whatever was in the
+   database. *@
+<section class="cms-block cms-rich-text" data-block-type="rich-text" data-block="@BlockId">
+    <div class="cms-rich-text-body">
+        <CmsBlockProperty Name="body" />
+    </div>
+
+    @* alignment is a choice; it renders as the chosen option's text. A site that wanted it as a
+       class would read the raw property instead — see the note on HeroBanner.isFullBleed. *@
+    <p class="cms-rich-text-alignment"><CmsBlockProperty Name="alignment" /></p>
+
+    <div class="cms-rich-text-embed">
+        <CmsBlockProperty Name="embed" />
+    </div>
+
+    @* 'settings' is a json property: developer-only data for this markup to read, which JsonRenderer
+       deliberately renders as nothing. Named here so the block that owns such a property is the one
+       that demonstrates it, rather than leaving the silent-by-design case undocumented in code. *@
+    <CmsBlockProperty Name="settings" />
+</section>

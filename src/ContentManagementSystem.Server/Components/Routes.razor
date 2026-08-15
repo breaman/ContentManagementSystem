@@ -1,3 +1,14 @@
+@* The backoffice's front door, and only the backoffice's (task P3-14, spec section 5.3).
+
+   Public pages do not reach this router at all: they are served by the CMS catch-all, which renders
+   its own document through CmsDeliveryDocument with no @@rendermode anywhere beneath it and no
+   blazor.web.js on the page. That separation is the decision output caching rests on — an
+   interactive circuit cannot be cached, and a visitor who never downloads the editor never pays for
+   it.
+
+   Interactivity is declared per page rather than here, and every page that declares it lives under
+   /admin. InteractiveRoutingTests asserts that, so a new page put outside the backoffice with a
+   render mode on it fails a test rather than quietly making a public URL interactive. *@
 <Router AppAssembly="@typeof(Program).Assembly" AdditionalAssemblies="new[] { typeof(Client._Imports).Assembly }" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">

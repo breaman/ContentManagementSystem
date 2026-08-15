@@ -27,9 +27,15 @@ internal static class RenderingHarness
 
     /// <summary>Builds a payload carrying the given zones, written as stored JSON.</summary>
     /// <param name="zones">Zone key and stored value JSON pairs.</param>
-    public static ContentPayload Payload(params (string Key, string Json)[] zones)
+    public static ContentPayload Payload(params (string Key, string Json)[] zones) =>
+        PayloadFor(TemplateKey, zones);
+
+    /// <summary>Builds a payload authored against a named template.</summary>
+    /// <param name="templateKey">The template the content declares.</param>
+    /// <param name="zones">Zone key and stored value JSON pairs.</param>
+    public static ContentPayload PayloadFor(string templateKey, params (string Key, string Json)[] zones)
     {
-        var builder = new ContentPayloadBuilder(TemplateKey, 1);
+        var builder = new ContentPayloadBuilder(templateKey, 1);
 
         foreach (var (key, json) in zones)
         {

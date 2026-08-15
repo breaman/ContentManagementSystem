@@ -1,0 +1,27 @@
+@* The whole HTML document a public request receives. Static SSR only: there is no @@rendermode
+   anywhere beneath this, no blazor.web.js, and no circuit — which is the decision that makes the
+   response cacheable at all (spec section 5.3).
+
+   Deliberately hand-written rather than reusing App.razor. App.razor is the backoffice's shell and
+   carries the WebAssembly bootstrapper and the ImportMap; serving that to an anonymous reader would
+   download the editor to every visitor and undo the reason the two front doors are separate. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@Content.DocumentTitle</title>
+    @if (Content.MetaDescription is { Length: > 0 } description)
+    {
+        <meta name="description" content="@description" />
+    }
+    <link rel="canonical" href="@Content.CanonicalOrOwnUrl" />
+    <meta name="robots" content="@Robots" />
+    <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body>
+<main class="cms-delivery">
+    <CmsPageHost Context="Context" />
+</main>
+</body>
+</html>

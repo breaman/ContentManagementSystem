@@ -67,14 +67,14 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync(
             Templates,
-            new CreateTemplateRequest("marketing-landing", "Marketing Landing Page", "Hero and body."),
+            new CreateTemplateRequest("campaign-landing", "Marketing Landing Page", "Hero and body."),
             cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var created = await response.Content.ReadFromJsonAsync<TemplateDetail>(cancellationToken);
 
-        created!.Template.Key.Should().Be("marketing-landing");
+        created!.Template.Key.Should().Be("campaign-landing");
         created.Template.Name.Should().Be("Marketing Landing Page");
         created.Template.CurrentRevision.Should().Be(1);
         created.Template.ZoneCount.Should().Be(0);
@@ -90,7 +90,7 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
             $"{Templates}/{created.Template.Id}",
             cancellationToken);
 
-        reread!.Template.Key.Should().Be("marketing-landing");
+        reread!.Template.Key.Should().Be("campaign-landing");
     }
 
     [Fact]

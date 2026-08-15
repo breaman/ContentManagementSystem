@@ -19,6 +19,12 @@ namespace ContentManagementSystem.Rendering;
 /// then writes (S2 spike, consequence 3), and no component beneath it may opt into streaming
 /// rendering.
 /// </para>
+/// <para>
+/// A page whose template key no deployed component declares renders through
+/// <see cref="CmsFallbackTemplate"/> rather than as nothing (spec section 15.3). The choice is made
+/// here, not by the caller, so that every entry point into the render path — delivery, preview, and
+/// the editor canvas later — behaves the same way without having to remember to.
+/// </para>
 /// </remarks>
 public partial class CmsPageHost : ComponentBase
 {
@@ -47,7 +53,11 @@ public partial class CmsPageHost : ComponentBase
             return;
         }
 
-        TemplateType = null;
+        // Spec section 15.3's first row: a minimal layout carrying the page's text content, so a
+        // visitor gets the words rather than a blank page (task P3-11). It is chosen here rather
+        // than left to the caller because every entry point into the render path — delivery,
+        // preview, the editor canvas in P6 — would otherwise need to remember to.
+        TemplateType = typeof(CmsFallbackTemplate);
 
         // An error rather than a warning, and never an exception: this is a deployment that lost a
         // template component while pages built on it are still live. The reconciler has already

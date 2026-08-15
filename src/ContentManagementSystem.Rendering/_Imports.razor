@@ -1,3 +1,7 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Web
 @using ContentManagementSystem.Rendering
+@* The [CmsTemplate] and [CmsBlockType] attributes live in Shared so Core's reconciler can read them
+   (Core sits below Rendering in the reference graph), which is why every template and block file
+   would otherwise need this using of its own. *@
+@using ContentManagementSystem.Shared.Contracts.Structure

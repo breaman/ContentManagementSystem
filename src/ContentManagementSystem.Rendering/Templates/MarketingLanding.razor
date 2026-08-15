@@ -1,0 +1,33 @@
+@attribute [CmsTemplate(
+    "marketing-landing",
+    "Marketing Landing Page",
+    Description = "A block-driven campaign page: a hero, an introduction, a flexible body, and a shared footer.",
+    SortOrder = 10)]
+@inherits CmsTemplateBase
+@* Placement and nothing else (spec section 8.2). Not one of these zones names a field type: the
+   template does not know whether 'intro' holds rich text or a block list, which is what lets a
+   Developer change it in the backoffice without a deployment. A zone the payload has never held
+   renders nothing at all, so what an unfilled zone looks like is decided by the markup around it
+   rather than by the zone. *@
+<article class="cms-page cms-landing" data-template="marketing-landing" data-page="@Page.PublicId">
+    <header class="cms-landing-hero">
+        <CmsZone Name="hero" />
+    </header>
+
+    <div class="cms-landing-intro">
+        <CmsZone Name="intro" />
+    </div>
+
+    <div class="cms-landing-body">
+        <CmsZone Name="body" />
+    </div>
+
+    <div class="cms-landing-cta">
+        <CmsZone Name="accent" />
+        <CmsZone Name="cta" />
+    </div>
+
+    <footer class="cms-landing-footer">
+        <CmsZone Name="footer" />
+    </footer>
+</article>

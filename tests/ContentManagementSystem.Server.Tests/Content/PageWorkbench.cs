@@ -8,6 +8,7 @@ using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.TestSupport;
 
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
@@ -82,6 +83,26 @@ public sealed class PageWorkbench : IAsyncDisposable
     public T Resolve<T>() where T : notnull => _scope.ServiceProvider.GetRequiredService<T>();
 
     /// <summary>
+    /// An HTTP client against the same application and the same database this workbench arranges.
+    /// </summary>
+    /// <param name="followRedirects">
+    /// Whether the client follows a 3xx. False for anything asserting on a redirect itself, since a
+    /// client that followed it reports the destination's status and hides the one under test.
+    /// </param>
+    /// <remarks>
+    /// What makes the delivery suite possible: content is arranged through the real services and
+    /// then requested over HTTP, rather than arranged in one process and read in another. Note that
+    /// the workbench's permissive <c>ICmsAuthorization</c> is in force for these requests too — it is
+    /// irrelevant to public delivery, which authorizes nothing, but it would be wrong to write an
+    /// authorization test through this client.
+    /// </remarks>
+    public HttpClient CreateClient(bool followRedirects = true) =>
+        _factory.CreateClient(new WebApplicationFactoryClientOptions
+        {
+            AllowAutoRedirect = followRedirects,
+        });
+
+    /// <summary>
     /// Creates a workbench over a freshly migrated database.
     /// </summary>
     /// <param name="fixture">The container fixture supplying the SQL Server instance.</param>
@@ -134,7 +155,12 @@ public sealed class PageWorkbench : IAsyncDisposable
     /// <summary>
     /// Inserts a template with the given zones and cuts its first revision, as the structure API does.
     /// </summary>
-    /// <param name="key">Key of the template.</param>
+    /// <param name="key">
+    /// Key of the template. It must be one <em>no deployed component declares</em>: the startup
+    /// reconciler has already inserted a row for every <c>[CmsTemplate]</c> in the solution, so
+    /// <c>article</c> and <c>marketing-landing</c> collide on the unique key here. Use
+    /// <see cref="UseTemplateAsync"/> when the test needs a template that actually renders.
+    /// </param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <param name="zones">The zone definitions.</param>
     public async Task<Template> AddTemplateAsync(
@@ -157,6 +183,45 @@ public sealed class PageWorkbench : IAsyncDisposable
         });
 
         Context.Templates.Add(template);
+        await Context.SaveChangesAsync(cancellationToken);
+
+        return template;
+    }
+
+    /// <summary>
+    /// Gives an already-reconciled template its zone definitions.
+    /// </summary>
+    /// <param name="key">Key of a template a deployed component declares.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <param name="zones">The zone definitions.</param>
+    /// <remarks>
+    /// <see cref="AddTemplateAsync"/> cannot be used for a template whose key is declared in code:
+    /// the startup reconciler has already inserted the row, with revision 1 and no zones, and a
+    /// second insert collides on the unique key. This finds that row and writes the zones into the
+    /// revision it already cut — legitimate only because no content exists yet, which is true of
+    /// every fixture that calls it.
+    /// </remarks>
+    public async Task<Template> UseTemplateAsync(
+        string key,
+        CancellationToken cancellationToken,
+        params Zone[] zones)
+    {
+        var template = await Context.Templates
+            .Include(candidate => candidate.Zones)
+            .Include(candidate => candidate.Revisions)
+            .FirstOrDefaultAsync(candidate => candidate.Key == key, cancellationToken);
+
+        if (template is null) return await AddTemplateAsync(key, cancellationToken, zones);
+
+        foreach (var zone in zones)
+        {
+            template.Zones.Add(zone);
+        }
+
+        var revision = template.Revisions.Single(candidate => candidate.RevisionNumber == 1);
+        revision.ZoneSnapshotJson = ContentSchemaSnapshot.WriteZones(zones);
+        template.CurrentRevision = 1;
+
         await Context.SaveChangesAsync(cancellationToken);
 
         return template;

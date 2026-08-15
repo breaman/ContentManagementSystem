@@ -24,11 +24,25 @@ public sealed class CmsMetrics
     /// <summary>Name of the histogram of publish durations.</summary>
     public const string PublishDurationName = "cms.publish.duration";
 
+    /// <summary>Name of the histogram of page render durations (task P3-28).</summary>
+    public const string PageRenderDurationName = "cms.page.render.duration";
+
+    /// <summary>Name of the counter of URLs that resolved to nothing (task P3-28).</summary>
+    public const string RouteResolutionMissName = "cms.route.resolution.miss";
+
     /// <summary>Tag naming how the attempt ended (spec section 24.1).</summary>
     public const string ResultTag = "result";
 
+    /// <summary>Tag naming the template a page was rendered with (spec section 24.1).</summary>
+    public const string TemplateTag = "template";
+
+    /// <summary>Tag saying whether the render was served from a cache (spec section 24.1).</summary>
+    public const string CacheHitTag = "cache_hit";
+
     private readonly Counter<long> _publishCount;
     private readonly Histogram<double> _publishDuration;
+    private readonly Histogram<double> _pageRenderDuration;
+    private readonly Counter<long> _routeResolutionMiss;
 
     /// <summary>Creates the instruments on the CMS meter.</summary>
     /// <param name="meterFactory">Factory supplying the container-scoped meter.</param>
@@ -47,6 +61,16 @@ public sealed class CmsMetrics
             PublishDurationName,
             unit: "ms",
             description: "Wall-clock time one publish attempt took, tagged by how it ended.");
+
+        _pageRenderDuration = meter.CreateHistogram<double>(
+            PageRenderDurationName,
+            unit: "ms",
+            description: "Wall-clock time one public page render took, tagged by template.");
+
+        _routeResolutionMiss = meter.CreateCounter<long>(
+            RouteResolutionMissName,
+            unit: "{request}",
+            description: "Requests whose URL resolved to neither a page nor a redirect.");
     }
 
     /// <summary>
@@ -67,4 +91,38 @@ public sealed class CmsMetrics
         _publishCount.Add(1, tag);
         _publishDuration.Record(elapsed.TotalMilliseconds, tag);
     }
+
+    /// <summary>
+    /// Records one public page render (spec section 24.1, task P3-28).
+    /// </summary>
+    /// <param name="templateKey">The template the page was rendered with.</param>
+    /// <param name="elapsed">How long the render took.</param>
+    /// <param name="cacheHit">Whether the response came from a cache rather than being rendered.</param>
+    /// <remarks>
+    /// Tagged by template because that is the dimension a regression actually has: pages are not
+    /// slow, <em>templates</em> are, and an untagged histogram of every page on the site averages the
+    /// one expensive layout into invisibility. The page id is deliberately not a tag — one time
+    /// series per page is how a metrics bill and a collector both fall over.
+    /// <para>
+    /// <paramref name="cacheHit"/> is recorded from the first release even though output caching does
+    /// not arrive until Phase 8. A histogram whose meaning silently changes when caching is switched
+    /// on is worse than one that was always able to say which of the two it measured.
+    /// </para>
+    /// </remarks>
+    public void RecordPageRender(string templateKey, TimeSpan elapsed, bool cacheHit = false) =>
+        _pageRenderDuration.Record(
+            elapsed.TotalMilliseconds,
+            new KeyValuePair<string, object?>(TemplateTag, templateKey),
+            new KeyValuePair<string, object?>(CacheHitTag, cacheHit));
+
+    /// <summary>
+    /// Records one request whose URL resolved to nothing (spec section 24.1, task P3-28).
+    /// </summary>
+    /// <remarks>
+    /// Untagged, and specifically not tagged by URL. The whole population of interest is
+    /// attacker- and crawler-supplied strings, so a tag here is an unbounded cardinality hole with
+    /// an open door in front of it. Which URLs missed is what <c>NotFoundLog</c> is for; this
+    /// counter answers the different question of whether the rate has changed.
+    /// </remarks>
+    public void RecordRouteMiss() => _routeResolutionMiss.Add(1);
 }

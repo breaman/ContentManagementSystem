@@ -1,0 +1,40 @@
+@attribute [CmsBlockType(
+    "feature-grid",
+    "Feature Grid",
+    Description = "A titled grid of nested blocks, with a gallery, related pages, and its own dating.",
+    IconKey = "bi-grid-3x2",
+    SummaryTemplate = "{heading}")]
+@inherits CmsBlockBase
+@* The container case. 'items' is a blocks property, so this block holds blocks — including, in
+   principle, another feature grid. Nothing here limits the nesting: what a property may contain is
+   the 'allowedBlockTypes' configuration on the property definition, enforced by the blocks field
+   type at validation time, and a render-time guess about it would only disagree with the answer the
+   editor was given. *@
+<section class="cms-block cms-feature-grid" data-block-type="feature-grid" data-block="@BlockId">
+    <header class="cms-feature-grid-header">
+        <h2 class="cms-feature-grid-heading">@Text("heading")</h2>
+
+        <p class="cms-feature-grid-columns">
+            Columns: <CmsBlockProperty Name="columns" />
+        </p>
+
+        <p class="cms-feature-grid-dates">
+            <CmsBlockProperty Name="publishedOn" />
+            <CmsBlockProperty Name="updatedAt" />
+        </p>
+    </header>
+
+    <div class="cms-feature-grid-items">
+        <CmsBlockProperty Name="items" />
+    </div>
+
+    <div class="cms-feature-grid-gallery">
+        <CmsBlockProperty Name="gallery" />
+    </div>
+
+    <footer class="cms-feature-grid-footer">
+        <CmsBlockProperty Name="tags" />
+        <CmsBlockProperty Name="related" />
+        <CmsBlockProperty Name="promo" />
+    </footer>
+</section>

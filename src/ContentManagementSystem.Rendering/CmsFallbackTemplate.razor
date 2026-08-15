@@ -1,0 +1,18 @@
+@inherits CmsTemplateBase
+@* Spec section 15.3, unknown templateKey: a minimal layout carrying the page's text content, rather
+   than a stack trace or a blank page. Deliberately carries no [CmsTemplate] attribute — it is not a
+   template anybody can choose, and a key here would put it in the create-page picker and let the
+   reconciler write a row for it.
+
+   The markers are attributes because the Razor compiler strips HTML comments out of .razor markup. *@
+<article class="cms-page cms-fallback"
+         data-cms-fallback="template"
+         data-page="@Page.PublicId"
+         data-template-missing="@Page.TemplateKey">
+    <h1>@Page.Title</h1>
+
+    @foreach (var paragraph in Paragraphs)
+    {
+        <p>@paragraph</p>
+    }
+</article>

@@ -26,6 +26,7 @@ public static class RoutingServiceCollectionExtensions
         services.TryAddScoped<IUrlService, UrlService>();
         services.TryAddScoped<IRouteResolver, RouteResolver>();
         services.TryAddScoped<ILinkResolver, LinkResolver>();
+        services.TryAddScoped<INotFoundLogService, NotFoundLogService>();
 
         // Shared with the page services; TryAdd means whichever call runs first wins and the two
         // cannot end up with different clocks.

@@ -1,5 +1,10 @@
-﻿@page "/client-hello"
+@page "/admin/client-hello"
 @rendermode InteractiveWebAssembly
+@* Moved under /admin by task P3-14. Interactive routing is scoped to the backoffice: the public
+   route space belongs to the CMS catch-all, and every literal route registered outside /admin is a
+   URL no page can ever be published at. This page is developer scaffolding, so /admin is where it
+   belongs — and InteractiveRoutingTests now asserts that no routable component carrying a render
+   mode sits outside the backoffice. *@
 
 <p>Welcome to your client side homepage</p>
 <p>This is a good starter page for the client side</p>

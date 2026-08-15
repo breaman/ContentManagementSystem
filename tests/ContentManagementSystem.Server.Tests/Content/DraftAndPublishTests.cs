@@ -96,7 +96,7 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
-        await _bench.AddTemplateAsync("article", cancellationToken, PageWorkbench.TextZone("body"));
+        await _bench.AddTemplateAsync("news-story", cancellationToken, PageWorkbench.TextZone("body"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
 
@@ -104,7 +104,7 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         // boundary rather than data: a client free to name either can pick rules its content passes.
         var wrongTemplate = await drafts.SaveAsync(
             page.Summary.Id,
-            new SaveDraftRequest(Payload("article", 1, "body", "text"), null),
+            new SaveDraftRequest(Payload("news-story", 1, "body", "text"), null),
             cancellationToken);
 
         wrongTemplate.Diagnostics.Diagnostics.Should().ContainSingle()

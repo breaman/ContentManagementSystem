@@ -2,14 +2,17 @@
 
 **Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3 is
-under way**: section 3.1 routing is finished — `PageRoute`, `Redirect`, `NotFoundLog`, and
-`PreviewToken` with migration #4, `UrlService`, `RedirectService`, `IRouteResolver`, `ILinkResolver`,
-the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2) is
-half built: `P3-08` put the pipeline's spine in place — `RenderContext` with its accumulating cache
-tags, `CmsZone`, `CmsPageHost`, the component base classes, and the component catalog — and `P3-09`
-filled it in with a renderer for every field type, the catalog mapping keys to them, the startup
-check over it, and `CmsBlockProperty` so a block's structured properties reach a renderer at all.
-Reference templates (`P3-10`), the error boundaries, delivery, and preview are next.
+under way**: sections 3.1 routing and **3.2 rendering are both finished**. Routing gave us
+`PageRoute`, `Redirect`, `NotFoundLog`, and `PreviewToken` with migration #4, `UrlService`,
+`RedirectService`, `IRouteResolver`, `ILinkResolver`, and the redirect API with its CSV pair.
+Rendering now runs end to end: the pipeline spine and every field renderer (`P3-08`, `P3-09`), two
+reference templates and three reference block types placing every field type (`P3-10`), error
+boundaries per zone and per block with the whole [§15.3] fallback matrix (`P3-11`),
+`PublishedContentService` (`P3-12`), and the catch-all delivery endpoint with its CMS 404 page and
+`NotFoundLog` writing (`P3-13`) — so **a published page is now reachable by an anonymous visitor at
+its real URL**. That meets `P3 #1`, `#3`, `#4`, `#5`, `#6`, `#7`, `#8`, `#9`, and `#11`, and the
+anonymous half of `#2`. **Preview (3.3) is what remains**, along with the perf harness (`P3-27`),
+visual regression (`P3-29`), and Q8.
 **Version:** 1.0
 **Last updated:** 2026-08-15
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -60,14 +63,14 @@ and record the date in the progress table.
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
-| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 12 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering under way (`P3-08`, `P3-09`) | — |
+| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 21 | 22.5 | Routing and rendering complete (`P3-01`–`P3-15`); preview (3.3) remains | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **93** | **203.5** | | |
+| **v1 total** | **281** | **102** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1913,29 +1916,149 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   green; `Server.Tests` 216 of 217, the one failure being `VersionAndDiffTests.RetentionKeepsWhat
   AnEditorWouldBeUpsetToLose`, **which fails identically on a clean checkout of `main`** and is
   unrelated to rendering.*
-- [ ] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
+- [x] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
   `Rendering/Blocks/`, between them exercising every field type. — 2 ed
-- [ ] **P3-11** Per-zone error boundaries and the full fallback matrix from [§15.3]: unknown template
+  *2026-08-15 — `marketing-landing` and `article`; `hero-banner`, `rich-text`, and `feature-grid`.
+  The split is deliberate: the landing page is almost entirely block lists and the article is almost
+  entirely single values, so between them every one of the eighteen renderers has a zone or property
+  it is actually reached through. **`ReferenceContentTests` asserts that against the field type
+  registry rather than against a list restated in the test**, so a field type added in a later phase
+  fails until the reference content gives it a home — which is the only thing that makes shipping
+  reference content worth the files.*
+  ***`feature-grid` is a container on purpose.*** Its `items` property is a `blocks` value, so the
+  render path goes zone → blocks → block → block property → blocks → block. That is the shape that
+  breaks if the block context is cascaded rather than scoped per block, or if a nested block's
+  captured revision is resolved against the outer block's schema, and nothing else in the reference
+  set can reach it.
+  *Two smaller decisions. **The zone definitions are not in these files and cannot be** — they are
+  database rows a `Developer` owns [§8.1] and promotes as JSON [§27.1] — so each component's XML doc
+  carries a table of the *intended* field type per zone, which is what the tests are written against.
+  And the class is `RichTextSection`, not `RichText`: a type of that name one namespace from
+  `RichTextRenderer` is exactly the pair that gets imported by mistake in a `.razor` file where
+  `@using` order picks the winner.*
+  ***One thing this broke, which is worth knowing before it recurs.*** Four Server tests were using
+  `article`, `marketing-landing`, and `hero-banner` as fixture keys. Those keys now belong to
+  deployed components, so the startup reconciler inserts them before the fixture does and the insert
+  collides on the unique index. Renamed to `news-story`, `campaign-landing`, and `promo-banner`;
+  `PageWorkbench.AddTemplateAsync` now says in its documentation that its key must be one no
+  component declares, and `UseTemplateAsync` is the method for a test that needs a template which
+  actually renders.*
+- [x] **P3-11** Per-zone error boundaries and the full fallback matrix from [§15.3]: unknown template
   key, unknown field type, missing media, unpublished reusable content, renderer throwing. — 1 ed
   *From [S2](./docs/spikes/s2-dynamic-ssr.md): derive from **`ErrorBoundaryBase`**, not the stock
   `ErrorBoundary` — overriding `OnErrorAsync` is what gets page id, zone key, version id, and block
   id into the log (`P3 #8`), and the stock fallback text is not acceptable on a public page. Put a
   boundary at **both** levels, per zone and per block.*
-- [ ] **P3-12** `PublishedContentService` in `Core/Delivery/` — resolve → load → deserialize → render;
+  *2026-08-15 — `CmsErrorBoundary` over `ErrorBoundaryBase`, wired into `CmsZone` (per zone) and
+  `BlocksRenderer` (per block), plus `CmsFallbackTemplate` for the matrix's first row. All three
+  spike constraints honoured. Asserted against all three failure shapes — lifecycle, mid-
+  `BuildRenderTree`, post-await — and the half-written case has its own test: a renderer that emits
+  an element and then throws leaves nothing behind, because Blazor discards the failing subtree
+  rather than flushing what it had.*
+  ***The marker is the boundary's own default, not an `ErrorContent` at each call site.*** The
+  templated-component route would have meant writing `Context="_"` on a component that already has a
+  `Context` cascading parameter, which is at best confusing and at worst ambiguous to the Razor
+  compiler; and a marker supplied per call site is a marker two call sites will eventually spell
+  differently. It is an element with attributes rather than an HTML comment, because the Razor
+  compiler strips comments out of `.razor` markup — the trap S2 found.
+  ***`CmsFallbackTemplate` asks the field types for the page's text rather than reading the JSON.***
+  Each zone's value is dispatched to the field type its own `type` discriminator names and reduced
+  through `ExtractSearchText` — the same method the search index is built from. A walk written here
+  would have to know that rich text hides its words inside markup and that a block list nests them
+  two levels down, and it would be wrong about the next field type somebody adds. It carries **no
+  `[CmsTemplate]` attribute**, so it cannot be chosen in the create-page picker and the reconciler
+  cannot write a row for it; a test asserts that.
+  *One test-harness fact worth recording: under bUnit the post-await failure needs a
+  `WaitForAssertion`, because the boundary's own re-render is queued behind the continuation.
+  Delivery does not have to care — `HtmlRenderer.RenderComponentAsync` waits for quiescence before
+  the markup is read at all — and `TheDeliveryRenderPathSeesTheBoundaryMarkerToo` asserts that
+  through a real `HtmlRenderer` rather than assuming it.*
+- [x] **P3-12** `PublishedContentService` in `Core/Delivery/` — resolve → load → deserialize → render;
   read-only, cache-ready, filters on `PublishedVersionId` **at the data layer** so drafts cannot leak
   [§20.1]. — 2 ed
-- [ ] **P3-13** Delivery endpoint `app.MapGet("/{**slug}", …)` in `Server/Delivery/`, registered
+  *2026-08-15 — one query, no tracking, no writes, returning an immutable `PublishedContent`.
+  **The projection selects through `page.PublishedVersion` and never mentions `DraftVersion`**, which
+  is what makes `P3 #3` a property of the SQL rather than of a reviewer noticing: the draft row is
+  not in the result set to be picked by mistake. The soft-delete query filter is left in place, so a
+  recycled page is not published content — `IgnoreQueryFilters` here would make the recycle bin a way
+  to keep serving a page nobody can see in the tree.*
+  ***Resolution is deliberately not folded in.*** `IRouteResolver` already owns the ordering that
+  makes a live page outrank a redirect at the same URL [§10.5], and a second entry point into it here
+  would be a second copy of that decision. The interface is one method taking a page id.
+  *Two shapes had to be settled. **`PublishedContent` is one flat record**, page facts and payload and
+  captured schema together, because a version *is* those things together and they are read in one
+  query and will be cached as one entry [§16.1]; `RenderPage.From` narrows it to what a renderer may
+  read, which is the point of keeping the two types — a renderer must not be able to reach the SEO
+  metadata or the payload wholesale. And **`RenderContext.For(content, mode)` is the one supported
+  way to start a render**, so the three things that must travel together cannot be assembled from
+  different sources by a caller in a hurry.*
+- [x] **P3-13** Delivery endpoint `app.MapGet("/{**slug}", …)` in `Server/Delivery/`, registered
   **after every other endpoint**; 404 page (itself a CMS page); `NotFoundLog` writing [§15.1, §10.6].
   — 1 ed
   *From [S2](./docs/spikes/s2-dynamic-ssr.md): **render to a buffer, then set headers, then write.**
   Cache tags accumulate during the render, so anything that streams sends headers before the tag set
   is complete — producing a page that never invalidates. No public delivery component may opt into
   streaming rendering.*
-- [ ] **P3-14** Scope interactive routing to `/admin` in `Server/Components/Routes.razor`; keep public
+  *2026-08-15 — `DeliveryEndpoint`, `CmsPageRenderer`, and `CmsDeliveryDocument`, mapped last by
+  `MapCmsDelivery()`. The spike's ordering is honoured through `HtmlRenderer`-to-string rather than
+  `RazorComponentResult`: the latter works today only because the response happens to be buffered,
+  and one `[StreamRendering]` attribute anywhere below would silently break it.*
+  ***`CmsDeliveryDocument` is a separate document from `App.razor`, and that is the whole of [§5.3]
+  in one file.*** It carries no `@rendermode`, no `blazor.web.js`, and no `ImportMap`; serving the
+  backoffice shell to an anonymous reader would download the editor to every visitor and undo the
+  reason the two front doors exist. `DeliveryTests` asserts the absence of `blazor.web.js` on a
+  public page, which is the assertion output caching depends on.
+  ***`NotFoundLog` writing is an upsert, update-first.*** The overwhelming majority of 404s repeat a
+  URL already in the table — that is the premise of the report — so the common path is one relative
+  `ExecuteUpdate` that cannot lose a concurrent increment. An insert race is caught and retried as an
+  update rather than surfaced, and **a request carrying no referrer does not erase the one a previous
+  request supplied**: "who is still linking to this" is what the column is for, and one live example
+  is enough. The referrer is attacker-controlled, so it is truncated rather than allowed to fail the
+  write.
+  ***A reserved prefix is a bare 404, not the site's 404 page*** — recorded as
+  [`ADR-0020` (D20)](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md). `GET
+  /api/cms/v1/no-such-thing` matches no API endpoint and therefore reaches the catch-all, which was
+  cheerfully serving HTML; a JSON client then reports a parse failure somewhere else entirely, which
+  is the same misdirection `UseStatusCodePagesWithReExecute` produced in `P1-21`. The prefix list is
+  **read from `Slugs.Reserved`**, not restated, so a page cannot be created at an address delivery
+  then declines to serve.
+  *Also here: `ETag` computed over the finished document (not derived from the version id — a link
+  target moving or a reusable item republishing changes the page without changing its version
+  [§16.4]), `Last-Modified` from the publish timestamp, `Cache-Control` per [§16.1], and a 404 that
+  is never cached anywhere, since a dead URL is very often one somebody is about to publish at.
+  **`CacheOutput` is deliberately not applied** — that is P8, and a response cached before there is
+  anything to evict it would make every publish look broken — but the accumulated tags are published
+  on `HttpContext.Items` under `DeliveryEndpoint.CacheTagsItemKey` for the policy that will read them.*
+- [x] **P3-14** Scope interactive routing to `/admin` in `Server/Components/Routes.razor`; keep public
   pages static SSR — the decision that makes output caching possible [§5.3]. *(Existing-code change.)*
   — 0.5 ed
-- [ ] **P3-15** Route-ordering integration tests asserting `/_blazor`, `/_framework`, `/api`, `/admin`,
+  *2026-08-15 — most of this fell out of `P3-13`: public pages no longer reach the Blazor router at
+  all, since delivery renders its own document. What was left was the invariant, and it is now
+  **enforced rather than documented**: `InteractiveRoutingTests` reflects over the routable
+  components in the Server and Client assemblies and fails if any component carrying a
+  `RenderModeAttribute` has a route outside `/admin`. That turns ADR-0002 from a convention into
+  something a test holds. It has a second test asserting the scan finds the backoffice pages, because
+  a test that asserts an empty set passes just as well when the scan finds nothing at all.*
+  *The one violation when the rule was written was `ClientHello` at `/client-hello` — scaffolding,
+  interactive, sitting in the public route space. Moved to `/admin/client-hello`. Note the scaffolding
+  `Home.razor` still claims `/`, so the site root does not reach the CMS; [§10.3] gives `/` to a CMS
+  page, so a real deployment deletes that component. Left in place because it is template scaffolding
+  rather than CMS code, and recorded in ADR-0020 because it is otherwise discovered as "why does my
+  home page not publish".*
+- [x] **P3-15** Route-ordering integration tests asserting `/_blazor`, `/_framework`, `/api`, `/admin`,
   `/account`, `/health` are not shadowed by the catch-all *(mitigates R6)*. — 0.5 ed
+  *2026-08-15 — `Server.Tests/Delivery/RouteOrderingTests`, 10 tests. **They assert outcomes, not
+  registration order**: precedence is one way to get this right and order is another, and what must
+  not change is that these paths reach the endpoints that own them whatever anybody does to
+  `Program.cs` later. The assertions are on the thing that distinguishes the two answers — the API
+  returns `application/json`, `/health` returns the literal text `Healthy`, the backoffice document
+  carries `blazor.web.js` and the delivery document never does.*
+  *The last test is the one that matters most and looks least important: an ordinary content URL
+  **does** reach the catch-all. Without it, deleting the catch-all entirely would pass every other
+  assertion in the file.*
+  *`/_blazor` is reserved but not mapped — it is the SignalR endpoint for interactive **server**
+  rendering, which this solution never uses (ADR-0002). Keeping it reserved costs nothing and means
+  turning that mode on later cannot collide with a published page. Recorded in ADR-0020.*
 
 ### 3.3 Preview — 4.5 ed
 
@@ -1965,8 +2088,30 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   *Chain flattening and loop detection are in `Server.Tests/Routing/RedirectServiceTests` rather
   than here — both are database facts (a unique index on a hash, a chain assembled across rows), and
   asserting them against a fake would be asserting that the fake works. 15 tests.*
-- [ ] **P3-23** bUnit: field renderers, block components, template composition, unknown-type fallbacks.
-- [ ] **P3-24** Integration: anonymous delivery of a published page; 404 for an unpublished page.
+- [x] **P3-23** bUnit: field renderers, block components, template composition, unknown-type fallbacks.
+  *2026-08-15 — the field renderers themselves were covered by `P3-09`. Added `Rendering/
+  ReferenceContentTests` (9) over the two reference templates and three block types, and
+  `Rendering/CmsErrorBoundaryTests` (8) over the boundaries, and rewrote the two `CmsPageHostTests`
+  cases the fallback template changed. All of it drives `CmsPageHost` and the **real** component
+  catalog — scanned over the Rendering assembly, so the composition under test is the one a
+  deployment runs — rather than instantiating components, because a value reaching the wrong renderer
+  and a renderer drawing the wrong thing look identical on the page.*
+  *Each renderer assertion looks for markup only that renderer emits (`<time class="cms-date"`,
+  `data-color=`, `<li class="cms-tag">`), not merely for the text somewhere on the page. 1172 green
+  in `Core.Tests`, up from 1154.*
+- [x] **P3-24** Integration: anonymous delivery of a published page; 404 for an unpublished page.
+  *2026-08-15 — `Server.Tests/Delivery/DeliveryTests`, 9 tests over the real HTTP pipeline against
+  SQL Server: content arranged through the real page, draft, and publishing services and then
+  requested by an `HttpClient` carrying no identity. Covers `P3 #1`, the anonymous half of `P3 #2`,
+  `P3 #3`, `P3 #4`, and `P3 #11`, plus the canonical-form 301, the configured CMS 404 page, ETag
+  revalidation, and that a 404 is never cached.*
+  ***`P3 #3` is asserted byte-for-byte***, not as "the response does not contain the draft text": the
+  weaker form passes for a response that changed in some other way nobody looked at. Three draft
+  saves between the two requests.
+  *This needed one addition to `PageWorkbench`: `CreateClient()`, so content can be arranged and then
+  requested against the **same** application and database. Its permissive `ICmsAuthorization` is in
+  force for those requests too — irrelevant to delivery, which authorizes nothing, but it would be
+  wrong to write an authorization test through that client, and the method says so.*
 - [x] **P3-25** Integration: URL change 301s the page and every descendant.
   *2026-08-14 — `Server.Tests/Routing/UrlServiceTests`, 11 tests driven through the real page,
   publishing, and recycle-bin services against SQL Server. The headline one renames a grandparent
@@ -1986,19 +2131,63 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   component rendering ~7 µs per block ([S2](./docs/spikes/s2-dynamic-ssr.md)). Warm **every** input
   size before measuring any of them; measuring sizes in sequence made a 200-block page look faster
   per block than a 50-block one, purely tiered-JIT artifact.*
-- [ ] **P3-28** Telemetry: `cms.page.render.duration`, `cms.route.resolution.miss` [§24.1].
+  ***Left open when 3.2 closed on 2026-08-15.*** It is the start of a cross-cutting workstream rather
+  than a test of the rendering pipeline, and it needs a benchmark project, a committed baseline, and
+  CI thresholds — none of which rendering produced or blocks on. What it can now be built against
+  exists: the reference content of `P3-10`, and `cms.page.render.duration` from `P3-28`, which gives
+  the same measurement from a running site.*
+- [x] **P3-28** Telemetry: `cms.page.render.duration`, `cms.route.resolution.miss` [§24.1].
+  *2026-08-15 — both on `CmsMetrics`, recorded from the delivery path, asserted by
+  `Server.Tests/Delivery/DeliveryTelemetryTests` through real requests rather than by calling the
+  recorder — what goes wrong is never the instrument, it is the instrument not being reached, and a
+  test that records a measurement by hand passes for every one of those.*
+  *Two cardinality decisions. The render histogram is tagged **`template`** and not page id: pages
+  are not slow, templates are, and an untagged histogram averages the one expensive layout into
+  invisibility — while one series per page is how a metrics bill falls over. The miss counter is
+  **untagged**, deliberately not carrying the requested URL, since that population is entirely
+  crawler- and attacker-supplied; which URLs missed is `NotFoundLog`'s question, and this counter
+  answers the different one of whether the rate has changed. `cache_hit` is recorded from the first
+  release although output caching is P8, because a histogram whose meaning silently changes when
+  caching is switched on is worse than one that could always say which of the two it measured.*
 - [ ] **P3-29** Visual regression baseline (Playwright screenshots) for the two reference templates.
+  ***Left open when 3.2 closed on 2026-08-15**, and now unblocked: the two reference templates exist
+  (`P3-10`) and a published page is reachable over HTTP (`P3-13`), which are the two things it was
+  waiting for. What it still needs is its own decisions — seeded content the screenshots are taken
+  of, a stylesheet worth photographing, and a baseline-image policy that survives being run on a
+  different platform from CI. The markup itself is pinned by `P3-23` in the meantime.*
 - [ ] **P3-30** Confirm Q8 (legacy URL preservation) is answered and its redirect import path tested.
-- [ ] **P3-31** ADR: catch-all route ordering and reserved prefixes.
+- [x] **P3-31** ADR: catch-all route ordering and reserved prefixes.
+  *2026-08-15 — [`ADR-0020` (D20)](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md).
+  Records the two failures that are actually distinct — a path an endpoint owns being matched by the
+  catch-all, which routing precedence already prevents, and a path an endpoint owns matching nothing
+  so the catch-all answers anyway, which it does not — and the four decisions that close them: map
+  last, refuse reserved prefixes with a bare 404, keep the prefix list in `Slugs.Reserved` alone, and
+  scope interactivity to `/admin`. Also records the two things a reader will otherwise trip over:
+  `/_blazor` is reserved but not mapped, and the scaffolding home page still owns `/`.*
 
 ### Acceptance criteria — Phase 3
 
-- [ ] **P3 #1** A published page is reachable at its URL by an anonymous request and renders its content.
-- [ ] **P3 #2** An unpublished page returns 404 to anonymous requests and renders in preview for an
+- [x] **P3 #1** A published page is reachable at its URL by an anonymous request and renders its content.
+  *2026-08-15 — `DeliveryTests.APublishedPageIsReachableAtItsUrlByAnAnonymousRequest`. Asserts the
+  document as well as the status: a doctype, the page's title, the template's own marker, and the
+  authored text — plus that `blazor.web.js` is **not** on the page, which is the static-SSR half of
+  [§5.3] and the precondition for output caching.*
+- [~] **P3 #2** An unpublished page returns 404 to anonymous requests and renders in preview for an
   editor.
-- [ ] **P3 #3** **After publishing, further draft edits do not change the anonymous response.**
-- [ ] **P3 #4** Changing a published page's slug 301s the old URL to the new one, for the page and all
+  *2026-08-15 — the anonymous half is met by
+  `DeliveryTests.AnUnpublishedPageReturnsNotFoundToAnAnonymousRequest`, and it is a 404 because the
+  published route the resolver looks up does not exist, not because of a check somebody could forget
+  to write. **The preview half waits on `P3-16`.***
+- [x] **P3 #3** **After publishing, further draft edits do not change the anonymous response.**
+  *2026-08-15 — `DeliveryTests.DraftEditsAfterAPublishDoNotChangeTheAnonymousResponse`, comparing the
+  two responses **byte for byte** across three intervening draft saves. The mechanism is in the SQL:
+  `PublishedContentService` projects through `page.PublishedVersion` and never mentions the draft, so
+  the draft row is not in the result set to be picked by mistake.*
+- [x] **P3 #4** Changing a published page's slug 301s the old URL to the new one, for the page and all
   descendants.
+  *2026-08-15 — the descendant cascade and the stored redirect rows were already asserted at the
+  service level by `P3-25`. `DeliveryTests.AChangedSlugRedirectsTheOldUrlPermanently` adds the half
+  that was missing: the endpoint actually serves them, with a 301 and the new `Location`.*
 - [x] **P3 #5** A redirect chain `A→B`, then `B→C`, is flattened to `A→C`; a cycle is refused at write
   time.
   *2026-08-14 — `RedirectServiceTests.AChainIsFlattenedOnWriteRatherThanWalkedOnEveryRequest` asserts
@@ -2015,18 +2204,39 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   redirect, two cannot. Nothing rewrote the payload — the id was always the stored value.
   **Rendering this through a component is P3-09**; what is asserted here is the resolution the
   renderer will call.*
-- [ ] **P3 #8** A template throwing inside one block renders the rest of the page and logs the failure
+- [x] **P3 #8** A template throwing inside one block renders the rest of the page and logs the failure
   with page id, zone key, and version id.
-- [ ] **P3 #9** An unknown field type key renders nothing, logs a warning, and does not throw.
+  *2026-08-15 — `CmsErrorBoundaryTests`. The isolation is asserted for all three shapes a renderer can
+  fail in (lifecycle, mid-`BuildRenderTree`, post-await) and at both levels, with a three-block list
+  whose middle block throws and whose siblings still render — the case a zone-level boundary alone
+  would fail. The log assertion is literal about the four facts, because a stack trace names a
+  component and not which of four hundred pages built on it was being rendered.*
+- [x] **P3 #9** An unknown field type key renders nothing, logs a warning, and does not throw.
+  *2026-08-15 — asserted in `P3-08` for the zone case and `P3-09` for the block-property case, and
+  extended here by `ReferenceContentTests.ABlockTypeNoComponentDeclaresIsSkippedAndItsSiblingsStill
+  Render`, which is the same rule one level down: the retired block is skipped and logged and the
+  list around it is unaffected.*
 - [ ] **P3 #10** A shareable preview link renders for an anonymous browser, expires on schedule, and is
   revocable; the token is not recoverable from the database.
-- [ ] **P3 #11** Unresolved URLs are recorded in `NotFoundLog` with an accurate hit count.
+- [x] **P3 #11** Unresolved URLs are recorded in `NotFoundLog` with an accurate hit count.
+  *2026-08-15 — `DeliveryTests.AnUnresolvedUrlIsRecordedOnceWithAnAccurateHitCount`: three requests
+  for one dead URL, one row, `HitCount` 3. One row per URL rather than one per request is what keeps
+  a crawler from making this the largest table on the site [§10.6].*
 
 **Exit gate — DEMO MILESTONE.** The full loop is demonstrable to a stakeholder: define a template →
 create a page → fill zones → save draft → preview → publish → view anonymously → edit draft → confirm
 the public page is unchanged → publish again. — [ ] met on ____
+*As of 2026-08-15 every step of that loop is built except **preview**, which is 3.3. Everything after
+it — publish, view anonymously, edit the draft, confirm the public page is unchanged — is asserted
+end to end by `DeliveryTests`.*
 
-**Risks:** R6 (catch-all route ordering), R7 (static SSR + `DynamicComponent`).
+**Risks:** ~~R6 (catch-all route ordering)~~ **closed 2026-08-15** — the catch-all is mapped last,
+reserved prefixes are refused from `Slugs.Reserved` alone, and `RouteOrderingTests` asserts the
+outcome for `/api`, `/admin`, `/Account/Login`, `/health`, `/alive`, and `/_framework`
+([ADR-0020](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md)).
+R7 (static SSR + `DynamicComponent`) closed at the Phase 0 gate on the S2 spike, and is now running
+in shipped code: `CmsPageHost` down through four levels of `DynamicComponent`, with no interactive
+render mode anywhere beneath it.
 
 ---
 
@@ -2766,10 +2976,10 @@ the checklist for verifying the delivered system against the original ask.
 | R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [ ] |
 | R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
 | R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
-| R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [ ] |
+| R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [x] 2026-08-15 |
 | R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [ ] |
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
-| R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [~] `P2 #4` met 2026-08-14; `P3 #3` awaits delivery |
+| R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [x] `P2 #4` 2026-08-14; `P3 #3` 2026-08-15 |
 | R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [ ] |
 | R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [ ] |
 | R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [ ] |
@@ -2781,8 +2991,8 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 
 | Gap | Item | Tasks | Done |
 |---|---|---|:--:|
-| #1 | URL management | P3-03, P3-04 | [ ] |
-| #2 | Redirects | P3-05, P3-06 | [ ] |
+| #1 | URL management | P3-03, P3-04 | [x] 2026-08-14 |
+| #2 | Redirects | P3-05, P3-06 | [x] 2026-08-15, serving over HTTP since P3-13 |
 | #3 | SEO metadata | P8-01…P8-03, P6-17 | [ ] |
 | #4 | `sitemap.xml` & `robots.txt` | P8-04, P8-05 | [ ] |
 | #5 | Scheduled publish/unpublish | P7-13…P7-16 | [ ] |
@@ -2846,8 +3056,8 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R3 | Sanitizer strips content editors legitimately need | Med | 1 | >3 editor complaints in the first month | Open |
 | R4 | Publish transaction leaves inconsistent state | **Critical** | 2 | Any occurrence — stop the line | Open |
 | R5 | Diff algorithm slow or noisy | Low | 2 | Diff over 2 s on a typical page | Open |
-| R6 | Catch-all route shadows framework/admin paths | High | 3 | Any framework path 404s in testing | Open |
-| R7 | `DynamicComponent` under static SSR misbehaves | High | 0/3 | S2 no-go | Open |
+| R6 | ~~Catch-all route shadows framework/admin paths~~ | — | 3 | **Closed 2026-08-15** — mapped last, reserved prefixes read from `Slugs.Reserved`, outcome asserted by `RouteOrderingTests` ([ADR-0020](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md)) | Closed |
+| R7 | ~~`DynamicComponent` under static SSR misbehaves~~ | — | 0/3 | **Closed** — S2 returned go at the Phase 0 gate; now running in shipped code through four levels of `DynamicComponent` (`P3-13`) | Closed |
 | R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | Open |
 | R9 | Testcontainers unreliable in CI | Med | 0 | Flake rate above 5% | Open |
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |

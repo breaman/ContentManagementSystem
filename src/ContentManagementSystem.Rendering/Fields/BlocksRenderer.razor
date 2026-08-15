@@ -1,10 +1,19 @@
 @inherits CmsFieldRendererBase
 @* Keyed by the block's own id, not by its position: that is what makes re-ordering a list move
    markup instead of rewriting every block in it. IsFixed because a block context is built once per
-   render and never replaced. *@
+   render and never replaced.
+
+   Each block gets its own boundary, which is the inner of the two levels spec section 15.3 asks for.
+   Without it, one block whose markup throws would be caught by the zone's boundary instead and take
+   every sibling in the list down with it — for a body zone, most of the page. *@
 @foreach (var block in Blocks)
 {
     <CascadingValue @key="block.Context.BlockId" Value="block.Context" IsFixed="true">
-        <DynamicComponent Type="block.ComponentType" Parameters="block.Parameters" />
+        <CmsErrorBoundary ZoneKey="@PropertyKey"
+                          Scope="CmsRenderScope.Block"
+                          BlockId="block.Context.BlockId"
+                          BlockTypeKey="@block.Context.BlockTypeKey">
+            <DynamicComponent Type="block.ComponentType" Parameters="block.Parameters" />
+        </CmsErrorBoundary>
     </CascadingValue>
 }

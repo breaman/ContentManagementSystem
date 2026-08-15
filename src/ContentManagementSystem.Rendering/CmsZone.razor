@@ -1,7 +1,14 @@
 @* Spec section 8.2: the template declares placement, and everything else is looked up at render
    time. A zone that resolved to no renderer emits nothing at all — no wrapper, no marker — so a
-   template's own markup decides what an empty zone looks like. *@
+   template's own markup decides what an empty zone looks like.
+
+   A zone that did resolve is rendered inside a boundary. It is the outer of the two levels: block
+   lists put a second boundary around each block, so the usual failure is isolated to one block and
+   this one catches what is left — a value-shaped renderer, or the block list renderer itself
+   (spec section 15.3). *@
 @if (RendererType is not null)
 {
-    <DynamicComponent Type="RendererType" Parameters="RendererParameters" />
+    <CmsErrorBoundary ZoneKey="@Name" Scope="CmsRenderScope.Zone">
+        <DynamicComponent Type="RendererType" Parameters="RendererParameters" />
+    </CmsErrorBoundary>
 }

@@ -142,7 +142,7 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
             Key = "featured",
             Name = "Featured article",
             FieldTypeKey = FieldTypeKeys.PageReference,
-            ConfigurationJson = """{"allowedTemplates":["article"]}""",
+            ConfigurationJson = """{"allowedTemplates":["news-story"]}""",
         };
 
         var landing = await _bench.AddTemplateAsync("landing", cancellationToken, zone);
@@ -187,11 +187,11 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
             Key = "featured",
             Name = "Featured article",
             FieldTypeKey = FieldTypeKeys.PageReference,
-            ConfigurationJson = """{"allowedTemplates":["article"]}""",
+            ConfigurationJson = """{"allowedTemplates":["news-story"]}""",
         };
 
         var landing = await _bench.AddTemplateAsync("landing", cancellationToken, zone);
-        var article = await _bench.AddTemplateAsync("article", cancellationToken);
+        var article = await _bench.AddTemplateAsync("news-story", cancellationToken);
 
         var home = await _bench.AddPageAsync(landing, "Home", cancellationToken);
         var story = await _bench.AddPageAsync(article, "A Story", cancellationToken);

@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Shared.Content;
 
 namespace ContentManagementSystem.Rendering;
@@ -55,6 +56,31 @@ public sealed class RenderContext
         // eventually be forgotten on one code path and leave a stale page live.
         CacheTags.Add(Rendering.CacheTags.Page(page.Id));
         CacheTags.Add(Rendering.CacheTags.Template(page.TemplateId));
+    }
+
+    /// <summary>
+    /// Builds a context around a loaded delivery result.
+    /// </summary>
+    /// <param name="content">What <c>IPublishedContentService</c> loaded.</param>
+    /// <param name="mode">Which audience the render is for.</param>
+    /// <returns>The context to hand <see cref="CmsPageHost"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="content"/> is null.</exception>
+    /// <remarks>
+    /// The one supported way to turn loaded content into a render, so that the three things that
+    /// have to travel together — the page facts, the payload, and the captured schema the payload
+    /// names — cannot be assembled from different sources by a caller in a hurry. A context built
+    /// with one version's payload and another's schema would render every value under bounds nobody
+    /// chose for it.
+    /// <para>
+    /// A fresh context, and therefore a fresh cache tag set, per call. The delivery result may come
+    /// out of a cache that is shared between requests; this must not.
+    /// </para>
+    /// </remarks>
+    public static RenderContext For(PublishedContent content, CmsRenderMode mode = CmsRenderMode.Live)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        return new RenderContext(RenderPage.From(content), content.Payload, mode, content.Schema);
     }
 
     /// <summary>The page version being rendered.</summary>
