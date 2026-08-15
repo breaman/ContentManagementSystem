@@ -57,8 +57,26 @@ public abstract class CmsFieldRendererBase : ComponentBase
     [CascadingParameter]
     public RenderContext Context { get; set; } = default!;
 
+    /// <summary>
+    /// The member the value-shaped field types store their content under.
+    /// </summary>
+    /// <remarks>
+    /// Part of the on-disk contract, mirrored from <c>FieldTypeBase</c> rather than referenced,
+    /// because the constant there is protected to its own hierarchy.
+    /// </remarks>
+    protected const string ValueMember = "value";
+
+    /// <summary>The member the list-shaped field types store their items under.</summary>
+    protected const string ItemsMember = "items";
+
     /// <summary>Whether there is a stored object to read at all.</summary>
     protected bool HasValue => Value.ValueKind is JsonValueKind.Object;
+
+    /// <summary>The stored <c>value</c> member, or null when it is absent or was cleared.</summary>
+    protected JsonElement? ValueElement => Member(ValueMember);
+
+    /// <summary>The stored <c>value</c> member as text, or null when it is absent or is not a string.</summary>
+    protected string? ValueText => StringMember(ValueMember);
 
     /// <summary>Reads a member of the stored value.</summary>
     /// <param name="name">The member name, such as <c>value</c> or <c>items</c>.</param>
@@ -73,4 +91,30 @@ public abstract class CmsFieldRendererBase : ComponentBase
     /// <returns>The string, or null when the member is absent or is not a string.</returns>
     protected string? StringMember(string name) =>
         Member(name) is { ValueKind: JsonValueKind.String } member ? member.GetString() : null;
+
+    /// <summary>Reads a list member of the stored value.</summary>
+    /// <param name="name">The member name, usually <see cref="ItemsMember"/>.</param>
+    /// <returns>The array, or null when the member is absent or holds something else.</returns>
+    /// <remarks>
+    /// A member that is present but is not an array reads as absent rather than as an error. The
+    /// validator has already reported the shape; repeating it on the delivery path would only turn
+    /// one editor-visible diagnostic into a log entry per request.
+    /// </remarks>
+    protected JsonElement? ArrayMember(string name) =>
+        Member(name) is { ValueKind: JsonValueKind.Array } member ? member : null;
+
+    /// <summary>Reads an integer identity member, such as a <c>mediaId</c> or a <c>pageId</c>.</summary>
+    /// <param name="name">The member name.</param>
+    /// <returns>The identity, or null when it is absent or is not a positive integer.</returns>
+    /// <remarks>
+    /// Positive is part of the question, not a separate check: every reference in the content model
+    /// is a server-assigned identity, so a zero or a negative number is a value nothing can resolve
+    /// and must not become a cache tag or an <c>href</c>.
+    /// </remarks>
+    protected int? IdMember(string name) =>
+        Member(name) is { ValueKind: JsonValueKind.Number } member &&
+        member.TryGetInt32(out var id) &&
+        id > 0
+            ? id
+            : null;
 }

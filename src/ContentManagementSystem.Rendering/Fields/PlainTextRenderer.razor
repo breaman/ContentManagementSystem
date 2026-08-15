@@ -1,0 +1,6 @@
+@inherits CmsFieldRendererBase
+@* Encoded by Razor, which is the whole of this field type's safety story: plainText stores exactly
+   what the author typed, including a literal '<', and nothing strips it on the way in. No wrapper
+   element — a headline zone sits inside the template's own <h1>, and a <span> nobody asked for
+   would have to be styled away on every site. *@
+@Text

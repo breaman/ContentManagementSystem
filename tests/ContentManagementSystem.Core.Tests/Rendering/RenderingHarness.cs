@@ -78,6 +78,8 @@ internal sealed class TestFieldRendererCatalog(params (string FieldTypeKey, Type
 
     public IReadOnlyCollection<string> FieldTypeKeys => _renderers.Keys;
 
+    public IReadOnlyCollection<string> FieldTypesWithNoRenderer => [];
+
     public bool TryGetRenderer(string fieldTypeKey, [NotNullWhen(true)] out Type? componentType)
     {
         componentType = null;

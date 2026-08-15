@@ -1,0 +1,7 @@
+@inherits CmsFieldRendererBase
+@* Same shape as the date renderer: the stored ISO instant as the machine-readable value, a reader's
+   version as the text. *@
+@if (Display is { Length: > 0 })
+{
+    <time class="cms-datetime" datetime="@Iso">@Display</time>
+}

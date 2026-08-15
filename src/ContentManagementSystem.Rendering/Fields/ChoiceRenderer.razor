@@ -1,0 +1,17 @@
+@inherits CmsFieldRendererBase
+@* One member holds both shapes, so the renderer branches on what is actually there rather than on
+   the 'multiple' setting — a property switched to single selection must still render the list a
+   page stored while it was multiple. *@
+@if (Single is { Length: > 0 })
+{
+    @Single
+}
+else if (Selected.Count > 0)
+{
+    <ul class="cms-choice">
+        @foreach (var option in Selected)
+        {
+            <li>@option</li>
+        }
+    </ul>
+}

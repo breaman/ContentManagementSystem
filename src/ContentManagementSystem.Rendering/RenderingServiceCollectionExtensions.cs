@@ -11,19 +11,21 @@ namespace ContentManagementSystem.Rendering;
 public static class RenderingServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the component catalog the render path resolves template and block keys through.
+    /// Registers the catalogs the render path resolves template, block, and field type keys through.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection, for chaining.</returns>
     /// <remarks>
     /// Call <c>AddCmsComponentScanning(...)</c> — directly, or through
     /// <c>AddCmsStructureReconciliation(...)</c> — to name the assemblies that declare the
-    /// components. Without it the catalog fails to resolve at startup rather than serving a site on
-    /// which every page reports an unknown template.
+    /// components, and <c>AddCmsFieldTypes()</c> for the field type registry the renderer catalog is
+    /// built from. Without either, the catalogs fail to resolve at startup rather than serving a
+    /// site on which every page reports an unknown template.
     /// <para>
-    /// A singleton, and the scan runs once when it is first resolved: the set of deployed components
-    /// cannot change without a restart, and scanning per request would put reflection on the
-    /// delivery path for an answer that never changes.
+    /// Both are singletons whose contents are computed once when they are first resolved: neither
+    /// the set of deployed components nor the set of registered field types can change without a
+    /// restart, and recomputing per request would put reflection on the delivery path for an answer
+    /// that never changes.
     /// </para>
     /// </remarks>
     public static IServiceCollection AddCmsRendering(this IServiceCollection services)
@@ -32,6 +34,7 @@ public static class RenderingServiceCollectionExtensions
 
         services.TryAddSingleton<CmsComponentScanner>();
         services.TryAddSingleton<ICmsComponentCatalog, CmsComponentCatalog>();
+        services.TryAddSingleton<IFieldRendererCatalog, FieldRendererCatalog>();
 
         return services;
     }

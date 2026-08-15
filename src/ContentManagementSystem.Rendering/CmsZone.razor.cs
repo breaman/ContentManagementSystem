@@ -1,7 +1,4 @@
-using System.Text.Json;
-
 using ContentManagementSystem.Shared.Content;
-using ContentManagementSystem.Shared.Contracts.Fields;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -80,7 +77,7 @@ public partial class CmsZone : ComponentBase
 
         var value = Context.Payload.GetZone(Name);
 
-        if (!TryGetFieldTypeKey(value, out var fieldTypeKey))
+        if (!FieldValueDispatch.TryGetFieldTypeKey(value, out var fieldTypeKey))
         {
             Logger.LogWarning(
                 "Zone '{ZoneKey}' on page {PageId} version {VersionId} stores no '{Member}' " +
@@ -107,42 +104,9 @@ public partial class CmsZone : ComponentBase
         }
 
         RendererType = renderer;
-        RendererParameters = new Dictionary<string, object?>(StringComparer.Ordinal)
-        {
-            [nameof(CmsFieldRendererBase.Value)] = value,
-            [nameof(CmsFieldRendererBase.PropertyKey)] = Name,
-            [nameof(CmsFieldRendererBase.Configuration)] = Configuration(fieldTypeKey),
-        };
+        RendererParameters = FieldValueDispatch.Parameters(
+            value,
+            Name,
+            FieldValueDispatch.Configuration(Context.Schema?.FindZone(Name), fieldTypeKey));
     }
-
-    private static bool TryGetFieldTypeKey(JsonElement value, out string fieldTypeKey)
-    {
-        fieldTypeKey = string.Empty;
-
-        if (value.ValueKind is not JsonValueKind.Object ||
-            !value.TryGetProperty(ContentPayloadMembers.Type, out var type) ||
-            type.ValueKind is not JsonValueKind.String)
-        {
-            return false;
-        }
-
-        fieldTypeKey = type.GetString() ?? string.Empty;
-
-        return fieldTypeKey.Length > 0;
-    }
-
-    /// <summary>
-    /// The configuration captured for this zone, but only when the schema agrees with the value
-    /// about what field type it is.
-    /// </summary>
-    /// <remarks>
-    /// The two disagree when a zone's field type was changed under stored content. Handing a
-    /// renderer the configuration of a different field type is worse than handing it none: the
-    /// settings would parse, and it would render with bounds and formats meant for something else.
-    /// </remarks>
-    private FieldConfiguration Configuration(string fieldTypeKey) =>
-        Context.Schema?.FindZone(Name) is { } zone &&
-        string.Equals(zone.FieldTypeKey, fieldTypeKey, StringComparison.Ordinal)
-            ? zone.Configuration
-            : FieldConfiguration.Empty;
 }

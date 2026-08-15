@@ -1,0 +1,11 @@
+@inherits CmsFieldRendererBase
+@* The line breaks the field type promised to preserve, turned into markup here rather than at write
+   time — a field whose whole contract is that it holds no markup must not have <br> stored in it. *@
+@for (var index = 0; index < Lines.Count; index++)
+{
+    if (index > 0)
+    {
+        <br />
+    }
+    @Lines[index]
+}

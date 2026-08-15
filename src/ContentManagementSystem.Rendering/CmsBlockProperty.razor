@@ -1,0 +1,7 @@
+@* The block-level counterpart of CmsZone: name a property, get whatever renderer the stored value
+   says can read it. Emits nothing at all when it resolves to nothing, so a block's own markup
+   decides what an unfilled property looks like. *@
+@if (RendererType is not null)
+{
+    <DynamicComponent Type="RendererType" Parameters="RendererParameters" />
+}

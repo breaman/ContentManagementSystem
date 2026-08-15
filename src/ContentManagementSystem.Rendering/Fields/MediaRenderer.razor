@@ -1,0 +1,8 @@
+@inherits CmsFieldRendererBase
+@* The spec section 15.3 placeholder: a missing media item renders its alt text, never a broken
+   <img>. Until P5 supplies the library, every item is "missing", which is why this is all there is
+   to see — the cache tag the code-behind adds is the half that has to be right now. *@
+@if (MediaId is { } mediaId)
+{
+    <span class="cms-media cms-media-placeholder" data-media-id="@mediaId">@Alt</span>
+}

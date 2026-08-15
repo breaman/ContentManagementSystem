@@ -161,6 +161,10 @@ try
     // Runs the reconciliation and then the schema sync, in that order, once at startup.
     builder.Services.AddHostedService<CmsStructureStartupService>();
 
+    // Builds the render-path catalogs while starting, so a component or renderer that cannot be
+    // resolved is a deployment-time failure rather than a page-time one (task P3-09).
+    builder.Services.AddHostedService<CmsRenderingStartupService>();
+
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
 

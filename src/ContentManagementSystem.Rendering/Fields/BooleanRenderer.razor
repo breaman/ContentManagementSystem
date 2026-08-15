@@ -1,0 +1,8 @@
+@inherits CmsFieldRendererBase
+@* The machine-readable answer is the data-value attribute; the text is for a reader. Both, because
+   a boolean zone rendered on its own has to say something, and markup that wants the switch rather
+   than the words reads it from the block instead. *@
+@if (State is { } state)
+{
+    <span class="cms-boolean" data-value="@(state ? "true" : "false")">@(state ? "Yes" : "No")</span>
+}

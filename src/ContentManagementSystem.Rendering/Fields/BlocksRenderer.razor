@@ -1,0 +1,10 @@
+@inherits CmsFieldRendererBase
+@* Keyed by the block's own id, not by its position: that is what makes re-ordering a list move
+   markup instead of rewriting every block in it. IsFixed because a block context is built once per
+   render and never replaced. *@
+@foreach (var block in Blocks)
+{
+    <CascadingValue @key="block.Context.BlockId" Value="block.Context" IsFixed="true">
+        <DynamicComponent Type="block.ComponentType" Parameters="block.Parameters" />
+    </CascadingValue>
+}

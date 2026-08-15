@@ -1,0 +1,5 @@
+@inherits CmsFieldRendererBase
+@* Markup, so it goes out as a MarkupString — which is exactly why the code-behind puts every path
+   through the sanitizer first (ADR 0008). Nothing reaches this line that has not been through the
+   active profile's allowlist on this request. *@
+@Html

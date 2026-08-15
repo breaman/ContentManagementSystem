@@ -1,0 +1,14 @@
+@inherits CmsFieldRendererBase
+@* Each item goes through the single-media renderer rather than through a copy of its markup, so the
+   gallery and the single picker cannot drift — and so P5 fills in the picture in one place. *@
+@if (Items.Count > 0)
+{
+    <ul class="cms-media-list">
+        @foreach (var item in Items)
+        {
+            <li>
+                <MediaRenderer Value="item" PropertyKey="@PropertyKey" Configuration="Configuration" />
+            </li>
+        }
+    </ul>
+}

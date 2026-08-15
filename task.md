@@ -4,12 +4,14 @@
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3 is
 under way**: section 3.1 routing is finished — `PageRoute`, `Redirect`, `NotFoundLog`, and
 `PreviewToken` with migration #4, `UrlService`, `RedirectService`, `IRouteResolver`, `ILinkResolver`,
-the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2) has
-started: `P3-08` put the pipeline's spine in place — `RenderContext` with its accumulating cache
-tags, `CmsZone`, `CmsPageHost`, the component base classes, and the component catalog. Field
-renderers (`P3-09`), reference templates, delivery, and preview are next.
+the redirect API and its CSV pair — meeting `P3 #5`, `P3 #6`, and `P3 #7`. Rendering (3.2) is
+half built: `P3-08` put the pipeline's spine in place — `RenderContext` with its accumulating cache
+tags, `CmsZone`, `CmsPageHost`, the component base classes, and the component catalog — and `P3-09`
+filled it in with a renderer for every field type, the catalog mapping keys to them, the startup
+check over it, and `CmsBlockProperty` so a block's structured properties reach a renderer at all.
+Reference templates (`P3-10`), the error boundaries, delivery, and preview are next.
 **Version:** 1.0
-**Last updated:** 2026-08-14
+**Last updated:** 2026-08-15
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -58,14 +60,14 @@ and record the date in the progress table.
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
-| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 11 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering under way (`P3-08`) | — |
+| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 12 | 22.5 | Routing complete (`P3-01`–`P3-07`); rendering under way (`P3-08`, `P3-09`) | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **92** | **203.5** | | |
+| **v1 total** | **281** | **93** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1847,13 +1849,70 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   build of these components failed with a wall of `RZ1021` and bogus `CS` errors in untouched files;
   it is a poisoned Razor build server on SDK 10.0.301, not the markup. `dotnet build-server shutdown`
   and rebuild.*
-- [ ] **P3-09** Field renderer components in `Rendering/Fields/` for every Phase 1 field type. — 2 ed
+- [x] **P3-09** Field renderer components in `Rendering/Fields/` for every Phase 1 field type. — 2 ed
   *Carries the renderer half of [`ADR-0014`](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md):
   built-in field types answer null for `RendererComponent`, so this task builds the catalog that maps
   a field type key to its renderer, plus the **startup check that every registered field type
   resolves to one**. Without that check a forgotten registration is invisible until someone looks at
   the page — delivery treats a missing renderer the same way it treats an unknown field type key,
   rendering nothing and logging [§15.3]. Editors are the mirror image in `P6`.*
+  *2026-08-15 — all eighteen, plus `BuiltInFieldRenderers` (the key → component table ADR-0014 says
+  the hosting layer must own) and `FieldRendererCatalog`. **The catalog is built from the field type
+  registry, not from that table**, which is what makes it describe this deployment: a field type
+  somebody removed has no renderer, so content authored against it renders nothing and logs, exactly
+  as [§15.3] requires. Seeding from the table instead would keep rendering values whose field type
+  was deliberately retired. Each field type is asked for its own renderer first and answered for only
+  when it declines, so an extension author above `Rendering` in the reference graph needs no entry
+  anywhere. `CmsRenderingStartupService` resolves both catalogs while the host starts — a declaration
+  on a non-component becomes a deployment-time throw rather than a production request — and **reports
+  a field type with no renderer rather than throwing**: unlike a duplicate key it has a defensible
+  outcome and every other page is unaffected, so what had to be fixed was it being silent.*
+  ***One task-shaped gap this had to close first.*** A block's structured properties had no way to
+  reach a renderer at all — `CmsBlockBase.Text` covers the text-shaped ones and nothing covered an
+  image, a link, or nested blocks — so `P3-10` could not have exercised every field type inside a
+  block. Added `CmsBlockProperty`, the block-level `CmsZone`, fed by a `BlockRenderContext` the
+  `blocks` renderer cascades around each item; the zone and block dispatch now share one
+  `FieldValueDispatch`, since a zone and a block property are the same thing at render time exactly
+  as they are at validation time.
+  ***Cache tags are the half of `media` and `reusable` that is finished, and deliberately so.*** P5
+  and P4 own the picture and the item store, but a page rendered before them would be invisible to
+  invalidation forever — nothing goes back and re-renders it — so `media:{id}` and `ru:{id}` are
+  declared now, against things that do not exist yet. `link` and `pageReference` tag `page:{id}`
+  **including ids that fail to resolve**, because a reference to a page that is not published yet
+  must re-render when it is. Media renders [§15.3]'s placeholder-with-alt-text, which is already the
+  right answer for an item nothing can resolve.
+  *Six decisions worth knowing before someone reports one as a bug. **`json` renders nothing,
+  silently** — it is developer-only data for a block's markup to read, and a "useful" default grows
+  into printing authored data inside a `<script>` block; it is not logged because it is intended,
+  unlike everything else that renders nothing. **`number` is emitted exactly as stored**, so
+  precision survives and no page depends on the server's culture. **`date` and `dateTime` format
+  under `InvariantCulture`**, and a `dateTime` is shown in UTC and says so — a cached page is served
+  to everybody and cannot be built from anything that varies by reader. **`color` carries
+  `data-color` and never an inline `style`**, which would be the one place [§20.5]'s CSP had to be
+  relaxed for authored content. **`choice` and `pageReference` branch on the shape that is stored,
+  not on the `multiple` setting**, because a property narrowed to single selection still has pages
+  holding arrays. And **`html`'s renderer is `RawHtmlRenderer`**: `HtmlRenderer` is already
+  `Microsoft.AspNetCore.Components.Web`'s, and a collision inside a `.razor` file resolves to
+  whichever `@using` came last.*
+  ***Sanitization runs again on render, on all three paths*** (ADR-0008) — markdown through the one
+  `IMarkdownRenderer` so preview and delivery stay byte-identical, HTML rich text under the
+  configured profile, `html` under `Developer`. `link` re-applies the scheme allowlist too, because
+  the field type's write-time check does not cover rows that arrived by import or restore, and
+  `javascript:` in an `href` is stored XSS. An unrecognised `profile` falls back to `Basic`: a
+  mistyped setting may only ever strip more than intended.
+  ***One bug the Server suite caught that no unit test could.*** `FieldRendererCatalog` had two
+  public constructors — one over the registry, one over an explicit `IEnumerable<IFieldType>` for
+  tests — and the container registers every field type as `IFieldType`, so both were resolvable,
+  neither was a superset, and **the host refused to start** with an ambiguous-constructor error that
+  named constructors rather than renderers. The test path is now the static `For(...)`. Worth
+  recording because the same shape will recur on any catalog built over a registered collection.
+  *58 new tests in `Core.Tests/Rendering/` (132 across the folder), driven through `CmsZone` and the
+  real catalog rather than by instantiating components — a value reaching the wrong renderer and a
+  renderer drawing the wrong thing look identical on the page. The one asserted for every field type
+  is that a malformed, absent, or stale value renders nothing and never throws. `Core.Tests` 1154
+  green; `Server.Tests` 216 of 217, the one failure being `VersionAndDiffTests.RetentionKeepsWhat
+  AnEditorWouldBeUpsetToLose`, **which fails identically on a clean checkout of `main`** and is
+  unrelated to rendering.*
 - [ ] **P3-10** Two reference templates in `Rendering/Templates/` and three reference block types in
   `Rendering/Blocks/`, between them exercising every field type. — 2 ed
 - [ ] **P3-11** Per-zone error boundaries and the full fallback matrix from [§15.3]: unknown template

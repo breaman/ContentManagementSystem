@@ -1,0 +1,8 @@
+@inherits CmsFieldRendererBase
+@* data-color rather than an inline style attribute: the site's stylesheet decides what a colour
+   looks like, and emitting style="" from stored content would be the one place the CSP has to be
+   loosened for authored data. *@
+@if (Color is { Length: > 0 })
+{
+    <span class="cms-color" data-color="@Color">@Color</span>
+}

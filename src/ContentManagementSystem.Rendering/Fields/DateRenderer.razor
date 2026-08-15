@@ -1,0 +1,7 @@
+@inherits CmsFieldRendererBase
+@* <time> so the machine-readable value survives alongside the human-readable one. The datetime
+   attribute is the stored ISO text itself rather than a re-formatting of it. *@
+@if (Display is { Length: > 0 })
+{
+    <time class="cms-date" datetime="@Iso">@Display</time>
+}

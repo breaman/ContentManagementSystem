@@ -7,9 +7,8 @@ namespace ContentManagementSystem.Rendering;
 /// (spec section 15.2, ADR-0014).
 /// </summary>
 /// <remarks>
-/// The seam exists here, in the infrastructure, because <see cref="CmsZone"/> is what dispatches
-/// through it; the renderers themselves and the startup check that every registered field type
-/// resolves to one are task <c>P3-09</c>.
+/// The seam exists here, in the infrastructure, because <see cref="CmsZone"/> and
+/// <see cref="CmsBlockProperty"/> are what dispatch through it.
 /// <para>
 /// <c>IFieldType.RendererComponent</c> is <c>Type?</c> and the built-in field types answer null:
 /// <c>Core</c> sits below <c>Rendering</c> in the reference graph and cannot name a component, so
@@ -20,6 +19,17 @@ public interface IFieldRendererCatalog
 {
     /// <summary>Every field type key that has a renderer.</summary>
     IReadOnlyCollection<string> FieldTypeKeys { get; }
+
+    /// <summary>
+    /// The registered field types that resolve to no renderer at all.
+    /// </summary>
+    /// <remarks>
+    /// Read at startup and reported, because that is the only moment the omission is visible before
+    /// a reader finds it. At render time the condition is indistinguishable from an unknown field
+    /// type key and is treated the same way — nothing rendered, a warning logged — but by then the
+    /// page is already missing content that nobody was told about (spec section 15.3).
+    /// </remarks>
+    IReadOnlyCollection<string> FieldTypesWithNoRenderer { get; }
 
     /// <summary>Finds the renderer for a field type.</summary>
     /// <param name="fieldTypeKey">The field type key stored on the value, such as <c>richText</c>.</param>

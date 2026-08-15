@@ -1,0 +1,12 @@
+@inherits CmsFieldRendererBase
+@* A link that resolved to somewhere is an anchor; a link that did not degrades to its own text
+   rather than to a dead href (spec section 15.3). Null attributes are omitted by Blazor, so an
+   unset target or rel leaves no empty attribute behind. *@
+@if (Href is { Length: > 0 })
+{
+    <a href="@Href" class="@CssClass" target="@Target" rel="@Rel">@Text</a>
+}
+else if (Text is { Length: > 0 })
+{
+    @Text
+}

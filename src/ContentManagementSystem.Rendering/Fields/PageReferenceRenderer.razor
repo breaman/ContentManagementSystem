@@ -1,0 +1,16 @@
+@inherits CmsFieldRendererBase
+@* One reference renders as a bare anchor; several render as a list. The single case is deliberately
+   not a one-item list — a "related article" placed in a sentence must not drag a <ul> into it. *@
+@if (Targets.Count == 1)
+{
+    <a href="@Targets[0].Url" class="@CssClass(Targets[0])">@Targets[0].Title</a>
+}
+else if (Targets.Count > 1)
+{
+    <ul class="cms-page-references">
+        @foreach (var target in Targets)
+        {
+            <li><a href="@target.Url" class="@CssClass(target)">@target.Title</a></li>
+        }
+    </ul>
+}
