@@ -1,5 +1,6 @@
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
+using ContentManagementSystem.Shared.Contracts.Preview;
 using ContentManagementSystem.Shared.Contracts.Structure;
 
 namespace ContentManagementSystem.Shared.Services;
@@ -133,5 +134,42 @@ public interface IPageClient
     Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Lists the shareable preview links issued for a page, newest first.</summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while loading.</param>
+    /// <remarks>
+    /// Revoked and expired links are in the list. The screen's most common question is not "which
+    /// links work" but "why did the one I sent stop working", and only a list that keeps them can
+    /// answer it.
+    /// </remarks>
+    Task<IReadOnlyList<PreviewTokenSummary>> GetPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Issues a shareable preview link.
+    /// </summary>
+    /// <param name="request">Which version, for how long, and how many views.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>The link, including the secret — which is returned once and never again.</returns>
+    Task<StructureClientResult<IssuedPreviewToken>> IssuePreviewTokenAsync(
+        CreatePreviewTokenRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Revokes one preview link.</summary>
+    /// <param name="tokenId">Identity of the token row.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    Task<StructureClientResult<PreviewTokenSummary>> RevokePreviewTokenAsync(
+        int tokenId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Revokes every live preview link for a page.</summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>How many links were revoked.</returns>
+    Task<StructureClientResult<int>> RevokeAllPreviewTokensAsync(
+        int id,
         CancellationToken cancellationToken = default);
 }

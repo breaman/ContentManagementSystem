@@ -83,7 +83,14 @@ public sealed class CmsPageRenderer(
             return output.ToHtmlString();
         });
 
-        metrics.RecordPageRender(content.TemplateKey, Stopwatch.GetElapsedTime(started));
+        // Only the public render is measured. `cms.page.render.duration` answers "what does the
+        // public site cost", and preview traffic is a handful of editors rendering deliberately
+        // unusual versions — folding it in would move the percentiles of a series that is watched
+        // for regressions, in a direction nobody could attribute (spec section 24.1).
+        if (mode is CmsRenderMode.Live)
+        {
+            metrics.RecordPageRender(content.TemplateKey, Stopwatch.GetElapsedTime(started));
+        }
 
         return new RenderedPage(html, context.CacheTags.ToArray());
     }

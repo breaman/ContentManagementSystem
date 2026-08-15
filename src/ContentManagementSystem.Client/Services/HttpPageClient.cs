@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
+using ContentManagementSystem.Shared.Contracts.Preview;
 using ContentManagementSystem.Shared.Contracts.Structure;
 using ContentManagementSystem.Shared.Services;
 
@@ -174,6 +175,53 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
             $"{Base}/pages/{id}/versions/{versionId}/restore",
             body: null,
             cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PreviewTokenSummary>> GetPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        await GetAsync<List<PreviewTokenSummary>>(
+            $"{Base}/preview-tokens?pageId={id}",
+            cancellationToken) ?? [];
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<IssuedPreviewToken>> IssuePreviewTokenAsync(
+        CreatePreviewTokenRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<CreatePreviewTokenRequest, IssuedPreviewToken>(
+            HttpMethod.Post,
+            $"{Base}/preview-tokens",
+            request,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<PreviewTokenSummary>> RevokePreviewTokenAsync(
+        int tokenId,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<object, PreviewTokenSummary>(
+            HttpMethod.Delete,
+            $"{Base}/preview-tokens/{tokenId}",
+            body: null,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<int>> RevokeAllPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendAsync<object, RevokedCount>(
+            HttpMethod.Delete,
+            $"{Base}/preview-tokens?pageId={id}",
+            body: null,
+            cancellationToken);
+
+        return result.IsSuccess
+            ? StructureClientResult<int>.Success(result.Value!.Revoked, result.Warnings)
+            : StructureClientResult<int>.Failure(result.Errors, result.Warnings);
+    }
+
+    /// <summary>The body of a bulk revocation, which returns a count rather than a resource.</summary>
+    private sealed record RevokedCount(int Revoked);
 
     /// <summary>Reads a resource, treating "not there" as null rather than as a fault.</summary>
     private async Task<T?> GetAsync<T>(string path, CancellationToken cancellationToken)

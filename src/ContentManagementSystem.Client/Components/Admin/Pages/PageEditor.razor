@@ -144,6 +144,11 @@ else
             }
         </AuthorizeView>
 
+        @* target="_blank" on purpose: preview is a look at another version, not a place to be
+           navigated to — an editor who lost their unsaved form to it would not use it twice. *@
+        <a class="btn btn-outline-secondary" href="@($"/preview/{Id}")" target="_blank"
+           rel="noopener">Preview draft</a>
+        <a class="btn btn-outline-secondary" href="@($"/admin/pages/{Id}/preview-links")">Preview links</a>
         <a class="btn btn-outline-secondary" href="@($"/admin/pages/{Id}/versions")">Version history</a>
     </div>
 }

@@ -1,10 +1,12 @@
 using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Preview;
 using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
+using ContentManagementSystem.Shared.Contracts.Preview;
 using ContentManagementSystem.Shared.Contracts.Structure;
 using ContentManagementSystem.Shared.Services;
 
@@ -19,6 +21,7 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="versions">History and restore.</param>
 /// <param name="diffs">Version comparison.</param>
 /// <param name="templates">Templates, and the revision snapshots the editor form is built from.</param>
+/// <param name="previews">Shareable preview links.</param>
 /// <remarks>
 /// Used during pre-rendering, so a page screen arrives with its content already in the HTML rather
 /// than showing a spinner until the WebAssembly runtime finishes downloading. It calls the services
@@ -35,7 +38,8 @@ public sealed class ServerPageClient(
     IPublishingService publishing,
     IVersionService versions,
     IContentDiffService diffs,
-    ITemplateService templates) : IPageClient
+    ITemplateService templates,
+    IPreviewTokenService previews) : IPageClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<PageTreeNode>> GetTreeAsync(
@@ -137,6 +141,30 @@ public sealed class ServerPageClient(
         int versionId,
         CancellationToken cancellationToken = default) =>
         Project(await versions.RestoreAsync(id, versionId, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PreviewTokenSummary>> GetPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        (await previews.ListAsync(id, cancellationToken)).Value ?? [];
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<IssuedPreviewToken>> IssuePreviewTokenAsync(
+        CreatePreviewTokenRequest request,
+        CancellationToken cancellationToken = default) =>
+        Project(await previews.IssueAsync(request, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<PreviewTokenSummary>> RevokePreviewTokenAsync(
+        int tokenId,
+        CancellationToken cancellationToken = default) =>
+        Project(await previews.RevokeAsync(tokenId, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<int>> RevokeAllPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Project(await previews.RevokeAllAsync(id, cancellationToken));
 
     /// <summary>
     /// Folds a service result into the shape the screens read.

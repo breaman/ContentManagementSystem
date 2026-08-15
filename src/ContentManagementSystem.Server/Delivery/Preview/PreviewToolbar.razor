@@ -1,0 +1,34 @@
+@* The floating bar spec section 12.1 asks for: version label, status, and exit — plus the device
+   widths of spec section 12.3, which are plain links rather than buttons so that nothing here needs
+   a render mode, a circuit, or a byte of JavaScript. *@
+<div class="cms-preview-toolbar" role="region" aria-label="Preview controls">
+    <div class="cms-preview-toolbar__identity">
+        <span class="cms-preview-toolbar__badge">Preview</span>
+        <span class="cms-preview-toolbar__title">@Chrome.Version.Title</span>
+        @* Parenthesised: Razor reads a bare `@` that follows a letter as part of an email address
+           and emits it literally, so `v@Chrome.Version…` renders as its own source. *@
+        <span class="cms-preview-toolbar__version">v@(Chrome.Version.VersionNumber)</span>
+        <span class="@StatusCssClass">@StatusLabel</span>
+    </div>
+
+    <nav class="cms-preview-toolbar__devices" aria-label="Preview width">
+        @foreach (var device in PreviewDevices.All)
+        {
+            <a href="@Chrome.UrlFor(device)"
+               class="@DeviceCssClass(device)"
+               aria-current="@(device == Chrome.Device ? "page" : null)"
+               title="@PreviewDevices.WidthLabel(device)">@PreviewDevices.Label(device)</a>
+        }
+    </nav>
+
+    <div class="cms-preview-toolbar__exit">
+        @if (Expiry is { Length: > 0 } expiry)
+        {
+            <span class="cms-preview-toolbar__expiry">@expiry</span>
+        }
+        @if (Chrome.ExitUrl is { Length: > 0 } exit)
+        {
+            <a href="@exit" class="cms-preview-toolbar__exit-link">Exit preview</a>
+        }
+    </div>
+</div>

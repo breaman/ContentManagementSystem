@@ -1,18 +1,23 @@
 # Content Management System — Implementation Task List
 
 **Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
-`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3 is
-under way**: sections 3.1 routing and **3.2 rendering are both finished**. Routing gave us
+`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3's three
+sections are all finished**: 3.1 routing, 3.2 rendering, and now **3.3 preview**. Routing gave us
 `PageRoute`, `Redirect`, `NotFoundLog`, and `PreviewToken` with migration #4, `UrlService`,
 `RedirectService`, `IRouteResolver`, `ILinkResolver`, and the redirect API with its CSV pair.
-Rendering now runs end to end: the pipeline spine and every field renderer (`P3-08`, `P3-09`), two
+Rendering runs end to end: the pipeline spine and every field renderer (`P3-08`, `P3-09`), two
 reference templates and three reference block types placing every field type (`P3-10`), error
 boundaries per zone and per block with the whole [§15.3] fallback matrix (`P3-11`),
 `PublishedContentService` (`P3-12`), and the catch-all delivery endpoint with its CMS 404 page and
-`NotFoundLog` writing (`P3-13`) — so **a published page is now reachable by an anonymous visitor at
-its real URL**. That meets `P3 #1`, `#3`, `#4`, `#5`, `#6`, `#7`, `#8`, `#9`, and `#11`, and the
-anonymous half of `#2`. **Preview (3.3) is what remains**, along with the perf harness (`P3-27`),
-visual regression (`P3-29`), and Q8.
+`NotFoundLog` writing (`P3-13`) — so **a published page is reachable by an anonymous visitor at its
+real URL**. Preview now closes the loop: `PreviewContentService` loads any version through the
+identical pipeline, `/preview/{pageId}` serves an authenticated editor a toolbar and a device frame
+(`P3-16`, `P3-21`), `PreviewTokenService` issues hashed bearer links (`P3-17`), `/preview/s/{token}`
+serves them to an anonymous stakeholder under a rate limit (`P3-18`), the management API and the
+revocation screen manage them (`P3-19`), and an unpublished link target resolves to its draft and is
+badged inside preview alone (`P3-20`). That meets **every Phase 3 acceptance criterion**, `#1`
+through `#11`. What is left in the phase is the perf harness (`P3-27`), visual regression (`P3-29`),
+and Q8 (`P3-30`) — none of which are on the exit gate's demo path.
 **Version:** 1.0
 **Last updated:** 2026-08-15
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -63,14 +68,14 @@ and record the date in the progress table.
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
-| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 21 | 22.5 | Routing and rendering complete (`P3-01`–`P3-15`); preview (3.3) remains | — |
+| [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **102** | **203.5** | | |
+| **v1 total** | **281** | **109** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -2062,19 +2067,158 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 
 ### 3.3 Preview — 4.5 ed
 
-- [ ] **P3-16** `GET /preview/{pageId}?version=` in `Server/Delivery/Preview/` — authenticated, renders
+**Complete 2026-08-15.** One thing [§12.3] lists that this section has no task for, recorded so it is
+not lost by being between two lists: **compare mode** — published and draft side by side. The
+comparison an editor actually makes is served today by the version diff of `P2-14` at
+`/admin/pages/{id}/versions`, which compares any two versions and preselects published against draft.
+A rendered side-by-side is a different thing and would belong in `P6` with the rest of the authoring
+experience; it is not a Phase 3 acceptance criterion and nothing here waits on it.
+
+- [x] **P3-16** `GET /preview/{pageId}?version=` in `Server/Delivery/Preview/` — authenticated, renders
   **any** version through the shared rendering path, output cache disabled, `X-Robots-Tag: noindex`,
   floating preview toolbar (version label, status, exit) [§12.1]. — 1.5 ed
-- [ ] **P3-17** `PreviewToken` entity + hashed-token issuance/validation in `Core/Preview/`: 32 bytes
+  *2026-08-15 — `PreviewContentService` in `Core/Preview/` plus `PreviewEndpoint`, `PreviewChrome`,
+  `CmsPreviewDocument`, and `PreviewToolbar` in `Server/Delivery/Preview/`, mapped by
+  `MapCmsPreview()` before the catch-all. Requires `Content.Read`, which is the permission that
+  already means "may see unpublished content" [§21.1], enforced by a **policy** rather than only in a
+  service: there is no service call on the refusal path here to make the check in.*
+  ***The chrome and the page are two documents, and that is the task's real content.*** The toolbar
+  lives in an outer document and the page is rendered into an `iframe` by the same `CmsPageRenderer`,
+  the same `CmsDeliveryDocument`, and the same components that serve an anonymous visitor. There is
+  no "but this is a preview" branch anywhere below, so preview fidelity is a property of the code
+  rather than a promise somebody has to keep up [§12.1] — and it is what gives `P3-21` a real
+  viewport to constrain. A toolbar injected into the rendered markup would have been the one
+  difference between preview and delivery, sitting in the middle of the thing preview verifies.
+  ***`PreviewContentService` is a separate service from `PublishedContentService`, deliberately.***
+  The whole value of the published one is that its projection selects through
+  `page.PublishedVersion` and never mentions the draft, which is what makes `P3 #3` a property of the
+  SQL; an "include drafts" flag on it would put the draft row back into the result set of the query
+  the public site runs, one boolean away from being served [§20.1]. **It also authorizes nothing** —
+  two callers reach it and prove their right to be there in completely different ways, so a check in
+  there would have to be satisfiable by the anonymous path, which means bypassable, which means not a
+  check.
+  *Three smaller decisions. **Headers are applied on entry to every handler**, not at each write, so
+  a path that returns early — including every refusal — cannot be the one that forgets `no-store` or
+  `X-Robots-Tag`; the failure being prevented is not one cached preview but an unpublished page in a
+  shared cache, which nothing the CMS does can evict. **`/preview` is excluded from
+  `UseStatusCodePagesWithReExecute`**, the same fix `P1-21` made for `/api`: preview writes its own
+  refusal documents ("this link has expired", "this preview is no longer available"), which are the
+  whole of what a stakeholder with no account has to go on, and re-executing a body-less 403 through
+  the site's error page reported it as a 404 besides. And **`cms.page.render.duration` now records
+  only `Live` renders** — preview traffic is a handful of editors rendering deliberately unusual
+  versions, and folding it in would move the percentiles of a series watched for regressions, in a
+  direction nobody could attribute.*
+- [x] **P3-17** `PreviewToken` entity + hashed-token issuance/validation in `Core/Preview/`: 32 bytes
   CSPRNG, base64url, **only the SHA-256 hash stored**, default 7-day expiry (max 30), `MaxUses`,
   revocation [§12.2]. — 1 ed
-- [ ] **P3-18** `GET /preview/s/{token}` anonymous shareable preview; serves exactly one page version,
+  *2026-08-15 — the entity shipped with migration #4 in `P3-01`; this is `PreviewTokens` (the secret)
+  and `PreviewTokenService` (issue, list, revoke, revoke-in-bulk, check, redeem). Issuing needs
+  **`Content.Edit`, not `Content.Publish`**: sharing work for review is the ordinary act of whoever
+  is doing the work, and a link that needed the publish permission would mean an author could not get
+  their own draft looked at, which is the entire feature [§21.1].*
+  ***The hash is taken over the decoded bytes, not the encoded string.*** base64url has spellings
+  that differ as text and decode identically, so hashing the string would make one secret hash to
+  several values and the lookup would depend on which spelling a mail client passed through. Pinned
+  by a test that asserts the two are different, because the symptom is a link that issues
+  successfully and never works — with nothing left to compare against, since the token is stored
+  nowhere.
+  ***Validating and recording a use are one operation, and there are two entry points on purpose.***
+  `RedeemAsync` re-states the `MaxUses` guard *inside* the `ExecuteUpdate`, so two simultaneous
+  requests for a single-use link do not both pass — which is the whole meaning of a single-use link.
+  `CheckAsync` is the non-consuming half the chrome uses: **a use is a view of the content, not a
+  request for the furniture around it**, and a `MaxUses = 1` link that spent its one view on the
+  toolbar would never show anybody a page.
+  *Four smaller decisions. **Shape is checked before the database is asked**, so a crawler walking
+  `/preview/s/{anything}` is answered without a query — the cheap half of `P3-18`'s rate limit.
+  **A revoked token and a token that never existed get one answer**, because confirming that a string
+  was once real narrows the search for anybody probing and the person holding a revoked link has to
+  go back to whoever sent it either way. **A recycled page is a distinct outcome**, reached with
+  `IgnoreQueryFilters`, because "this preview is no longer available" and "this link is invalid" send
+  the reviewer to different people — and the use is *not* spent on it, so the link still works if the
+  page comes back. **An expiry over thirty days is refused rather than clamped**: a link somebody
+  believes lasts a year and which actually lasts thirty days is a support ticket on day thirty-one,
+  and the request is the last moment the misunderstanding is visible.*
+  ***One thing the spec's wording overpromises, now recorded in the contract.*** Pinning a version id
+  stops a link following the page to a *different* version, however many times it publishes. It
+  cannot freeze the draft, because the draft is the one version a page is allowed to keep editing
+  [§11.1] — so a link shared against the draft shows the latest save. Both behaviours are useful and
+  the sender chooses between them by picking a version; `ALinkSharingTheDraftFollowsTheDraftRow`
+  asserts it rather than leaving it to be discovered.
+- [x] **P3-18** `GET /preview/s/{token}` anonymous shareable preview; serves exactly one page version,
   always `noindex, nofollow`, excluded from `sitemap.xml`, rate-limited. — 0.5 ed
-- [ ] **P3-19** `POST /preview-tokens`, `GET /preview-tokens?pageId=`, `DELETE /preview-tokens/{id}` +
+  *2026-08-15 — two routes (`/preview/s/{token}` and `/preview/s/{token}/content`) sharing every line
+  of the editor path except how the caller proved they may be there. **The version is carried by the
+  token and never by the query string**, so nothing in the URL a reviewer holds can be edited to
+  reach a different one — which is what "serves exactly one page version" has to mean.*
+  ***Rate limiting is a fixed window partitioned by address, 60 requests a minute, on these two
+  routes alone.*** Anonymous by design means there is no account to key on; an unknown address falls
+  into one shared bucket rather than being exempt, because unlimited is the wrong side to fail on for
+  a link that reads unpublished content. `429`, not the framework's default `503`: a link being
+  clicked too fast is the client's problem to slow down about, and `503` tells every intermediary the
+  site itself is unhealthy. A limiter in front of the whole site would be a denial-of-service tool
+  pointed at its own visitors, and `TheSharedPreviewIsRateLimitedAndTheRestOfTheSiteIsNot` asserts
+  both halves.
+  ***`sitemap.xml` exclusion needed no code, and that is the point.*** The Phase 8 sitemap is built
+  from published `PageRoute` rows; a preview URL is a token or a page id under a reserved prefix and
+  is not a route. The exclusion is structural, which is the only kind that survives somebody writing
+  the sitemap generator without having read the preview code. Recorded in `PreviewEndpoint`'s remarks
+  so the reader who goes looking for the filter finds out why there isn't one.
+  *Status codes are part of the contract here: `410 Gone` for a link that worked and has stopped —
+  expired or used up — and `404` for one that never worked or whose page is gone. The difference is
+  what an intermediary is told, and what the person reading is told to do next.*
+- [x] **P3-19** `POST /preview-tokens`, `GET /preview-tokens?pageId=`, `DELETE /preview-tokens/{id}` +
   revocation UI. — 0.5 ed
-- [ ] **P3-20** Draft-link resolution inside preview — an internal link to an unpublished page resolves
+  *2026-08-15 — four endpoints (the three above plus `DELETE /preview-tokens?pageId=` for the bulk
+  revocation [§12.2] asks for), and `/admin/pages/{id}/preview-links` over an extended `IPageClient`.
+  **`DELETE` revokes; it does not delete.** The row is stamped and kept, because "this link was
+  revoked on the 3rd, by this person" is the answer somebody needs when a stakeholder reports that a
+  link stopped working — and it is the only record of who could once read an unpublished page, which
+  a verb that removed the row would destroy at the exact moment it starts mattering.*
+  ***The secret has no member to travel on.*** `PreviewTokenSummary` carries no token, so the list
+  and the revoke responses could not leak it even if a caller wanted them to;
+  `IssuedPreviewToken` exists only as the body of the creating response. `NoResponseButTheCreating
+  OneEverCarriesTheSecret` asserts that against the **raw** response text rather than through the
+  typed shape, since deserializing into a record with no token member would hide a token that was on
+  the wire.
+  *The screen is built around the one thing that cannot be undone — the secret is shown once, and the
+  banner says so rather than leaving somebody to find out by closing the tab. Revoked and expired
+  links stay in the table: the question it is opened to answer is usually "why did the link I sent
+  stop working", and a list that filtered them out could only answer "there is no such link", which
+  reads as a bug in the CMS rather than as an expiry.*
+- [x] **P3-20** Draft-link resolution inside preview — an internal link to an unpublished page resolves
   to *that page's* draft, clearly badged [§12.3]. — 0.5 ed
-- [ ] **P3-21** Device-width preview frame (desktop/tablet/mobile) via a width-constrained iframe. — 0.5 ed
+  *2026-08-15 — the resolution half already existed: `ILinkResolver.ResolveAsync` takes
+  `includeUnpublished`, `LinkRenderer` and `PageReferenceRenderer` pass `Context.IsPreview`, and
+  `P3-07` made "is published" and "has a URL" deliberately different questions. What this task found
+  missing was the **badge**, and the fix is the interesting part.*
+  ***`cms-link-draft` was a class and nothing more, which is not "clearly badged".*** The document a
+  reader sees is the delivery document, styled by the *site's* stylesheet — written by whoever built
+  the site, and knowing nothing about the CMS's class names. A badge that were only a class would
+  therefore be invisible on every deployment nobody had told to add a rule for it. `CmsDraftBadge`
+  emits visible text inside the anchor, so a screen reader announces "Enterprise, draft" and a sighted
+  reviewer sees it whatever the stylesheet does; the class stays, for a site that wants to style it.
+  *A component rather than a string in two renderers, so the wording, the class, and the tooltip are
+  one decision. Asserted three ways: a draft target is badged, a **published** one is not (a badge on
+  everything says nothing, and a reviewer would stop reading it within a page), and a mixed
+  `pageReference` list badges exactly its unpublished entry. The end-to-end case is in
+  `PreviewTests` — the same link, at the same moment, resolving to `/unreleased-section` with a badge
+  in preview and to plain text with no URL on the live page.*
+- [x] **P3-21** Device-width preview frame (desktop/tablet/mobile) via a width-constrained iframe. — 0.5 ed
+  *2026-08-15 — `?device=desktop|tablet|mobile`, three CSS classes in `wwwroot/css/preview.css`, and
+  the toolbar's buttons are **plain links**. That keeps the whole preview chrome static SSR: no render
+  mode, no circuit, and not a byte of JavaScript on a document whose job is to show what a reader
+  would see.*
+  ***The constraint is on the `iframe`, which is why the frame exists at all.*** An iframe's width
+  *is* the viewport its content reads, so a media query inside behaves as it would on the device. A
+  `div` with a `max-width` would make the layout narrow while leaving every breakpoint reporting the
+  desktop width — a preview that agrees with the real thing right up until the moment it matters.
+  *Two smaller decisions. **The device is not passed down to the framed page**: if it were, a page
+  could render differently inside preview, which is the one thing preview must not permit. And **an
+  unreadable value falls back rather than failing** — the parameter is a view preference in a URL
+  people paste to each other, and a mangled one must produce a preview at the default width, not an
+  error page. The widths are classes rather than inline styles because authored content already
+  renders under a policy that forbids those [§20.5], and the preview chrome must not be the one page
+  that needs the policy relaxed.*
 
 ### Tests — Phase 3
 
@@ -2123,7 +2267,24 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   before ever reaching a URL collision — which is itself worth recording: **the only way two pages
   can collide on a URL without being siblings is an explicit URL**, so that is the case the URL
   check exists for and the case the tests now use.*
-- [ ] **P3-26** Integration: preview-token expiry, revocation, and non-recoverability from the database.
+- [x] **P3-26** Integration: preview-token expiry, revocation, and non-recoverability from the database.
+  *2026-08-15 — `Server.Tests/Delivery/PreviewTests`, 23 tests over the real HTTP pipeline against
+  SQL Server, plus `Api/Cms/PreviewTokenApiTests` (5) for the management contract and
+  `Core.Tests/Preview/PreviewTokensTests` (8) for the secret itself. Content is arranged through the
+  real page, draft, and publishing services, then requested with a client carrying an editor's roles
+  for the authenticated path and **no identity at all** for the shared-link one.*
+  *The three the task names: **expiry** advances the fake clock to six days (still good) and then to
+  eight (`410 Gone`) — a link that expired immediately would pass an assertion that only checked the
+  second half; **revocation** asserts the link stops working *and* that the row survives it; and
+  **non-recoverability** reads the stored row and asserts the column is 32 bytes that are neither the
+  token nor any encoding of it, then asserts it really is `SHA-256` of the token, so the first
+  assertion is not passing vacuously.*
+  *Beyond the wording: a version belonging to another page is refused under this page's URL (the pair
+  is the address), `Content.Read` is required and `MediaManager` is refused, a single-use link is
+  spent by the content request and not by the chrome, a recycled page answers "no longer available"
+  without spending a use, and the rate limit answers `429` while the rest of the site is untouched.
+  `PreviewTests` needed one addition to `PageWorkbench`: `CreateClient` now takes roles, since these
+  are the first tests where the **endpoint policy** rather than the service check is what refuses.*
 - [ ] **P3-27** Performance benchmark harness for page render, with CI regression thresholds (starts
   here per the plan's cross-cutting performance workstream).
   *Baselines from the spikes, both **excluding** database access — treat them as the floor, not a
@@ -2172,12 +2333,15 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   document as well as the status: a doctype, the page's title, the template's own marker, and the
   authored text — plus that `blazor.web.js` is **not** on the page, which is the static-SSR half of
   [§5.3] and the precondition for output caching.*
-- [~] **P3 #2** An unpublished page returns 404 to anonymous requests and renders in preview for an
+- [x] **P3 #2** An unpublished page returns 404 to anonymous requests and renders in preview for an
   editor.
   *2026-08-15 — the anonymous half is met by
   `DeliveryTests.AnUnpublishedPageReturnsNotFoundToAnAnonymousRequest`, and it is a 404 because the
   published route the resolver looks up does not exist, not because of a check somebody could forget
-  to write. **The preview half waits on `P3-16`.***
+  to write. The preview half is `PreviewTests.AnUnpublishedPageRendersInPreviewForAnEditor`, which
+  asserts **both at once**: the same page, at the same moment, is a 404 to a client with no identity
+  and readable to one carrying an editor's roles. Asserting them together is what makes it a
+  statement about the page rather than two statements about two fixtures.*
 - [x] **P3 #3** **After publishing, further draft edits do not change the anonymous response.**
   *2026-08-15 — `DeliveryTests.DraftEditsAfterAPublishDoNotChangeTheAnonymousResponse`, comparing the
   two responses **byte for byte** across three intervening draft saves. The mechanism is in the SQL:
@@ -2216,8 +2380,17 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
   extended here by `ReferenceContentTests.ABlockTypeNoComponentDeclaresIsSkippedAndItsSiblingsStill
   Render`, which is the same rule one level down: the retired block is skipped and logged and the
   list around it is unaffected.*
-- [ ] **P3 #10** A shareable preview link renders for an anonymous browser, expires on schedule, and is
+- [x] **P3 #10** A shareable preview link renders for an anonymous browser, expires on schedule, and is
   revocable; the token is not recoverable from the database.
+  *2026-08-15 — four tests in `PreviewTests`, one per clause. **Renders for an anonymous browser**:
+  the client carries no cookie, no role header, and no identity of any kind — the token is the whole
+  of its authority. **Expires on schedule**: still good at six days, `410 Gone` at eight.
+  **Revocable**: individually and in bulk, with the row kept and stamped both times.
+  **Not recoverable**: the stored column is 32 bytes that are neither the token nor any encoding of
+  it, and separately are exactly `SHA-256` of it — so whoever can read that table holds a hash and no
+  way to turn it back into a working link. `PreviewTokenApiTests` adds the client's side of the same
+  question: no response but the creating one ever carries the secret, asserted against raw response
+  text rather than through a typed shape that has no member to put it in.*
 - [x] **P3 #11** Unresolved URLs are recorded in `NotFoundLog` with an accurate hit count.
   *2026-08-15 — `DeliveryTests.AnUnresolvedUrlIsRecordedOnceWithAnAccurateHitCount`: three requests
   for one dead URL, one row, `HitCount` 3. One row per URL rather than one per request is what keeps
@@ -2225,10 +2398,15 @@ URLs, and drafts are previewable but invisible. **22.5 ed** · Entry: Phase 2 ex
 
 **Exit gate — DEMO MILESTONE.** The full loop is demonstrable to a stakeholder: define a template →
 create a page → fill zones → save draft → preview → publish → view anonymously → edit draft → confirm
-the public page is unchanged → publish again. — [ ] met on ____
-*As of 2026-08-15 every step of that loop is built except **preview**, which is 3.3. Everything after
-it — publish, view anonymously, edit the draft, confirm the public page is unchanged — is asserted
-end to end by `DeliveryTests`.*
+the public page is unchanged → publish again. — [~] every step built and asserted **2026-08-15**;
+the demonstration itself has not been performed.
+*Every step of the loop now exists and is covered end to end by automated tests against SQL Server
+over real HTTP: the structure API for the template, `PageApiTests` for creation and zone filling,
+`DraftAndPublishTests` for the draft, **`PreviewTests` for preview**, and `DeliveryTests` for the
+publish, the anonymous view, the draft edit that changes nothing, and the second publish. What is
+open is only the demo: nobody has yet sat a stakeholder in front of it and walked the ten steps,
+which is what this gate actually asks for. Nothing is known to be missing — but "a test asserts it"
+and "a person watched it work" are different claims, and this gate makes the second one.*
 
 **Risks:** ~~R6 (catch-all route ordering)~~ **closed 2026-08-15** — the catch-all is mapped last,
 reserved prefixes are refused from `Slugs.Reserved` alone, and `RouteOrderingTests` asserts the
@@ -2977,7 +3155,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
 | R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
 | R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [x] 2026-08-15 |
-| R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [ ] |
+| R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [x] 2026-08-15 |
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
 | R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [x] `P2 #4` 2026-08-14; `P3 #3` 2026-08-15 |
 | R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [ ] |
@@ -2998,7 +3176,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #5 | Scheduled publish/unpublish | P7-13…P7-16 | [ ] |
 | #6 | Approval workflow | P7-08…P7-12 | [ ] |
 | #7 | Granular permissions | P7-01…P7-07 | [ ] |
-| #8 | Shareable preview links | P3-17…P3-19 | [ ] |
+| #8 | Shareable preview links | P3-17…P3-19 | [x] 2026-08-15 |
 | #9 | Version diff & rollback | P2-13, P2-14 | [ ] |
 | #10 | Soft delete & recycle bin | P2-08, P6-28 | [ ] |
 | #11 | HTML sanitization / XSS defense | P1-18…P1-20, P9-06 | [ ] |

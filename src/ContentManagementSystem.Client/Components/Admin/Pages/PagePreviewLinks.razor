@@ -1,0 +1,152 @@
+@page "/admin/pages/{Id:int}/preview-links"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Preview
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Preview links</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <a href="@($"/admin/pages/{Id}")">← Back to the page</a>
+</nav>
+
+<h1>Preview links</h1>
+<p class="text-body-secondary">
+    A shareable link lets somebody with no account read one version of this page. Only a hash of the
+    link is stored, so it can be revoked but never recovered — if it is lost, issue a new one.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="That did not work" />
+
+@if (Issued is not null)
+{
+    <div class="alert alert-success" role="status">
+        <p class="fw-semibold mb-1">Copy this link now. It is not shown again.</p>
+        <p class="font-monospace text-break mb-1">@Issued.Url</p>
+        <p class="mb-0 small">
+            Shows v@Issued.Summary.VersionNumber, expires
+            @Issued.Summary.ExpiresOn.UtcDateTime.ToString("d MMM yyyy HH:mm") UTC.
+        </p>
+    </div>
+}
+
+<AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+    <section class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Issue a link</h2>
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="form-floating">
+                        <select id="version" class="form-select" @bind="NewVersionId">
+                            <option value="0">Current draft</option>
+                            @foreach (var version in Versions ?? [])
+                            {
+                                <option value="@version.Id">v@version.VersionNumber — @version.Status</option>
+                            }
+                        </select>
+                        <label for="version">Version to share</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-floating">
+                        <input id="days" type="number" min="1" max="30" class="form-control"
+                               placeholder="7" @bind="NewExpiryDays" />
+                        <label for="days">Days (max 30)</label>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="form-floating">
+                        <input id="maxUses" type="number" min="1" class="form-control"
+                               placeholder="Unlimited" @bind="NewMaxUses" />
+                        <label for="maxUses">Max views</label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-floating">
+                        <input id="notes" class="form-control" placeholder="Who is this for?"
+                               @bind="NewNotes" />
+                        <label for="notes">Shared with (note)</label>
+                    </div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-primary mt-3" disabled="@IsBusy" @onclick="IssueAsync">
+                Issue link
+            </button>
+        </div>
+    </section>
+</AuthorizeView>
+
+@if (Tokens is null)
+{
+    <p role="status">Loading links…</p>
+}
+else if (Tokens.Count == 0)
+{
+    <p>No preview links have been issued for this page.</p>
+}
+else
+{
+    <table class="table">
+        <caption>@Tokens.Count link(s), newest first. Revoked and expired links are kept as a record.</caption>
+        <thead>
+            <tr>
+                <th scope="col">Version</th>
+                <th scope="col">State</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Views</th>
+                <th scope="col">Shared with</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var token in Tokens)
+            {
+                <tr>
+                    <th scope="row">v@token.VersionNumber</th>
+                    <td>
+                        @if (token.IsActive)
+                        {
+                            <span class="badge text-bg-success">Live</span>
+                        }
+                        else if (token.RevokedOn is { } revoked)
+                        {
+                            <span class="badge text-bg-secondary">
+                                Revoked @revoked.UtcDateTime.ToString("d MMM yyyy")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-light text-dark">Expired or used up</span>
+                        }
+                    </td>
+                    <td>@token.ExpiresOn.UtcDateTime.ToString("d MMM yyyy HH:mm") UTC</td>
+                    <td>@token.UseCount@(token.MaxUses is { } max ? $" of {max}" : string.Empty)</td>
+                    <td>@token.Notes</td>
+                    <td>
+                        <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                            @if (token.RevokedOn is null)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                        disabled="@IsBusy" @onclick="() => RevokeAsync(token.Id)">
+                                    Revoke
+                                </button>
+                            }
+                        </AuthorizeView>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+        @if (HasLiveTokens)
+        {
+            <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
+                    @onclick="RevokeAllAsync">
+                Revoke every live link
+            </button>
+        }
+    </AuthorizeView>
+}

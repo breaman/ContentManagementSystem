@@ -1,0 +1,10 @@
+@* The badge spec section 12.3 asks for on a link whose target is not published.
+
+   Text, not a coloured square. The document this appears in is styled by the site's own stylesheet,
+   which is written by whoever built the site and knows nothing about the CMS's class names — so a
+   badge that was only a class would be invisible on every deployment that had not been told to add
+   a rule for it, which is the one place "clearly badged" cannot afford to be optional.
+
+   Inside the anchor, so a screen reader announces "Enterprise, draft" rather than reading the words
+   apart from the link they qualify. *@
+<span class="cms-draft-badge" title="This page has not been published. Only preview can reach it.">draft</span>

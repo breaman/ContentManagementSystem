@@ -15,6 +15,7 @@ using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
+using ContentManagementSystem.Server.Delivery.Preview;
 using ContentManagementSystem.Server.HealthChecks;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
@@ -127,6 +128,10 @@ try
     // The read-only public delivery path (tasks P3-12 and P3-13): the published-content service and
     // the component renderer the catch-all endpoint serves pages through.
     builder.Services.AddCmsDeliveryEndpoint();
+    // Preview (tasks P3-16 to P3-19). It renders through the delivery pipeline registered above and
+    // differs only in which version it loads, which is what makes preview fidelity structural
+    // (spec section 12.1). Also registers the rate limiter the shared-link routes require.
+    builder.Services.AddCmsPreviewEndpoint();
 
     // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
     // instruments is not enough on its own: an unlisted meter records measurements that no exporter
@@ -216,14 +221,26 @@ try
     // body, so it qualifies for re-execution, and re-running a JSON POST through a component
     // endpoint replaced it with an unrelated 400 about the content type. An API client must see the
     // status its request actually produced.
+    //
+    // Preview is excluded for the same reason, one surface along. It writes its own documents for
+    // every refusal — "this link has expired", "this preview is no longer available" — which are the
+    // whole of what a stakeholder with no account has to go on, and re-executing a body-less 403
+    // through the site's error page reported it as a 404 besides.
     app.UseWhen(
-        context => !context.Request.Path.StartsWithSegments(CmsApiEndpoints.ApiPathPrefix),
+        context => !context.Request.Path.StartsWithSegments(CmsApiEndpoints.ApiPathPrefix) &&
+                   !context.Request.Path.StartsWithSegments(PreviewEndpoint.BasePath),
         branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
     app.UseHttpsRedirection();
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
+
+    // After authorization, so the limiter reads the endpoint's policy metadata. Only the shared
+    // preview routes opt in; everything else is unlimited, because a limiter in front of the whole
+    // site is a denial-of-service tool pointed at its own visitors.
+    app.UseRateLimiter();
+
     app.MapStaticAssets();
 
     app.MapRazorComponents<App>()
@@ -232,6 +249,10 @@ try
 
     app.MapAdditionalIdentityEndpoints();
     app.MapCmsApi();
+
+    // Before the catch-all, like every other route. /preview is a reserved first segment
+    // (Slugs.Reserved), so no page can ever be published at one of these addresses.
+    app.MapCmsPreview();
 
     // Last, and it must stay last (task P3-13, spec section 15.1). This is the catch-all that serves
     // every content URL, and anything mapped after it is a route a visitor could shadow with a page

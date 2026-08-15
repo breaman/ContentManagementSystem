@@ -58,6 +58,12 @@ public class PageScreenAccessibilityTests
             new() { ["Id"] = FakePageClient.Id },
             "before the big rewrite"
         },
+        {
+            "preview links",
+            typeof(PagePreviewLinks),
+            new() { ["Id"] = FakePageClient.Id },
+            "Sent to the agency"
+        },
     };
 
     [Theory]

@@ -96,11 +96,22 @@ public sealed class PageWorkbench : IAsyncDisposable
     /// irrelevant to public delivery, which authorizes nothing, but it would be wrong to write an
     /// authorization test through this client.
     /// </remarks>
-    public HttpClient CreateClient(bool followRedirects = true) =>
-        _factory.CreateClient(new WebApplicationFactoryClientOptions
+    public HttpClient CreateClient(bool followRedirects = true, params string[] roles)
+    {
+        var client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = followRedirects,
         });
+
+        // No roles means no identity at all rather than an identity holding nothing — the two
+        // produce different status codes, and the preview suite asserts on that difference.
+        if (roles.Length > 0)
+        {
+            client.DefaultRequestHeaders.Add(TestAuthHandler.RolesHeader, string.Join(',', roles));
+        }
+
+        return client;
+    }
 
     /// <summary>
     /// Creates a workbench over a freshly migrated database.

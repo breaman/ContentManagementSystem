@@ -1,5 +1,6 @@
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
+using ContentManagementSystem.Shared.Contracts.Preview;
 using ContentManagementSystem.Shared.Contracts.Structure;
 using ContentManagementSystem.Shared.Services;
 
@@ -212,6 +213,60 @@ public sealed class FakePageClient : IPageClient
         Task.FromResult(StructureClientResult<DraftState>.Success(
             new DraftState(id, DraftVersionId, 5, "{}", "marketing-landing", 3, "AAAAAAAAB9M=",
                 DateTimeOffset.UtcNow)));
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Three links, in the three states the screen renders differently — live, revoked, and expired.
+    /// A fixture with only live rows would leave two of the three badge branches out of the markup
+    /// axe inspects, which is the whole reason this class is varied rather than minimal.
+    /// </remarks>
+    public Task<IReadOnlyList<PreviewTokenSummary>> GetPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PreviewTokenSummary>>(
+        [
+            new PreviewTokenSummary(
+                31, id, DraftVersionId, 5, "Draft", DateTimeOffset.UtcNow.AddDays(-1), 1,
+                DateTimeOffset.UtcNow.AddDays(6), null, 2, null, true, "Sent to the agency"),
+            new PreviewTokenSummary(
+                32, id, DraftVersionId, 5, "Draft", DateTimeOffset.UtcNow.AddDays(-4), 1,
+                DateTimeOffset.UtcNow.AddDays(3), 1, 1, DateTimeOffset.UtcNow.AddDays(-2), false,
+                "Revoked after the review"),
+            new PreviewTokenSummary(
+                33, id, PublishedVersionId, 4, "Published", DateTimeOffset.UtcNow.AddDays(-40), 1,
+                DateTimeOffset.UtcNow.AddDays(-10), null, 7, null, false, null),
+        ]);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<IssuedPreviewToken>> IssuePreviewTokenAsync(
+        CreatePreviewTokenRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Task.FromResult(StructureClientResult<IssuedPreviewToken>.Success(
+            new IssuedPreviewToken(
+                new PreviewTokenSummary(
+                    34, request.PageId, DraftVersionId, 5, "Draft", DateTimeOffset.UtcNow, 1,
+                    DateTimeOffset.UtcNow.AddDays(7), request.MaxUses, 0, null, true, request.Notes),
+                "not-a-real-token",
+                "/preview/s/not-a-real-token")));
+    }
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<PreviewTokenSummary>> RevokePreviewTokenAsync(
+        int tokenId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<PreviewTokenSummary>.Success(
+            new PreviewTokenSummary(
+                tokenId, Id, DraftVersionId, 5, "Draft", DateTimeOffset.UtcNow.AddDays(-1), 1,
+                DateTimeOffset.UtcNow.AddDays(6), null, 2, DateTimeOffset.UtcNow, false, null)));
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<int>> RevokeAllPreviewTokensAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<int>.Success(1));
 
     private static PageSummary Summary(
         int id,

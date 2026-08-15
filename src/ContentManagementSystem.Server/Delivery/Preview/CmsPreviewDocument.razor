@@ -1,0 +1,25 @@
+@* The outer preview document: toolbar, and a width-constrained frame holding the page itself.
+
+   It carries no @@rendermode, no blazor.web.js and no ImportMap, exactly like the delivery document
+   it wraps — the device buttons are links and the toolbar is static markup, so there is nothing here
+   that needs a circuit. Serving the backoffice shell would download the editor into a frame whose
+   only job is to show what a reader would see. *@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Preview — @Chrome.Version.Title</title>
+    @* Belt and braces with the X-Robots-Tag header the endpoint sets: the header covers the
+       response, this covers a copy somebody saves or a crawler that only reads markup. *@
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="/css/site.css" />
+    <link rel="stylesheet" href="/css/preview.css" />
+</head>
+<body class="cms-preview">
+<PreviewToolbar Chrome="Chrome" />
+<div class="@Chrome.ViewportCssClass">
+    <iframe class="cms-preview-frame" src="@Chrome.ContentUrl" title="Page preview"></iframe>
+</div>
+</body>
+</html>

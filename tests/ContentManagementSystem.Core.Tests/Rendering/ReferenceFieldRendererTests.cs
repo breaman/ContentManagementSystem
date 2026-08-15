@@ -68,6 +68,49 @@ public class ReferenceFieldRendererTests : IDisposable
     }
 
     [Fact]
+    public void ADraftTargetIsBadgedWithVisibleTextRatherThanOnlyAClass()
+    {
+        // Task P3-20. The framed page is styled by the *site's* stylesheet, written by whoever built
+        // the site and knowing nothing about the CMS's class names — so a badge that were only a
+        // class would be invisible on every deployment nobody had told about it, which is the one
+        // place spec section 12.3's "clearly badged" cannot be left optional.
+        var preview = _harness.Render(
+            """{"type":"link","kind":"page","pageId":46,"text":"Coming soon"}""",
+            mode: CmsRenderMode.Preview);
+
+        preview.Should().Contain("cms-draft-badge").And.Contain(">draft<");
+    }
+
+    [Fact]
+    public void APublishedTargetIsNotBadgedInPreview()
+    {
+        // The other half, and the one that fails silently: a badge on everything says nothing, and a
+        // reviewer who saw it on every link would stop reading it within a page.
+        var preview = _harness.Render(
+            """{"type":"link","kind":"page","pageId":44,"text":"Get started"}""",
+            mode: CmsRenderMode.Preview);
+
+        preview.Should().Contain("href=\"/about\"")
+            .And.NotContain("cms-draft-badge")
+            .And.NotContain("cms-link-draft");
+    }
+
+    [Fact]
+    public void APageReferenceListBadgesOnlyItsUnpublishedEntries()
+    {
+        // The same rule one level up. A list is where the mistake actually gets made: a reviewer
+        // reads six related articles and has no way to tell which two are not live yet.
+        var markup = _harness.Render(
+            """{"type":"pageReference","value":[44,46]}""",
+            mode: CmsRenderMode.Preview);
+
+        markup.Should().Contain("/about").And.Contain("/drafts/unreleased");
+
+        System.Text.RegularExpressions.Regex.Matches(markup, "cms-draft-badge")
+            .Should().HaveCount(1, "only the unpublished entry is a draft");
+    }
+
+    [Fact]
     public void ALinkToAPageThatNoLongerExistsRendersItsTextAndLogs()
     {
         // A dead href puts a 404 in front of a reader; rendering nothing removes a sentence's words.

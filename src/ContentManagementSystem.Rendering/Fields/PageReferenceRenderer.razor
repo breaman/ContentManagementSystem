@@ -1,16 +1,34 @@
 @inherits CmsFieldRendererBase
 @* One reference renders as a bare anchor; several render as a list. The single case is deliberately
-   not a one-item list — a "related article" placed in a sentence must not drag a <ul> into it. *@
+   not a one-item list — a "related article" placed in a sentence must not drag a <ul> into it.
+
+   The draft badge is only ever reachable in preview, where an unpublished target resolves to its
+   draft URL; on the public site the same target resolves to nothing and is dropped from the output
+   entirely (spec section 12.3). *@
 @if (Targets.Count == 1)
 {
-    <a href="@Targets[0].Url" class="@CssClass(Targets[0])">@Targets[0].Title</a>
+    <a href="@Targets[0].Url" class="@CssClass(Targets[0])">
+        @Targets[0].Title
+        @if (!Targets[0].IsPublished)
+        {
+            <CmsDraftBadge />
+        }
+    </a>
 }
 else if (Targets.Count > 1)
 {
     <ul class="cms-page-references">
         @foreach (var target in Targets)
         {
-            <li><a href="@target.Url" class="@CssClass(target)">@target.Title</a></li>
+            <li>
+                <a href="@target.Url" class="@CssClass(target)">
+                    @target.Title
+                    @if (!target.IsPublished)
+                    {
+                        <CmsDraftBadge />
+                    }
+                </a>
+            </li>
         }
     </ul>
 }

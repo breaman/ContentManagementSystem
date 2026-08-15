@@ -4,7 +4,15 @@
    unset target or rel leaves no empty attribute behind. *@
 @if (Href is { Length: > 0 })
 {
-    <a href="@Href" class="@CssClass" target="@Target" rel="@Rel">@Text</a>
+    <a href="@Href" class="@CssClass" target="@Target" rel="@Rel">
+        @Text
+        @* Only reachable in preview: the public path never resolves an unpublished target, so there
+           is no anchor for a badge to sit in (spec section 12.3). *@
+        @if (IsDraft)
+        {
+            <CmsDraftBadge />
+        }
+    </a>
 }
 else if (Text is { Length: > 0 })
 {
