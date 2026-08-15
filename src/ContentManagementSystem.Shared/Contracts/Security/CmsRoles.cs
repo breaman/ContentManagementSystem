@@ -20,6 +20,23 @@ public static class CmsRoles
     /// </remarks>
     public const string StructureEditors = $"{Administrator},{Developer}";
 
+    /// <summary>
+    /// The roles that may open the backoffice's content screens, as an <c>[Authorize(Roles = …)]</c>
+    /// list.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors <see cref="CmsPermissions.ContentRead"/>. See <see cref="StructureEditors"/> for why
+    /// these lists exist at all and why the authoritative check is elsewhere.
+    /// </remarks>
+    public const string ContentReaders =
+        $"{Administrator},{Developer},{Editor},{Author},{Approver},{Viewer}";
+
+    /// <summary>The roles that may create and edit drafts. Mirrors <see cref="CmsPermissions.ContentEdit"/>.</summary>
+    public const string ContentEditors = $"{Administrator},{Developer},{Editor},{Author},{Approver}";
+
+    /// <summary>The roles that may publish. Mirrors <see cref="CmsPermissions.ContentPublish"/>.</summary>
+    public const string ContentPublishers = $"{Administrator},{Developer},{Editor},{Approver}";
+
     /// <summary>Everything, including user and role management.</summary>
     public const string Administrator = "Administrator";
 

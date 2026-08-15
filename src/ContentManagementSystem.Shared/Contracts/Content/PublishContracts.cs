@@ -3,6 +3,26 @@ using ContentManagementSystem.Shared.Contracts.Api;
 namespace ContentManagementSystem.Shared.Contracts.Content;
 
 /// <summary>
+/// Body of <c>POST /api/cms/v1/pages/{id}/publish</c>.
+/// </summary>
+/// <param name="AcknowledgeWarnings">
+/// Whether the caller has seen the non-blocking diagnostics and still wants to proceed.
+/// </param>
+/// <remarks>
+/// Defaults to <see langword="false"/>, and an omitted body means the same thing. A first attempt
+/// carrying warnings is refused with <c>422</c> and the warnings in it; the client shows them and
+/// resubmits with this set (spec section 22.2). The point is that an unattended caller — a scheduled
+/// job, a script — cannot publish past a problem a person would have stopped to look at.
+/// <para>
+/// A flag rather than spec section 22.2's <c>acknowledgedWarnings</c> array of codes. Listing codes
+/// looks more precise and is not: the set of warnings can change between the check and the publish,
+/// so a client would be acknowledging a list it may no longer be looking at, and the honest question
+/// is whether a person saw the warnings this attempt produced.
+/// </para>
+/// </remarks>
+public sealed record PublishPageRequest(bool AcknowledgeWarnings = false);
+
+/// <summary>
 /// What a dry-run publish check found, as <c>POST /pages/{id}/validate</c> returns it.
 /// </summary>
 /// <param name="CanPublish">Whether a publish attempted now would be accepted.</param>
@@ -46,3 +66,14 @@ public sealed record PublishResult(
     int? ArchivedVersionNumber,
     int ReferenceCount,
     IReadOnlyList<ApiDiagnostic> Warnings);
+
+/// <summary>
+/// What an unpublish retired.
+/// </summary>
+/// <param name="PageId">Page retired from the public site.</param>
+/// <param name="UnpublishedVersionNumber">
+/// The version that stopped being served. Reported rather than answering with no content, so the
+/// confirmation can name what visitors will no longer see instead of only saying that something
+/// happened.
+/// </param>
+public sealed record UnpublishResult(int PageId, int UnpublishedVersionNumber);

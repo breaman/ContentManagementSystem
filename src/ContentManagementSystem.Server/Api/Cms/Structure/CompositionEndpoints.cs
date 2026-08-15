@@ -46,37 +46,37 @@ public static class CompositionEndpoints
             .WithName("CreateComposition")
             .WithSummary("Creates a shared property group.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         compositions.MapPut("/{id:int}", UpdateAsync)
             .WithName("UpdateComposition")
             .WithSummary("Updates a composition's editor-facing metadata.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         compositions.MapDelete("/{id:int}", DeleteAsync)
             .WithName("DeleteComposition")
             .WithSummary("Deletes a composition. Refused while any block type composes it.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         compositions.MapPost("/{id:int}/properties", CreatePropertyAsync)
             .WithName("CreateCompositionProperty")
             .WithSummary("Adds a property and recuts every block type composing the group.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         compositions.MapPut("/{id:int}/properties/{propertyId:int}", UpdatePropertyAsync)
             .WithName("UpdateCompositionProperty")
             .WithSummary("Updates a property. Its key and field type cannot change.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         compositions.MapDelete("/{id:int}/properties/{propertyId:int}", DeletePropertyAsync)
             .WithName("DeleteCompositionProperty")
             .WithSummary("Removes a property and recuts every block type composing the group.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         var fieldTypes = group.MapGroup(FieldTypesPath).WithTags("Structure");
 

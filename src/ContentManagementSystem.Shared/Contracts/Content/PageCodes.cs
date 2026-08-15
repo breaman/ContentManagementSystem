@@ -17,6 +17,17 @@ public static class PageCodes
     /// <summary>The caller is authenticated but holds no role permitting this.</summary>
     public const string Forbidden = "page.forbidden";
 
+    /// <summary>
+    /// A collection filter or paging token could not be read.
+    /// </summary>
+    /// <remarks>
+    /// Refused rather than ignored. A filter the server silently drops returns a superset of what
+    /// was asked for, and the caller has no way to tell that from an honest answer — an unrecognised
+    /// status reads as "every page is a draft", and a malformed cursor turns a paging bug into a
+    /// loop over the first page.
+    /// </remarks>
+    public const string FilterInvalid = "page.filter-invalid";
+
     /// <summary>A title was not supplied.</summary>
     /// <remarks>
     /// Required at creation because the slug is generated from it, and a page with no title has no

@@ -18,6 +18,16 @@ namespace ContentManagementSystem.Shared.Contracts.Content;
 public sealed record SaveDraftRequest(string? ContentJson, string? ExpectedRowVersion);
 
 /// <summary>
+/// Body of <c>POST /api/cms/v1/pages/{id}/draft/checkpoint</c>.
+/// </summary>
+/// <param name="Label">
+/// What the editor is marking, such as "before the big rewrite". Optional, because the useful thing
+/// about a checkpoint is that it exists; a nameless one still shows in the history with its
+/// timestamp.
+/// </param>
+public sealed record CheckpointDraftRequest(string? Label = null);
+
+/// <summary>
 /// The working draft of a page.
 /// </summary>
 /// <param name="PageId">Page the draft belongs to.</param>

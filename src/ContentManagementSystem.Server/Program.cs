@@ -145,6 +145,7 @@ try
     // Backs the structure admin screens while they pre-render, calling the services directly rather
     // than looping back through the HTTP API (task P1-29).
     builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
+    builder.Services.AddScoped<IPageClient, ServerPageClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
     // Add route configuration to enforce lowercase URLs for better SEO

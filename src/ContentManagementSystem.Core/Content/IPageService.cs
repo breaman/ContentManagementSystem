@@ -1,3 +1,4 @@
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 
 namespace ContentManagementSystem.Core.Content;
@@ -46,10 +47,62 @@ public interface IPageService
     Task<CmsResult<PageDetail>> GetAsync(int id, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Lists pages matching a set of filters, one keyset page at a time.
+    /// </summary>
+    /// <param name="query">Filters and paging.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>
+    /// The matching pages with a resume token, or an invalid result when a filter cannot be read.
+    /// </returns>
+    /// <remarks>
+    /// Ordered by identity, which for these rows is creation order. That is not an arbitrary choice:
+    /// keyset pagination needs a total order over a unique, indexed column, and the primary key is
+    /// the only one Phase 2's schema offers. Ordering by "recently changed", which a browse screen
+    /// would prefer, needs a composite <c>(ModifiedOn, Id)</c> keyset over a column with no index,
+    /// so every page of results would scan; when a list screen earns that, the index comes with it.
+    /// <para>
+    /// Deleted pages are excluded by the global query filter. The recycle bin is a separate
+    /// collection with a separate shape, because a list mixing live and deleted rows makes every
+    /// caller re-filter it (spec section 14.10).
+    /// </para>
+    /// </remarks>
+    Task<CmsResult<CursorPage<PageSummary>>> ListAsync(
+        PageQuery query,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches a slice of the content tree, for a lazily expanded tree control.
+    /// </summary>
+    /// <param name="parentId">Node to expand, or null for the root of the site.</param>
+    /// <param name="depth">
+    /// How many levels below the node to return. Clamped to <see cref="MaxTreeDepth"/>, because a
+    /// tree fetch is a UI convenience and an unbounded one is a request to serialize the whole site.
+    /// </param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The node's children in editor order, or a not-found result.</returns>
+    /// <remarks>
+    /// Answered from the materialized path in one prefix match rather than a query per level, which
+    /// is what <c>Page.Path</c> exists for (spec section 10.1).
+    /// </remarks>
+    Task<CmsResult<IReadOnlyList<PageTreeNode>>> TreeAsync(
+        int? parentId,
+        int depth = 1,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Deepest slice of the tree one fetch will return.</summary>
+    const int MaxTreeDepth = 5;
+
+    /// <summary>
     /// Applies a partial update to a page's title, slug, SEO, and editorial metadata.
     /// </summary>
     /// <param name="id">Identity of the page.</param>
     /// <param name="request">The members to change. Omitted members are left alone.</param>
+    /// <param name="expectedRowVersion">
+    /// The draft's <c>rowversion</c> as the caller last saw it, Base64-encoded — what an
+    /// <c>If-Match</c> header carries. Null writes unconditionally, which is the ordinary case: a
+    /// patch names the members it changes, so two concurrent patches to different fields merge
+    /// correctly and only a caller that read first has a precondition worth stating.
+    /// </param>
     /// <param name="cancellationToken">Token observed while saving.</param>
     /// <returns>The updated page, a not-found result, an invalid result, or a conflict.</returns>
     /// <remarks>
@@ -60,5 +113,6 @@ public interface IPageService
     Task<CmsResult<PageDetail>> PatchMetadataAsync(
         int id,
         PatchPageMetadataRequest request,
+        string? expectedRowVersion = null,
         CancellationToken cancellationToken = default);
 }

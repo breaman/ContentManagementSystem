@@ -1,0 +1,123 @@
+@page "/admin/pages/{Id:int}/versions"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Version history</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <a href="@($"/admin/pages/{Id}")">← Back to the page</a>
+</nav>
+
+<h1>Version history</h1>
+<p class="text-body-secondary">
+    Every version this page has had. The draft is the one mutable row; everything else is frozen, so
+    restoring an old version copies it into the draft rather than putting it back on the site.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="That did not work" />
+
+@if (Notice is { Length: > 0 })
+{
+    <p class="alert alert-success" role="status">@Notice</p>
+}
+
+@if (Versions is null)
+{
+    <p role="status">Loading history…</p>
+}
+else if (Versions.Count == 0)
+{
+    <p>No versions. That should not be possible for a page that exists — check the server log.</p>
+}
+else
+{
+    <table class="table">
+        <caption>@Versions.Count version(s), newest first.</caption>
+        <thead>
+            <tr>
+                <th scope="col">Version</th>
+                <th scope="col">Title</th>
+                <th scope="col">Status</th>
+                <th scope="col">Created</th>
+                <th scope="col">Compare</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var version in Versions)
+            {
+                <tr>
+                    <th scope="row">
+                        v@version.VersionNumber
+                        @if (version.Label is { Length: > 0 } label)
+                        {
+                            <span class="badge text-bg-info ms-1">@label</span>
+                        }
+                    </th>
+                    <td>@version.Title</td>
+                    <td>
+                        @if (version.IsDraft)
+                        {
+                            <span class="badge text-bg-secondary">Draft</span>
+                        }
+                        @if (version.IsPublished)
+                        {
+                            <span class="badge text-bg-success">Published</span>
+                        }
+                        @if (!version.IsDraft && !version.IsPublished)
+                        {
+                            <span class="badge text-bg-light text-dark">@version.Status</span>
+                        }
+                    </td>
+                    <td>@version.CreatedOn?.ToString("g")</td>
+                    <td>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="diff-from"
+                                   id="@($"from-{version.Id}")" checked="@(FromVersionId == version.Id)"
+                                   @onchange="() => FromVersionId = version.Id" />
+                            <label class="form-check-label" for="@($"from-{version.Id}")">From</label>
+                        </div>
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="radio" name="diff-to"
+                                   id="@($"to-{version.Id}")" checked="@(ToVersionId == version.Id)"
+                                   @onchange="() => ToVersionId = version.Id" />
+                            <label class="form-check-label" for="@($"to-{version.Id}")">To</label>
+                        </div>
+                    </td>
+                    <td>
+                        <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                            @if (!version.IsDraft)
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        disabled="@IsBusy" @onclick="() => RestoreAsync(version.Id)">
+                                    Restore into draft
+                                </button>
+                            }
+                        </AuthorizeView>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    <button type="button" class="btn btn-primary" disabled="@(IsBusy || !CanCompare)"
+            @onclick="CompareAsync">
+        Compare selected versions
+    </button>
+
+    @if (!CanCompare)
+    {
+        <p class="form-text">Choose two different versions to compare.</p>
+    }
+}
+
+@if (Diff is not null)
+{
+    <h2 class="h5 mt-4">
+        v@Diff.FromVersionNumber → v@Diff.ToVersionNumber
+    </h2>
+
+    <ContentDiffView Diff="Diff" />
+}

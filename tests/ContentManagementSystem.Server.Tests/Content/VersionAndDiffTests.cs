@@ -348,7 +348,7 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         await _bench.Resolve<IPageService>().PatchMetadataAsync(
             page.Summary.Id,
             new PatchPageMetadataRequest { Title = "Pricing and Plans", MetaDescription = "What it costs." },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         var changed = await diffs.CompareAsync(page.Summary.Id, published.Id, draft.Id, cancellationToken);
 

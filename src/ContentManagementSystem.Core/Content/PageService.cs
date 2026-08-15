@@ -4,6 +4,7 @@ using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
 using ContentManagementSystem.Shared.Content;
+using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -24,6 +25,12 @@ public sealed class PageService(
     ICmsAuthorization authorization,
     ILogger<PageService> logger) : IPageService
 {
+    /// <summary>Escape character used with <c>LIKE</c>, so a search term's wildcards are literal.</summary>
+    private const string LikeEscape = "\\";
+
+    /// <summary>Stands in for the synthetic site root when grouping pages by parent.</summary>
+    private const int RootKey = 0;
+
     /// <inheritdoc />
     public async Task<CmsResult<PageDetail>> CreateAsync(
         CreatePageRequest request,
@@ -141,9 +148,207 @@ public sealed class PageService(
     }
 
     /// <inheritdoc />
+    public async Task<CmsResult<CursorPage<PageSummary>>> ListAsync(
+        PageQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        if (!authorization.HasPermission(CmsPermissions.ContentRead))
+        {
+            return CmsResult<CursorPage<PageSummary>>.Forbidden(
+                "Reading pages is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        if (!Cursor.TryDecode(query.Cursor, out var after))
+        {
+            return CmsResult<CursorPage<PageSummary>>.Invalid(
+                PageCodes.FilterInvalid,
+                "That cursor could not be read. Start from the first page rather than assembling " +
+                "one by hand.",
+                nameof(PageQuery.Cursor));
+        }
+
+        PageVersionStatus? status = null;
+        if (!string.IsNullOrWhiteSpace(query.Status))
+        {
+            // Refused rather than ignored: a mistyped status that quietly matched everything would
+            // read as "every page is a draft", which is a far more expensive thing to debug.
+            if (!Enum.TryParse(query.Status, ignoreCase: true, out PageVersionStatus parsed))
+            {
+                return CmsResult<CursorPage<PageSummary>>.Invalid(
+                    PageCodes.FilterInvalid,
+                    $"'{query.Status}' is not a page status. Try one of: " +
+                    $"{string.Join(", ", Enum.GetNames<PageVersionStatus>())}.",
+                    nameof(PageQuery.Status));
+            }
+
+            status = parsed;
+        }
+
+        var limit = Cursor.Clamp(query.Limit);
+
+        var pages = context.Pages
+            .AsNoTracking()
+            .Include(candidate => candidate.Template)
+            .Include(candidate => candidate.DraftVersion)
+            .Include(candidate => candidate.PublishedVersion)
+            .Where(candidate => candidate.Id > after);
+
+        if (query.RootOnly)
+        {
+            pages = pages.Where(candidate => candidate.ParentId == null);
+        }
+        else if (query.ParentId is { } parentId)
+        {
+            pages = pages.Where(candidate => candidate.ParentId == parentId);
+        }
+
+        if (query.TemplateId is { } templateId)
+        {
+            pages = pages.Where(candidate => candidate.TemplateId == templateId);
+        }
+
+        if (status is { } wanted)
+        {
+            pages = pages.Where(candidate => candidate.DraftVersion!.Status == wanted);
+        }
+
+        if (query.ModifiedAfter is { } modifiedAfter)
+        {
+            pages = pages.Where(candidate =>
+                (candidate.ModifiedOn ?? candidate.CreatedOn) > modifiedAfter);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query.Search))
+        {
+            var term = $"%{Escape(query.Search.Trim())}%";
+
+            pages = pages.Where(candidate =>
+                EF.Functions.Like(candidate.DraftVersion!.Title, term, LikeEscape) ||
+                EF.Functions.Like(candidate.Slug, term, LikeEscape));
+        }
+
+        // One row beyond the limit, so that "is there a next page" is answered by the same query
+        // rather than by a count that would have to scan the whole filtered set.
+        var found = await pages
+            .OrderBy(candidate => candidate.Id)
+            .Take(limit + 1)
+            .ToListAsync(cancellationToken);
+
+        var hasMore = found.Count > limit;
+        if (hasMore) found.RemoveAt(found.Count - 1);
+
+        var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
+
+        var items = found
+            .Where(page => page.DraftVersion is not null)
+            .Select(page => ToSummary(page, page.DraftVersion!, withChildren.Contains(page.Id)))
+            .ToList();
+
+        var next = hasMore && found.Count > 0 ? Cursor.Encode(found[^1].Id) : null;
+
+        return CmsResult<CursorPage<PageSummary>>.Success(new CursorPage<PageSummary>(items, next));
+    }
+
+    /// <inheritdoc />
+    public async Task<CmsResult<IReadOnlyList<PageTreeNode>>> TreeAsync(
+        int? parentId,
+        int depth = 1,
+        CancellationToken cancellationToken = default)
+    {
+        if (!authorization.HasPermission(CmsPermissions.ContentRead))
+        {
+            return CmsResult<IReadOnlyList<PageTreeNode>>.Forbidden(
+                "Reading pages is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        var levels = Math.Clamp(depth, 1, IPageService.MaxTreeDepth);
+
+        Page? parent = null;
+        if (parentId is { } id)
+        {
+            parent = await context.Pages
+                .AsNoTracking()
+                .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+
+            if (parent is null)
+            {
+                return CmsResult<IReadOnlyList<PageTreeNode>>.NotFound(
+                    $"No page has id {id}.",
+                    PageCodes.NotFound);
+            }
+        }
+
+        // The root level is depth 0, so a page's own depth already counts the levels above it and
+        // the bound below is an absolute depth rather than a relative one.
+        var deepest = (parent?.Depth ?? -1) + levels;
+
+        var descendants = context.Pages
+            .AsNoTracking()
+            .Include(candidate => candidate.Template)
+            .Include(candidate => candidate.DraftVersion)
+            .Include(candidate => candidate.PublishedVersion)
+            .Where(candidate => candidate.Depth <= deepest);
+
+        if (parent is not null)
+        {
+            var prefix = $"{parent.Path}%";
+
+            // One indexed prefix match instead of a query per level, which is the whole reason the
+            // path is materialized. Paths hold only digits and slashes, so nothing in them is a LIKE
+            // metacharacter needing an escape.
+            descendants = descendants.Where(candidate =>
+                candidate.Id != parent.Id && EF.Functions.Like(candidate.Path, prefix));
+        }
+
+        var found = await descendants
+            .OrderBy(candidate => candidate.Depth)
+            .ThenBy(candidate => candidate.SortOrder)
+            .ThenBy(candidate => candidate.Id)
+            .ToListAsync(cancellationToken);
+
+        var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
+
+        // Keyed on the parent's id, with the synthetic site root as zero — no page has that identity,
+        // and a nullable key would need its own comparer to say the same thing.
+        var byParent = new Dictionary<int, List<PageTreeNode>>();
+
+        // Walked deepest-first, so a node's children are already assembled by the time it is built —
+        // the depth ordering above is what makes one pass enough.
+        foreach (var page in Enumerable.Reverse(found))
+        {
+            if (page.DraftVersion is null) continue;
+
+            var children = byParent.TryGetValue(page.Id, out var assembled) ? assembled : [];
+            var node = new PageTreeNode(
+                ToSummary(page, page.DraftVersion, withChildren.Contains(page.Id)),
+                children);
+
+            var key = page.ParentId ?? RootKey;
+
+            if (!byParent.TryGetValue(key, out var siblings))
+            {
+                siblings = [];
+                byParent[key] = siblings;
+            }
+
+            // Prepended, because the walk is reversed: siblings come back out in the order queried.
+            siblings.Insert(0, node);
+        }
+
+        var roots = byParent.TryGetValue(parentId ?? RootKey, out var top) ? top : [];
+
+        return CmsResult<IReadOnlyList<PageTreeNode>>.Success(roots);
+    }
+
+    /// <inheritdoc />
     public async Task<CmsResult<PageDetail>> PatchMetadataAsync(
         int id,
         PatchPageMetadataRequest request,
+        string? expectedRowVersion = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -222,6 +427,14 @@ public sealed class PageService(
         // someone publishes (spec section 11.1).
         draft.Title = title!.Trim();
         WriteSeo(draft, seo);
+
+        if (RowVersions.TryApply(context.Entry(draft), expectedRowVersion) is false)
+        {
+            return CmsResult<PageDetail>.Invalid(
+                PageCodes.ConcurrentChange,
+                "The supplied row version is not a value this server issued.",
+                nameof(PageDetail.RowVersion));
+        }
 
         try
         {
@@ -616,25 +829,68 @@ public sealed class PageService(
             version.ChangeFreq,
             version.Priority);
 
+    /// <summary>
+    /// Finds which of a loaded set of pages have live children.
+    /// </summary>
+    /// <param name="pages">The pages just read.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>Identities of the pages that have at least one child.</returns>
+    /// <remarks>
+    /// One query for the whole set rather than a correlated subquery per row: the flag drives a
+    /// tree control's expander, so it is needed for every row of every list and a per-row lookup
+    /// would make a fifty-page list fifty-one round trips.
+    /// </remarks>
+    private async Task<HashSet<int>> ParentsWithChildrenAsync(
+        IReadOnlyCollection<Page> pages,
+        CancellationToken cancellationToken)
+    {
+        if (pages.Count == 0) return [];
+
+        var ids = pages.Select(page => page.Id).ToList();
+
+        var parents = await context.Pages
+            .AsNoTracking()
+            .Where(candidate => candidate.ParentId != null && ids.Contains(candidate.ParentId.Value))
+            .Select(candidate => candidate.ParentId!.Value)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        return [.. parents];
+    }
+
+    /// <summary>Escapes the wildcards of a caller-supplied search term (spec section 22.1).</summary>
+    /// <remarks>
+    /// Without this, a term containing <c>%</c> matches everything and one containing <c>_</c>
+    /// matches more than it should — not an injection, but a filter that quietly stops filtering.
+    /// </remarks>
+    private static string Escape(string term) => term
+        .Replace(LikeEscape, LikeEscape + LikeEscape, StringComparison.Ordinal)
+        .Replace("%", LikeEscape + "%", StringComparison.Ordinal)
+        .Replace("_", LikeEscape + "_", StringComparison.Ordinal)
+        .Replace("[", LikeEscape + "[", StringComparison.Ordinal);
+
+    private static PageSummary ToSummary(Page page, PageVersion draft, bool hasChildren) =>
+        new(
+            page.Id,
+            page.PublicId,
+            page.ParentId,
+            draft.Title,
+            page.Slug,
+            page.Depth,
+            page.SortOrder,
+            page.TemplateId,
+            page.Template.Key,
+            draft.Status.ToString(),
+            HasUnpublishedChanges(draft, page.PublishedVersion),
+            draft.VersionNumber,
+            page.PublishedVersion?.VersionNumber,
+            page.ShowInNavigation,
+            hasChildren,
+            page.ModifiedOn ?? page.CreatedOn);
+
     private static PageDetail ToDetail(Page page, PageVersion draft, bool hasChildren) =>
         new(
-            new PageSummary(
-                page.Id,
-                page.PublicId,
-                page.ParentId,
-                draft.Title,
-                page.Slug,
-                page.Depth,
-                page.SortOrder,
-                page.TemplateId,
-                page.Template.Key,
-                draft.Status.ToString(),
-                HasUnpublishedChanges(draft, page.PublishedVersion),
-                draft.VersionNumber,
-                page.PublishedVersion?.VersionNumber,
-                page.ShowInNavigation,
-                hasChildren,
-                page.ModifiedOn ?? page.CreatedOn),
+            ToSummary(page, draft, hasChildren),
             draft.ContentJson,
             draft.TemplateRevision,
             page.UseExplicitUrl,

@@ -1,6 +1,20 @@
 namespace ContentManagementSystem.Shared.Contracts.Content;
 
 /// <summary>
+/// Body of <c>POST /api/cms/v1/pages/{id}/lock</c>.
+/// </summary>
+/// <param name="TakeOver">
+/// Whether to take a live lock away from its current holder. False — the default, and what opening
+/// the editor sends — leaves an existing holder in place and simply reports them; true is the
+/// explicit "Edit anyway" the UI offers afterwards.
+/// </param>
+/// <remarks>
+/// Both forms succeed. Neither can fail for the reason a caller might expect, because a lock never
+/// prevents editing (ADR 0012) — the difference is only whose name the banner shows next.
+/// </remarks>
+public sealed record AcquireLockRequest(bool TakeOver = false);
+
+/// <summary>
 /// Who has a page open in the editor, as the backoffice shows it (spec section 11.8).
 /// </summary>
 /// <param name="PageId">Page the lock is on.</param>

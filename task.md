@@ -1,7 +1,8 @@
 # Content Management System — Implementation Task List
 
 **Status:** In progress — Phase 0 complete; Phase 1 complete except the `P1-32` template-delete
-guard; Phase 2's data layer and services (2.1 and 2.2) complete, API and UI next
+guard; Phase 2 complete through 2.3 (data, services, API, and admin UI), with four unit and
+telemetry test tasks outstanding
 **Version:** 1.0
 **Last updated:** 2026-08-14
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -51,7 +52,7 @@ and record the date in the progress table.
 |---|---|---|---|---|---|
 | [0 — Foundations & spikes](#phase-0--foundations-and-de-risking-spikes) | 19 | 19 | 12.0 | Complete — all three spikes returned go | 2026-08-12 |
 | [1 — Content structure](#phase-1--content-structure) | 33 | 32 | 28.0 | In progress — `P1-30` closed by `P2-10`; only `P1-32`'s template-delete guard left | — |
-| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 16 | 27.0 | In progress — 2.1 and 2.2 complete; API and UI (2.3) next | — |
+| [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 25 | 27.0 | In progress — 2.1, 2.2, and 2.3 complete; four unit and telemetry test tasks left | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 0 | 22.5 | Not started | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
@@ -59,7 +60,7 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **67** | **203.5** | | |
+| **v1 total** | **281** | **76** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -1273,24 +1274,159 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
 
 ### 2.3 API and UI — 4.5 ed
 
-- [ ] **P2-16** Page endpoints in `Server/Api/Cms/Pages/` per [§22.1]: `GET /pages`, `GET /pages/tree`,
+- [x] **P2-16** Page endpoints in `Server/Api/Cms/Pages/` per [§22.1]: `GET /pages`, `GET /pages/tree`,
   `POST /pages`, `GET /pages/{id}`, `PUT /pages/{id}/draft`, `PATCH /pages/{id}/metadata`. — 1 ed
-- [ ] **P2-17** Lifecycle endpoints: `POST /pages/{id}/duplicate`, `DELETE /pages/{id}`,
+  *2026-08-14 — those six plus three the table does not list. `GET /pages/{id}/draft` is the read pair
+  of the `PUT` and is what stamps the `ETag` the `PUT` requires; `POST /pages/{id}/draft/discard` and
+  `/draft/checkpoint` are the other two operations `P2-10` built. Without them `DraftService.Discard`
+  and `.Checkpoint` would ship dead — [§22.1]'s table is not exhaustive for drafts, and a service
+  method no endpoint reaches is a service method nobody is running.*
+  ***Two of the six needed a query service that did not exist.*** `IPageService` gained `ListAsync`
+  and `TreeAsync`. The list is **ordered by identity**, which is a real constraint rather than a
+  preference: keyset pagination needs a total order over a unique indexed column and the primary key
+  is the only one Phase 2's schema offers. Ordering by "recently changed", which a browse screen
+  would rather have, needs a composite `(ModifiedOn, Id)` keyset over an unindexed column, so every
+  page of results would scan; when a screen earns that, the index comes with it. The tree is answered
+  from the materialized path in one prefix match with **one extra query for the has-children flags** —
+  a correlated subquery per row would make a fifty-page list fifty-one round trips, and the flag is
+  what tells a node the fetch stopped at from a leaf.
+  ***`rootOnly` is a separate flag from `parentId`.*** A null `parentId` already means "do not filter
+  by parent", and one nullable value cannot also mean "at the root of the site".
+  ***A filter that cannot be read is refused, not ignored*** (`PageCodes.FilterInvalid`). A dropped
+  filter answers with a superset of what was asked for and the caller cannot tell that from an honest
+  answer — an unrecognised status reads as "every page is a draft", and a malformed cursor turns a
+  paging bug into a loop over the first page. The `tag` filter [§22.1] lists is deliberately **absent**
+  rather than stubbed: the tag projection arrives in P8, and a filter that silently matched nothing
+  would read as "no pages are tagged".*
+- [x] **P2-17** Lifecycle endpoints: `POST /pages/{id}/duplicate`, `DELETE /pages/{id}`,
   `POST /pages/{id}/restore`, `POST /pages/{id}/validate`, `POST /pages/{id}/publish`,
   `POST /pages/{id}/unpublish`. — 0.75 ed
-- [ ] **P2-18** Version endpoints: `GET /versions`, `GET /versions/{vid}`,
+  *2026-08-14 — those six plus `GET /pages/recycle-bin` and `DELETE /pages/{id}/permanent`, for the
+  reason the draft additions above give: `RecycleBinService.ListAsync` and `.PurgeAsync` exist and had
+  no way in. The permanent delete keeps its `Users.Manage` gate — an editor who can empty the bin can
+  destroy history — so it is the one endpoint in the CMS API behind a permission no content role
+  holds.*
+  *Three response shapes rather than `204`s, each because the operation has something the screen
+  cannot otherwise learn: a delete answers with the affected subtree (**how many pages went, and how
+  many were live** — the number a confirmation dialog has to show), an unpublish names the version it
+  retired, and a purge reports how many version rows it destroyed. `UnpublishResult` and `PurgeResult`
+  are named records, not anonymous objects: a wire contract nobody can reference is one no client can
+  be written against.*
+  ***`PublishPageRequest` is a flag, not [§22.2]'s array of acknowledged codes.*** Listing codes looks
+  more precise and is not — the set of warnings can change between the check and the publish, so a
+  client would be acknowledging a list it may no longer be looking at. The honest question is whether
+  a person saw the warnings *this attempt* produced, and a boolean asks exactly that.
+  ***`validate` requires `Content.Read`, not `Content.Publish`.*** It is a dry run that changes
+  nothing, and an Author who cannot publish still needs to know whether their page would.*
+- [x] **P2-18** Version endpoints: `GET /versions`, `GET /versions/{vid}`,
   `GET /versions/{a}/diff/{b}`, `POST /versions/{vid}/restore`. — 0.5 ed
-- [ ] **P2-19** `POST`/`DELETE /pages/{id}/lock`. — 0.25 ed
-- [ ] **P2-20** Cross-cutting API concerns: `ETag`/`If-Match` optimistic concurrency, RFC 9457
+  *2026-08-14 — nested under the page for the reason zones are nested under their template: the pair
+  is the address, so a version of another page answers **404** rather than confirming the existence of
+  a row the caller did not ask about. **The history is deliberately unpaged** — `P2-13`'s retention
+  caps it at the last twenty plus what the policy protects, so it is bounded by construction and a
+  cursor would be ceremony over a set that fits on one screen.*
+  ***The diff is a `GET`*** even though it computes rather than reads: no side effects, idempotent,
+  and its whole input is two ids, so it is bookmarkable and cacheable. Cost is bounded by `WordDiff`
+  degrading past ten thousand words, not by the verb.
+  ***Restore answers with the draft's new `ETag`.*** A restore rewrites the draft, so the token the
+  editor was holding is stale the instant it returns; without this the next save would be refused as
+  a conflict with itself.*
+- [x] **P2-19** `POST`/`DELETE /pages/{id}/lock`. — 0.25 ed
+  *2026-08-14 — three, with `GET` beside them. **The acquire and the heartbeat are the same `POST`**,
+  so the editor sends one request every thirty seconds whether it is opening the page or still on it;
+  a separate heartbeat verb would be a second code path exercised four times more often than the
+  first. An unheld page answers **204, not 404** — the question "who has this open" has been answered
+  and the answer is nobody, and a 404 would be indistinguishable from the page not existing.*
+  *Nothing here can refuse anything on the grounds of a lock, and the API test asserts the property
+  the design turns on rather than the mechanism: the second editor's **save still goes through** [D12].*
+- [x] **P2-20** Cross-cutting API concerns: `ETag`/`If-Match` optimistic concurrency, RFC 9457
   problem-details error contract with the `errors`/`warnings` shape from [§22.2], antiforgery on all
   writes, cursor pagination on collections. — 1 ed
-- [ ] **P2-21** Authorization policies and permission constants in `Server/Authorization/`
+  *2026-08-14 — the problem-details half already existed (`CmsProblems`, `P1-21`); this added the
+  other three.*
+  ***`If-Match` is mandatory on the draft save and optional on the metadata patch.*** An unconditional
+  draft save is a lost update waiting for two editors, so a missing precondition is **428 Precondition
+  Required** rather than an accepted write — 428 exists precisely so a server can insist. A patch names
+  the members it changes, so two concurrent patches to different fields merge rather than collide, and
+  insisting there would make "clear the review date" fail for a client that never read the page.
+  Honouring it anyway meant `PatchMetadataAsync` gaining an `expectedRowVersion`, and the row-version
+  handling moving out of `DraftService` into a shared `RowVersions` — the two must not drift on the
+  one rule that matters, which is that the token is applied as EF's **original value** and never
+  compared in code.
+  ***A mismatch answers 409, not 412.*** A deliberate departure from the letter of RFC 9110: a 412 is
+  conventionally bodiless, and the losing editor needs the winning draft in hand to be offered
+  keep-mine / take-theirs / open-diff [§11.8]. Recorded in `ETags`.
+  ***Cursor pagination carries no total count.*** A keyset query knows where it is, not how long the
+  collection is, and answering with a count means a second full scan per request — the exact cost
+  cursor pagination exists to avoid. `Cursor` is Base64Url over the last key rather than a bare
+  number, so widening to a composite keyset later is a change to one class rather than to every
+  bookmarked URL; it is explicitly **not** a security boundary, since a decoded cursor is only ever a
+  `WHERE Id > @cursor` bound inside a query that already applied the caller's permissions.
+  ***Antiforgery gained a marker so it can be audited.*** `AddEndpointFilter` leaves no trace in
+  `Endpoint.Metadata`, which made "is every write protected?" a question nothing could answer by
+  inspection — and that is precisely the question worth answering automatically, because this defence
+  fails by a new endpoint simply forgetting it. `RequireCmsAntiforgery()` adds the filter and a
+  `CmsAntiforgeryMetadata` marker together; the structure endpoints were moved onto it too.*
+- [x] **P2-21** Authorization policies and permission constants in `Server/Authorization/`
   (`Content.Read/Edit/Publish/Delete`, `Structure.Edit`, `Settings.Edit`) — global roles only; section
   ACLs land in P7. — 1 ed
-- [ ] **P2-22** Explicit DTOs on every write endpoint so a client cannot mass-assign `Status:
+  *2026-08-14 — **the code for this shipped in `P1-21`**, which needed the same seam a phase early:
+  `CmsPermissions`, `CmsPermissionMap` ([§21.1] transcribed once), `CmsAuthorizationExtensions`, and
+  the request-scoped `HttpCmsAuthorization` the services ask. What Phase 2 owed was the part that
+  keeps it true, and that is what landed here — `Api/Cms/ApiContractTests` asserts over the route
+  table the application actually builds that **every permission has a policy, every policy has a
+  permission, every CMS endpoint carries a named policy**, and that the Phase 2 grants match [§21.1]
+  (an Author edits and cannot publish; an Approver publishes and cannot delete). The one exemption is
+  `/antiforgery-token`, and the test names it rather than skipping it.*
+  ***One thing the backoffice forced.*** The screens run in WebAssembly, where the server's policies
+  do not exist, so `[Authorize(Roles = …)]` is all they can say. `CmsRoles` gained `ContentReaders` /
+  `ContentEditors` / `ContentPublishers` beside the existing `StructureEditors` — convenient and
+  hazardous in equal measure, since a role added to the map and not to the list gets a blank screen
+  instead of the page it is entitled to and nothing else would notice. A contract test now asserts
+  each list equals the map's roles for the permission it stands in for.*
+- [x] **P2-22** Explicit DTOs on every write endpoint so a client cannot mass-assign `Status:
   "Published"`; status transitions only via dedicated endpoints [§20.1]. — included above
-- [ ] **P2-23** Plain admin screens in `Client/Components/Admin/Pages/`: page list,
+  *2026-08-14 — every write binds a record from `Shared.Contracts`, and `AcquireLockRequest`,
+  `PublishPageRequest`, and `CheckpointDraftRequest` were added rather than accepting a bare value or
+  a query parameter for something that will grow members.*
+  ***The rule is enforced structurally, not by review.*** `NoWriteEndpointBindsATypeThatCouldMoveAPagesLifecycle`
+  reflects over the route table: for every `POST`/`PUT`/`PATCH`/`DELETE` under `/api/cms`, the
+  body-bound parameter must be a request contract, and it must declare no member named `Status`,
+  `IsDeleted`, `PublishedVersionId`, `DraftVersionId`, `VersionNumber`, `Path`, `Depth`,
+  `CurrentRevision`, or the audit stamps. Which parameter is body-bound is settled by **asking the
+  container** rather than by matching on namespace — minimal APIs infer it the same way, and a rule
+  that guessed would stop covering a handler the day somebody injects a concrete service.
+  *Status transitions are reachable only through publish, unpublish, delete, and restore, each with
+  its own permission and its own transaction. A DTO accepting one as data would route around all four.*
+- [x] **P2-23** Plain admin screens in `Client/Components/Admin/Pages/`: page list,
   create-from-template, generic zone form, version history, diff viewer. — 1 ed
+  *2026-08-14 — four components over a new `IPageClient`, implemented twice per the pre-rendering
+  pattern (`HttpPageClient` in the browser, `ServerPageClient` over the services during pre-render),
+  exactly as `IStructureClient` is. Reads return bare values and writes return
+  `StructureClientResult<T>`, and publishing is the case that makes the asymmetry earn its keep: an
+  unfilled required zone has to come back as a list of zones to go and fill in, not as a red banner
+  saying 422.*
+  ***The zone form is built from the revision the draft captured, never from the template's current
+  zones*** [§8.5]. That needed a contract — `CapturedSlot`, with a forgiving reader over the snapshot
+  array — because `ZoneDefinition` describes the template *now* and carries database identities a
+  revision does not have. A form built from the live definitions would show a control for a zone the
+  page has no value for and silently drop one it does, which is authoring against a schema the content
+  is not being judged by.
+  ***Every zone is a textarea, and the non-text field types are read-only.*** The per-field-type
+  editors arrive in P6 behind [ADR-0014](./docs/adr/0014-field-type-components-resolved-by-the-hosting-layer.md);
+  inventing a control for a media reference here would mean inventing a shape for its value, and P6's
+  first job would be repairing what this one wrote. A value the screen cannot edit is shown as stored
+  JSON and **written back verbatim**, so a save made for some other zone cannot damage it.
+  ***An emptied control removes the zone rather than storing null.*** Absent means never authored and
+  null means deliberately cleared, and `P1-14` kept them apart on purpose; writing null for a box
+  nobody filled in would tell the renderer a fallback was declined. Rich text keeps its stored
+  `format`, so a save from this screen cannot silently reinterpret an author's HTML as markdown.
+  *The publish button relabels itself to "Publish anyway" **only after** a refused attempt has shown
+  the warnings, which is [§22.2]'s resubmit-to-acknowledge as one visible decision rather than a
+  checkbox nobody reads. The diff viewer renders a `Moved` block as one row saying where it went, and
+  uses `<del>`/`<ins>` so the distinction survives for a screen reader and in monochrome —
+  `PageScreenAccessibilityTests` asserts both, and puts all three screens under the same axe gate
+  `P1-31` built (3 screens + the diff, 0 violations).*
 
 ### Tests — Phase 2
 
@@ -1308,7 +1444,18 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
   here is the filtered tree index's predicate (read back from `sys.indexes`) beside the plain unique
   ones. The filtered-unique case the criterion has in mind arrives with `PageRoute.UrlHash WHERE
   IsPublished = 1` in `P3-01`.*
-- [ ] **P2-27** API integration: authorization, validation, and concurrency behavior for every endpoint.
+- [x] **P2-27** API integration: authorization, validation, and concurrency behavior for every endpoint.
+  *2026-08-14 — closed by `2.3`'s own definition of done rather than as separate work. Three suites in
+  `Server.Tests/Api/Cms/`: `PageApiTests` (17), `PageLifecycleApiTests` (9), `PageVersionApiTests` (8),
+  plus `ApiContractTests` (6) over the route table. **Every fixture is built through the API** — a
+  test whose arrange step inserts its own template and page proves nothing about whether the endpoints
+  an editor uses can produce that state, and the arrange step is exactly what would keep passing after
+  an endpoint broke.*
+  *Authorization is asserted per role and not only per endpoint: a Viewer reads and cannot write, an
+  Author edits and cannot publish or delete, an Editor empties the bin and cannot purge it, an
+  anonymous caller gets **401 and not 403**. Concurrency is asserted at all three of its statuses —
+  428 for a draft save with no precondition, 409 for one that lost a race, 409 for a metadata patch
+  with a stale `If-Match`.*
 - [ ] **P2-28** API integration: publish transactionality under fault injection.
 - [ ] **P2-29** Telemetry: `cms.publish.count` / `.duration` metrics and publish trace spans [§24.1].
 
@@ -1345,11 +1492,13 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
   untouched.
   *2026-08-14 — the published row's bytes, status, and the page's `PublishedVersionId` are all
   asserted unchanged after the restore.*
-- [~] **P2 #8** Two concurrent draft saves: the second receives `409 Conflict` with both payloads.
-  *2026-08-14 — the behaviour is asserted at the service layer: the second save returns
-  `CmsOutcome.Conflict` carrying the stored draft, so the editor has both copies. **What is not yet
-  asserted is the literal `409`**, which is the endpoint mapping — `CmsProblems` already maps
-  `Conflict` to 409, but there is no draft endpoint to drive until `P2-16`.*
+- [x] **P2 #8** Two concurrent draft saves: the second receives `409 Conflict` with both payloads.
+  *2026-08-14 — the behaviour was asserted at the service layer (the second save returns
+  `CmsOutcome.Conflict` carrying the stored draft, so the editor has both copies). **The literal `409`
+  is now asserted too**, by `Api/Cms/PageApiTests.TwoConcurrentDraftSavesGiveTheSecondA409CarryingBothPayloads`:
+  two saves send the same `If-Match`, the first wins, the second comes back 409 with
+  `page.concurrent-change`, and the stored draft is re-read to confirm the winner's text is what
+  survived. 409 rather than the protocol's 412 — see `P2-20` for why.*
 - [x] **P2 #9** An advisory lock is visible to a second editor and can be overridden; it expires after 2
   minutes of silence.
   *2026-08-14 — `Content/EditLockTests`, all three, on an injected clock. The suite also asserts the
@@ -1359,16 +1508,20 @@ not disturb what is published. **27 ed** · Entry: Phase 1 exit.
   retrievable.
   *2026-08-14 — `Content/RecycleBinAndDuplicationTests`: the subtree disappears from the default
   query, is still there under `IgnoreQueryFilters`, and its version history still lists.*
-- [~] **P2 #11** Publishing with an unfilled required zone returns `422` naming that zone.
-  *2026-08-14 — the publish is refused and the diagnostic names the zone in its path. As with
-  `P2 #8`, the literal status code waits on the endpoint in `P2-17`.*
+- [x] **P2 #11** Publishing with an unfilled required zone returns `422` naming that zone.
+  *2026-08-14 — `Api/Cms/PageLifecycleApiTests.PublishingWithAnUnfilledRequiredZoneAnswers422NamingThatZone`.
+  The assertion is on the diagnostic's **path containing the zone key**, not merely on the count: an
+  editor has to be told which zone to go and fill in, and "3 errors prevent publishing" is not
+  something anyone can act on.*
 
 **Exit gate:** acceptance test **#4** passes — the requirement's central promise is mechanically
 verified. — [x] met on **2026-08-14**.
 *The gate is the one criterion that could not be faked by careful implementation, and it passes:
 publishing snapshots the draft into a separate row, and no operation in `DraftService` can reach it.
-Two criteria remain `[~]` — both only for the HTTP status code, which needs `2.3`'s endpoints — and
-neither weakens the gate, since the behaviour underneath each is asserted.*
+**All eleven criteria are now `[x]`** — `P2 #8` and `P2 #11` were held at `[~]` for their literal HTTP
+status codes, and `2.3`'s endpoints closed both. `P2 #4` is additionally re-asserted through the API
+in `PageLifecycleApiTests`, so the promise holds at the surface an editor actually touches and not
+only at the service beneath it.*
 
 **Risks:** R4 (publish transaction correctness), R5 (diff complexity).
 
@@ -2234,7 +2387,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-2 | "Specify what type of data can be used in a zone (plain text, reusable content, html/markdown, etc)" | [§7], [§8.3] | P1-08…P1-12 | P1 #1, #2 | [ ] |
 | R-3 | "In zones that are plain text or html/markdown … inline editing … 'edit/preview' editor experience" | [§14.4] | P6-08…P6-14 | P6 #2, #3 | [ ] |
 | R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [ ] |
-| R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [ ] |
+| R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
 | R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
 | R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [ ] |
 | R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [ ] |

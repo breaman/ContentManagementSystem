@@ -47,13 +47,13 @@ public static class BlockTypeEndpoints
             .WithName("CreateBlockType")
             .WithSummary("Creates a block type and cuts its first revision.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapPut("/{id:int}", UpdateAsync)
             .WithName("UpdateBlockType")
             .WithSummary("Updates a block type's editor-facing metadata.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapGet("/{id:int}/revisions", ListRevisionsAsync)
             .WithName("ListBlockTypeRevisions")
@@ -69,31 +69,31 @@ public static class BlockTypeEndpoints
             .WithName("CreateBlockTypeProperty")
             .WithSummary("Adds a property to a block type and cuts a new revision.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapPut("/{id:int}/properties/{propertyId:int}", UpdatePropertyAsync)
             .WithName("UpdateBlockTypeProperty")
             .WithSummary("Updates a property. Its key and field type cannot change.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapDelete("/{id:int}/properties/{propertyId:int}", DeletePropertyAsync)
             .WithName("DeleteBlockTypeProperty")
             .WithSummary("Removes a property. Values stored under its key are retained.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapPost("/{id:int}/compositions", AttachCompositionAsync)
             .WithName("AttachComposition")
             .WithSummary("Composes a shared property group into a block type.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         blockTypes.MapDelete("/{id:int}/compositions/{compositionId:int}", DetachCompositionAsync)
             .WithName("DetachComposition")
             .WithSummary("Removes a composed group from a block type.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         return group;
     }

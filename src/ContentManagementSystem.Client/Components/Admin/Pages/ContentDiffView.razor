@@ -1,0 +1,107 @@
+@using ContentManagementSystem.Shared.Contracts.Content
+
+@if (Diff is null)
+{
+    return;
+}
+
+@if (!Diff.HasChanges)
+{
+    <p role="status">These two versions are identical.</p>
+
+    return;
+}
+
+@if (Diff.Metadata.Count > 0)
+{
+    <h3 class="h6">Metadata</h3>
+
+    <table class="table table-sm">
+        <thead>
+            <tr>
+                <th scope="col">Field</th>
+                <th scope="col">Before</th>
+                <th scope="col">After</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var change in Diff.Metadata)
+            {
+                <tr>
+                    <th scope="row">@change.Name</th>
+                    <td><del>@Show(change.Before)</del></td>
+                    <td><ins>@Show(change.After)</ins></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@foreach (var zone in Diff.Zones)
+{
+    <h3 class="h6">
+        <code>@zone.ZoneKey</code>
+        <span class="badge @BadgeClass(zone.Kind)">@Label(zone.Kind)</span>
+    </h3>
+
+    @if (zone.Segments.Count > 0)
+    {
+        <p class="border rounded p-2">
+            @foreach (var segment in zone.Segments)
+            {
+                @switch (segment.Kind)
+                {
+                    case ContentChangeKind.Added:
+                        <ins class="bg-success-subtle">@segment.Text</ins>
+                        break;
+                    case ContentChangeKind.Removed:
+                        <del class="bg-danger-subtle">@segment.Text</del>
+                        break;
+                    default:
+                        @segment.Text
+                        break;
+                }
+            }
+        </p>
+    }
+    else if (zone.Blocks.Count == 0)
+    {
+        <dl class="row">
+            <dt class="col-sm-2">Before</dt>
+            <dd class="col-sm-10"><del>@Show(zone.Before)</del></dd>
+            <dt class="col-sm-2">After</dt>
+            <dd class="col-sm-10"><ins>@Show(zone.After)</ins></dd>
+        </dl>
+    }
+
+    @if (zone.Blocks.Count > 0)
+    {
+        <ul class="list-group mb-3">
+            @foreach (var block in zone.Blocks)
+            {
+                <li class="list-group-item">
+                    <span class="badge @BadgeClass(block.Kind)">@Label(block.Kind)</span>
+                    <code>@(block.BlockTypeKey ?? "unknown block type")</code>
+
+                    @if (block.Kind is ContentChangeKind.Moved)
+                    {
+                        <text> — position @(block.BeforeIndex + 1) → @(block.AfterIndex + 1)</text>
+                    }
+
+                    @if (block.Properties.Count > 0)
+                    {
+                        <ul>
+                            @foreach (var property in block.Properties)
+                            {
+                                <li>
+                                    <code>@property.Key</code>:
+                                    <del>@Show(property.Before)</del> → <ins>@Show(property.After)</ins>
+                                </li>
+                            }
+                        </ul>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}

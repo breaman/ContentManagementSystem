@@ -162,7 +162,7 @@ public sealed class DraftService(
             payload,
             cancellationToken);
 
-        if (TryApplyExpectedRowVersion(context.Entry(draft), request.ExpectedRowVersion) is false)
+        if (RowVersions.TryApply(context.Entry(draft), request.ExpectedRowVersion) is false)
         {
             return CmsResult<DraftSaveResult>.Invalid(
                 PageCodes.ConcurrentChange,
@@ -329,31 +329,6 @@ public sealed class DraftService(
         }
 
         return null;
-    }
-
-    /// <summary>
-    /// Tells EF which row version this save is claiming to overwrite.
-    /// </summary>
-    /// <returns>False when the supplied token is not decodable, true otherwise.</returns>
-    /// <remarks>
-    /// Setting the original value is what makes the check happen against the value the <em>caller</em>
-    /// last saw, rather than against the one this request just read. Without it the window between
-    /// this request's read and its write is unguarded, which is precisely the window two editors
-    /// saving at once occupy (spec section 11.8).
-    /// </remarks>
-    private static bool? TryApplyExpectedRowVersion(
-        Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry<PageVersion> entry,
-        string? expected)
-    {
-        if (string.IsNullOrWhiteSpace(expected)) return null;
-
-        Span<byte> buffer = stackalloc byte[16];
-
-        if (!Convert.TryFromBase64String(expected, buffer, out var written)) return false;
-
-        entry.Property(version => version.RowVersion).OriginalValue = buffer[..written].ToArray();
-
-        return true;
     }
 
     /// <summary>Reloads the stored draft so a conflict can hand back the copy that won.</summary>

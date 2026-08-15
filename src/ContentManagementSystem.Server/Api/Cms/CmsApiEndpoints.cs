@@ -1,3 +1,4 @@
+using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 
@@ -48,6 +49,11 @@ public static class CmsApiEndpoints
         group.MapZoneEndpoints();
         group.MapBlockTypeEndpoints();
         group.MapCompositionEndpoints();
+
+        group.MapPageEndpoints();
+        group.MapPageLifecycleEndpoints();
+        group.MapPageVersionEndpoints();
+        group.MapPageLockEndpoints();
 
         return group;
     }

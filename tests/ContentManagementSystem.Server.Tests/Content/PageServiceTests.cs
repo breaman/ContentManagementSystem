@@ -279,14 +279,14 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
                 InternalNotes = "Check with finance before publishing.",
                 RobotsIndex = false,
             },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         // A second patch naming one member must leave the first patch's five alone. Binding these to
         // plain nullables instead of Patch<T> is what turns "fix the title" into "clear the SEO".
         var patched = await pages.PatchMetadataAsync(
             created.Summary.Id,
             new PatchPageMetadataRequest { Title = "Pricing and Plans" },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         patched.IsSuccess.Should().BeTrue(Because(patched));
 
@@ -324,12 +324,12 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         await pages.PatchMetadataAsync(
             created.Summary.Id,
             new PatchPageMetadataRequest { OwnerUserId = owner, MetaTitle = "Plans and pricing" },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         var cleared = await pages.PatchMetadataAsync(
             created.Summary.Id,
             new PatchPageMetadataRequest { OwnerUserId = new Patch<int?>(null) },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         cleared.Value!.OwnerUserId.Should().BeNull("an explicit null is how a value is cleared");
         cleared.Value!.Seo.MetaTitle.Should().Be(
@@ -358,7 +358,7 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
                 StructuredDataJson = "{ not json",
                 UseExplicitUrl = true,
             },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         refused.Outcome.Should().Be(CmsOutcome.Invalid);
 
@@ -403,7 +403,7 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await viewer.PatchMetadataAsync(
                 created.Summary.Id,
                 new PatchPageMetadataRequest { Title = "Nope" },
-                cancellationToken))
+                cancellationToken: cancellationToken))
             .Outcome.Should().Be(CmsOutcome.Forbidden);
 
         var stranger = Service(scope, context, []);
@@ -444,7 +444,7 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         var result = await pages.PatchMetadataAsync(
             created.Summary.Id,
             new PatchPageMetadataRequest { OwnerUserId = 999_999 },
-            cancellationToken);
+            cancellationToken: cancellationToken);
 
         result.Outcome.Should().Be(CmsOutcome.Invalid);
         result.Diagnostics.Diagnostics.Should().ContainSingle()

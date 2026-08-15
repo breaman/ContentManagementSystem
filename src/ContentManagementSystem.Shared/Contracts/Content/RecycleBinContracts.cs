@@ -60,3 +60,14 @@ public sealed record SubtreeResult(
 /// alternative is irreversible.
 /// </remarks>
 public sealed record ReferenceBlockage(int PageId, IReadOnlyList<int> ReferencingPageIds);
+
+/// <summary>
+/// What a permanent delete removed.
+/// </summary>
+/// <param name="PageId">The page that no longer exists.</param>
+/// <param name="VersionsRemoved">
+/// How many version rows went with it. The number is the honest measure of what was destroyed —
+/// deleting a page nobody edited and deleting one with four years of history are the same request
+/// and very different events.
+/// </param>
+public sealed record PurgeResult(int PageId, int VersionsRemoved);

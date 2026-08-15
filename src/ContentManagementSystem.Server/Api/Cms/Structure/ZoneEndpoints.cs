@@ -45,19 +45,19 @@ public static class ZoneEndpoints
             .WithName("CreateZone")
             .WithSummary("Adds a zone to a template and cuts a new revision.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         zones.MapPut("/{zoneId:int}", UpdateAsync)
             .WithName("UpdateZone")
             .WithSummary("Updates a zone. Its key and field type cannot change.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         zones.MapDelete("/{zoneId:int}", DeleteAsync)
             .WithName("DeleteZone")
             .WithSummary("Removes a zone definition. Payload values under its key are retained.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         return group;
     }

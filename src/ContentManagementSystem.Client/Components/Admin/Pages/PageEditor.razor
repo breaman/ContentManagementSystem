@@ -1,0 +1,149 @@
+@page "/admin/pages/{Id:int}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Page?.Summary.Title ?? "Page")</PageTitle>
+
+@if (Page is null)
+{
+    <p role="status">Loading page…</p>
+}
+else
+{
+    <nav aria-label="Breadcrumb">
+        <a href="/admin/pages">← All pages</a>
+    </nav>
+
+    <h1>@Page.Summary.Title</h1>
+    <p class="text-body-secondary">
+        <code>@Page.Summary.Slug</code> · template <code>@Page.Summary.TemplateKey</code>
+        revision @Page.TemplateRevision · draft v@Page.Summary.DraftVersionNumber
+        @if (Page.Summary.PublishedVersionNumber is { } published)
+        {
+            <text> · published v@published</text>
+        }
+    </p>
+
+    @if (Page.Summary.HasUnpublishedChanges)
+    {
+        <p class="alert alert-warning" role="status">
+            This draft has moved on from what is published. The public site still shows
+            v@Page.Summary.PublishedVersionNumber until you publish again.
+        </p>
+    }
+
+    <DiagnosticList Diagnostics="Errors" Heading="@ErrorHeading" />
+    <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Worth knowing" />
+
+    @if (Notice is { Length: > 0 })
+    {
+        <p class="alert alert-success" role="status">@Notice</p>
+    }
+
+    <h2 class="h5 mt-4">Content</h2>
+
+    @if (Slots is null)
+    {
+        <p role="status">Loading zones…</p>
+    }
+    else if (Slots.Count == 0)
+    {
+        <p>
+            This template's revision @Page.TemplateRevision captured no zones, so there is nothing to
+            fill in. <a href="@($"/admin/structure/templates/{Page.Summary.TemplateId}")">Add some</a>,
+            then republish the page to adopt them.
+        </p>
+    }
+    else
+    {
+        <EditForm Model="Values" OnValidSubmit="SaveAsync" FormName="save-draft">
+            <fieldset disabled="@(IsBusy || !CanEdit)">
+                @foreach (var slot in Slots)
+                {
+                    <div class="mb-3">
+                        <label class="form-label" for="@($"zone-{slot.Key}")">
+                            @slot.Name
+                            @if (slot.IsRequired)
+                            {
+                                <span class="text-danger" aria-hidden="true">*</span>
+                                <span class="visually-hidden">(required to publish)</span>
+                            }
+                        </label>
+
+                        @if (Editable(slot.FieldTypeKey))
+                        {
+                            <textarea id="@($"zone-{slot.Key}")" class="form-control" rows="3"
+                                      value="@Values.GetValueOrDefault(slot.Key)"
+                                      @onchange="e => Values[slot.Key] = e.Value?.ToString() ?? string.Empty">
+                            </textarea>
+                        }
+                        else
+                        {
+                            <textarea id="@($"zone-{slot.Key}")" class="form-control font-monospace" rows="4"
+                                      readonly value="@Values.GetValueOrDefault(slot.Key)"></textarea>
+                        }
+
+                        <div class="form-text">
+                            <code>@slot.Key</code> · @slot.FieldTypeKey
+                            @if (!Editable(slot.FieldTypeKey))
+                            {
+                                <text>
+                                    — shown as stored. A control for this field type arrives with the
+                                    authoring experience in Phase 6.
+                                </text>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                    <button type="submit" class="btn btn-primary">Save draft</button>
+                </AuthorizeView>
+            </fieldset>
+        </EditForm>
+    }
+
+    <h2 class="h5 mt-4">Publishing</h2>
+
+    @if (Validation is not null)
+    {
+        <p role="status">
+            @if (Validation.CanPublish)
+            {
+                <span class="badge text-bg-success">Ready to publish</span>
+            }
+            else
+            {
+                <span class="badge text-bg-danger">@Validation.Errors.Count problem(s) block publishing</span>
+            }
+        </p>
+
+        <DiagnosticList Diagnostics="Validation.Errors" Heading="Blocking" />
+        <DiagnosticList Diagnostics="Validation.Warnings" IsError="false" Heading="Worth checking first" />
+    }
+
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
+                @onclick="ValidateAsync">
+            Check before publishing
+        </button>
+
+        <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
+            <button type="button" class="btn btn-success" disabled="@IsBusy" @onclick="PublishAsync">
+                @(AcknowledgeWarnings ? "Publish anyway" : "Publish")
+            </button>
+
+            @if (Page.Summary.PublishedVersionNumber is not null)
+            {
+                <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
+                        @onclick="UnpublishAsync">
+                    Unpublish
+                </button>
+            }
+        </AuthorizeView>
+
+        <a class="btn btn-outline-secondary" href="@($"/admin/pages/{Id}/versions")">Version history</a>
+    </div>
+}

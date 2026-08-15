@@ -1,0 +1,141 @@
+@page "/admin/pages"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+@using ContentManagementSystem.Shared.Contracts.Structure
+
+<PageTitle>Pages</PageTitle>
+
+<h1>Pages</h1>
+<p class="text-body-secondary">
+    The content tree. A page has a draft you edit and, once published, a separate version the public
+    site serves — editing one never disturbs the other.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The page was not created" />
+<DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Created, with warnings" />
+
+@if (Roots is null)
+{
+    <p role="status">Loading pages…</p>
+}
+else if (Roots.Count == 0)
+{
+    <p>No pages yet. Create one below.</p>
+}
+else
+{
+    <table class="table">
+        <caption>The site tree, two levels deep.</caption>
+        <thead>
+            <tr>
+                <th scope="col">Title</th>
+                <th scope="col">Slug</th>
+                <th scope="col">Template</th>
+                <th scope="col">Draft</th>
+                <th scope="col">Published</th>
+                <th scope="col">State</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var node in Flatten(Roots))
+            {
+                <tr>
+                    <th scope="row" style="@Indent(node.Page.Depth)">
+                        <a href="@($"/admin/pages/{node.Page.Id}")">@node.Page.Title</a>
+                    </th>
+                    <td><code>@node.Page.Slug</code></td>
+                    <td>@node.Page.TemplateKey</td>
+                    <td>v@node.Page.DraftVersionNumber</td>
+                    <td>
+                        @if (node.Page.PublishedVersionNumber is { } published)
+                        {
+                            @($"v{published}")
+                        }
+                        else
+                        {
+                            <span class="text-body-secondary">—</span>
+                        }
+                    </td>
+                    <td>
+                        @if (node.Page.PublishedVersionNumber is null)
+                        {
+                            <span class="badge text-bg-secondary">Never published</span>
+                        }
+                        else if (node.Page.HasUnpublishedChanges)
+                        {
+                            <span class="badge text-bg-warning">Unpublished changes</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">Live</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+    <h2 class="h5 mt-4">Create a page</h2>
+
+    @if (Templates is { Count: 0 })
+    {
+        <p>
+            There are no templates to create a page from yet.
+            <a href="/admin/structure/templates">Define one first.</a>
+        </p>
+    }
+    else
+    {
+        <EditForm Model="Form" OnValidSubmit="CreateAsync" FormName="create-page">
+            <DataAnnotationsValidator />
+
+            <fieldset disabled="@IsBusy">
+                <div class="form-floating mb-3">
+                    <InputSelect @bind-Value="Form.TemplateId" id="page-template" class="form-select">
+                        <option value="0">Choose a template…</option>
+                        @foreach (var template in Templates ?? [])
+                        {
+                            <option value="@template.Id" disabled="@(!template.IsEnabled)">
+                                @template.Name (@template.ZoneCount zone(s))
+                            </option>
+                        }
+                    </InputSelect>
+                    <label for="page-template">Template</label>
+                    <ValidationMessage For="() => Form.TemplateId" class="text-danger" />
+                    <div class="form-text">Fixed once the page exists: it decides which zones the page has.</div>
+                </div>
+
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Form.Title" id="page-title" class="form-control"
+                               placeholder="Pricing" />
+                    <label for="page-title">Title</label>
+                    <ValidationMessage For="() => Form.Title" class="text-danger" />
+                </div>
+
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Form.Slug" id="page-slug" class="form-control"
+                               placeholder="pricing" />
+                    <label for="page-slug">Slug (optional)</label>
+                    <div class="form-text">Left empty, it is generated from the title and stays editable.</div>
+                </div>
+
+                <div class="form-floating mb-3">
+                    <InputSelect @bind-Value="Form.ParentId" id="page-parent" class="form-select">
+                        <option value="">At the root of the site</option>
+                        @foreach (var node in Flatten(Roots ?? []))
+                        {
+                            <option value="@node.Page.Id">@Prefix(node.Page.Depth)@node.Page.Title</option>
+                        }
+                    </InputSelect>
+                    <label for="page-parent">Parent</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Create page</button>
+            </fieldset>
+        </EditForm>
+    }
+</AuthorizeView>

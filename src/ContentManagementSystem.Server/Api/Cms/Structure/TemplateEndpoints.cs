@@ -44,13 +44,13 @@ public static class TemplateEndpoints
             .WithName("CreateTemplate")
             .WithSummary("Creates a template and cuts its first revision.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         templates.MapPut("/{id:int}", UpdateAsync)
             .WithName("UpdateTemplate")
             .WithSummary("Updates a template's editor-facing metadata.")
             .RequireAuthorization(CmsPermissions.StructureEdit)
-            .AddEndpointFilter<CmsAntiforgeryFilter>();
+            .RequireCmsAntiforgery();
 
         templates.MapGet("/{id:int}/revisions", ListRevisionsAsync)
             .WithName("ListTemplateRevisions")

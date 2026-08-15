@@ -21,4 +21,7 @@ builder.Services.AddScoped<IToastService, ToastService>();
 // ServerStructureClient, backs the same screens during pre-render.
 builder.Services.AddScoped<IStructureClient, HttpStructureClient>();
 
+// The page admin screens, likewise, with ServerPageClient behind the same interface on the server.
+builder.Services.AddScoped<IPageClient, HttpPageClient>();
+
 await builder.Build().RunAsync();
