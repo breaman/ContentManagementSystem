@@ -72,6 +72,12 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>Every state of every page — drafts, published versions, and archived history.</summary>
     public DbSet<PageVersion> PageVersions => Set<PageVersion>();
 
+    /// <summary>Content authored once and placed on many pages — footers, banners, carousels.</summary>
+    public DbSet<ReusableContent> ReusableContents => Set<ReusableContent>();
+
+    /// <summary>Every state of every reusable item — drafts, published versions, and history.</summary>
+    public DbSet<ReusableContentVersion> ReusableContentVersions => Set<ReusableContentVersion>();
+
     /// <summary>Edges from stored content to the entities it depends on, rebuilt on every save.</summary>
     public DbSet<ContentReference> ContentReferences => Set<ContentReference>();
 
@@ -101,6 +107,7 @@ public class ApplicationDbContext : AuthDbContext
         // thing the recycle bin exists to preserve (spec section 23.5) — and giving the dependents
         // a matching filter would hide exactly the rows a restore needs to find. Suppressed here
         // rather than at each registration so the decision travels with the model that made it.
+        // ReusableContent and ReusableContentVersion are the same pairing for the same reason.
         optionsBuilder.ConfigureWarnings(warnings => warnings.Ignore(
             CoreEventId.PossibleIncorrectRequiredNavigationWithQueryFilterInteractionWarning));
     }

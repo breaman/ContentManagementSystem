@@ -69,4 +69,34 @@ public static class VersionNumbers
 
         return (highest ?? 0) + First;
     }
+
+    /// <summary>
+    /// Reads the next number for a reusable content item from the database.
+    /// </summary>
+    /// <param name="context">The application database context.</param>
+    /// <param name="reusableContentId">Identity of the reusable item.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The number to give the next version written for that item.</returns>
+    /// <remarks>
+    /// Here rather than in <c>ReusableContentService</c> because this is the rule, not the query:
+    /// the highest ever issued and never the count, so that pruning the middle of a history cannot
+    /// reissue a number. For a reusable item that rule is load-bearing in a way it is not for a
+    /// page — a version number is what a <em>pinned</em> placement names (spec section 9.2), so a
+    /// reissued number would silently repoint somebody's audited, deliberately frozen content at a
+    /// different snapshot.
+    /// </remarks>
+    public static async Task<int> NextForReusableAsync(
+        ApplicationDbContext context,
+        int reusableContentId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var highest = await context.ReusableContentVersions
+            .Where(version => version.ReusableContentId == reusableContentId)
+            .Select(version => (int?)version.VersionNumber)
+            .MaxAsync(cancellationToken);
+
+        return (highest ?? 0) + First;
+    }
 }

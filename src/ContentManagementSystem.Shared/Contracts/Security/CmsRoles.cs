@@ -37,6 +37,17 @@ public static class CmsRoles
     /// <summary>The roles that may publish. Mirrors <see cref="CmsPermissions.ContentPublish"/>.</summary>
     public const string ContentPublishers = $"{Administrator},{Developer},{Editor},{Approver}";
 
+    /// <summary>
+    /// The roles that may move content to the recycle bin and restore it. Mirrors
+    /// <see cref="CmsPermissions.ContentDelete"/>.
+    /// </summary>
+    /// <remarks>
+    /// Narrower than <see cref="ContentEditors"/> by two roles, which is the point: an author may
+    /// write anything and remove nothing, so the delete control is absent from their screen rather
+    /// than present and refused.
+    /// </remarks>
+    public const string ContentDeleters = $"{Administrator},{Developer},{Editor}";
+
     /// <summary>Everything, including user and role management.</summary>
     public const string Administrator = "Administrator";
 

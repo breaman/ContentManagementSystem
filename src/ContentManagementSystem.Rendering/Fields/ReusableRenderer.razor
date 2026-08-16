@@ -1,4 +1,32 @@
 @inherits CmsFieldRendererBase
-@* Renders nothing, which is what spec section 15.3 asks for when reusable content cannot be
-   resolved — and until P4 builds the item store, none of it can be. The cache tag is added anyway;
-   see the code-behind. *@
+@* A resolved placement renders as the block type the item is shaped by — the same component, given
+   the same shape of properties, as an inline block of that type. That is the whole of spec section
+   9.1's "a reusable item is an instance of a block type": nothing here knows what a footer looks
+   like, and adding a reusable-content shape is a block type rather than a change to this file.
+
+   Cascading the chain is what makes nesting safe. It is IsFixed because a chain is built once for
+   this placement and never replaced, and it is what the resolver reads to refuse a loop.
+
+   The boundary is a block-scope one: an item is a block, and one broken shared banner must not take
+   down the zone that holds it — which on a footer zone is the bottom of every page on the site. *@
+@if (Resolved.IsResolved && ComponentType is not null)
+{
+    <CascadingValue Value="Chain" IsFixed="true">
+        <CascadingValue @key="Resolved.VersionId" Value="Block" IsFixed="true">
+            <CmsErrorBoundary ZoneKey="@PropertyKey"
+                              Scope="CmsRenderScope.Block"
+                              BlockId="Block!.BlockId"
+                              BlockTypeKey="@Resolved.BlockTypeKey">
+                @if (ShowsBadge)
+                {
+                    <CmsReusableBadge Name="@Resolved.Name"
+                                      VersionNumber="Resolved.VersionNumber"
+                                      IsPinned="Resolved.IsPinned"
+                                      IsLatest="Resolved.IsLatest"
+                                      PublishedVersionNumber="Resolved.PublishedVersionNumber" />
+                }
+                <DynamicComponent Type="ComponentType" Parameters="Parameters" />
+            </CmsErrorBoundary>
+        </CascadingValue>
+    </CascadingValue>
+}

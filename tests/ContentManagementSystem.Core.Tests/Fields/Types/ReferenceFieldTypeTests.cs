@@ -144,8 +144,28 @@ public class ReferenceFieldTypeTests
         var references = _reusable.ExtractReferences(
             """{ "type": "reusable", "reusableContentId": 3, "pinnedVersionId": 7 }""");
 
-        // One row, for the item, pinned or not. Recording the version instead would drop the page
-        // out of the where-used list the delete guard runs (spec section 9.4).
+        // One row, and its target is the item, pinned or not. Recording the version as the target
+        // instead would drop the page out of the where-used list the delete guard runs — while the
+        // pin riding along on the row is what lets the publish-impact check split the pages that
+        // will change from the ones that will not (spec section 9.4).
+        references.Should().ContainSingle()
+            .Which.Should().Be(new ContentReference(
+                ContentReferenceTargetType.ReusableContent,
+                3,
+                Path: null,
+                IsPinned: true,
+                PinnedVersionId: 7));
+    }
+
+    [Fact]
+    public void ALateBoundPlacementReportsNoPin()
+    {
+        var references = _reusable.ExtractReferences(
+            """{ "type": "reusable", "reusableContentId": 3, "pinnedVersionId": null }""");
+
+        // The default, and the one that delivers G4. Asserted beside the pinned case because the
+        // two rows differ in nothing an index can see — only in the flag that decides whether a
+        // publish of item 3 counts this page as changing.
         references.Should().ContainSingle()
             .Which.Should().Be(new ContentReference(ContentReferenceTargetType.ReusableContent, 3));
     }

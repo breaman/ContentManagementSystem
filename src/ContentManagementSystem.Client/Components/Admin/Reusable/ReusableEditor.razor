@@ -1,0 +1,238 @@
+@page "/admin/reusable/{Id:int}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Item?.Summary.Name ?? "Reusable content")</PageTitle>
+
+@if (Item is null)
+{
+    <p role="status">Loading item…</p>
+}
+else
+{
+    <nav aria-label="Breadcrumb">
+        <a href="/admin/reusable">← Reusable content</a>
+    </nav>
+
+    <h1>@Item.Summary.Name</h1>
+    <p class="text-body-secondary">
+        <code>@Item.Summary.Key</code> · shaped by <code>@Item.Summary.BlockTypeKey</code>
+        revision @Item.BlockTypeRevision · draft v@Item.Summary.DraftVersionNumber
+        @if (Item.Summary.PublishedVersionNumber is { } published)
+        {
+            <text> · published v@published</text>
+        }
+    </p>
+
+    @if (Item.Summary.HasUnpublishedChanges)
+    {
+        <p class="alert alert-warning" role="status">
+            This draft has moved on from what is published. Every page placing this item still shows
+            v@Item.Summary.PublishedVersionNumber until you publish again.
+        </p>
+    }
+
+    <DiagnosticList Diagnostics="Errors" Heading="@ErrorHeading" />
+    <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Worth knowing" />
+
+    @if (Notice is { Length: > 0 })
+    {
+        <p class="alert alert-success" role="status">@Notice</p>
+    }
+
+    <h2 class="h5 mt-4">Content</h2>
+
+    @if (Slots is null)
+    {
+        <p role="status">Loading properties…</p>
+    }
+    else if (Slots.Count == 0)
+    {
+        <p>
+            Revision @Item.BlockTypeRevision of <code>@Item.Summary.BlockTypeKey</code> captured no
+            properties, so there is nothing to fill in.
+            <a href="@($"/admin/structure/block-types/{Item.Summary.BlockTypeId}")">Add some</a>,
+            then republish to adopt them.
+        </p>
+    }
+    else
+    {
+        <EditForm Model="Values" OnValidSubmit="SaveAsync" FormName="save-reusable-draft">
+            <fieldset disabled="@(IsBusy || !CanEdit)">
+                @foreach (var slot in Slots)
+                {
+                    <div class="mb-3">
+                        <label class="form-label" for="@($"prop-{slot.Key}")">
+                            @slot.Name
+                            @if (slot.IsRequired)
+                            {
+                                <span class="text-danger" aria-hidden="true">*</span>
+                                <span class="visually-hidden">(required to publish)</span>
+                            }
+                        </label>
+
+                        @if (Editable(slot.FieldTypeKey))
+                        {
+                            <textarea id="@($"prop-{slot.Key}")" class="form-control" rows="3"
+                                      value="@Values.GetValueOrDefault(slot.Key)"
+                                      @onchange="e => Values[slot.Key] = e.Value?.ToString() ?? string.Empty">
+                            </textarea>
+                        }
+                        else
+                        {
+                            <textarea id="@($"prop-{slot.Key}")" class="form-control font-monospace" rows="4"
+                                      readonly value="@Values.GetValueOrDefault(slot.Key)"></textarea>
+                        }
+
+                        <div class="form-text">
+                            <code>@slot.Key</code> · @slot.FieldTypeKey
+                            @if (!Editable(slot.FieldTypeKey))
+                            {
+                                <text>
+                                    — shown as stored. A control for this field type arrives with the
+                                    authoring experience in Phase 6.
+                                </text>
+                            }
+                        </div>
+                    </div>
+                }
+
+                <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                    <button type="submit" class="btn btn-primary">Save draft</button>
+                </AuthorizeView>
+            </fieldset>
+        </EditForm>
+    }
+
+    <h2 class="h5 mt-4">Where this is used</h2>
+    <WhereUsedPanel Impact="Impact" Verb="@ImpactVerb" />
+
+    <h2 class="h5 mt-4">Publishing</h2>
+
+    @if (Validation is not null)
+    {
+        <p role="status">
+            @if (Validation.CanPublish)
+            {
+                <span class="badge text-bg-success">Ready to publish</span>
+            }
+            else
+            {
+                <span class="badge text-bg-danger">@Validation.Errors.Count problem(s) block publishing</span>
+            }
+        </p>
+
+        <DiagnosticList Diagnostics="Validation.Errors" Heading="Blocking" />
+        <DiagnosticList Diagnostics="Validation.Warnings" IsError="false" Heading="Worth checking first" />
+    }
+
+    @* The confirmation spec section 9.4 requires whenever affectedPageCount > 0. It is a panel
+       rather than a modal because these screens are unstyled and have no dialog machinery yet — what
+       matters is that the count is put in front of a person before the irreversible click, and that
+       the server refuses the click if it was not. *@
+    @if (Pending is { } pending)
+    {
+        <div class="alert alert-warning" role="alertdialog"
+             aria-labelledby="impact-heading" aria-describedby="impact-body">
+            <h3 class="h6" id="impact-heading">Confirm: this reaches pages you are not editing</h3>
+            <p class="mb-2" id="impact-body">
+                @pending.Description
+            </p>
+            <WhereUsedPanel Impact="pending.Impact" Verb="@pending.Verb" />
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-danger" disabled="@IsBusy"
+                        @onclick="ConfirmAsync">
+                    @pending.ConfirmLabel
+                </button>
+                <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
+                        @onclick="Cancel">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy" @onclick="ValidateAsync">
+            Check before publishing
+        </button>
+
+        <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
+            <button type="button" class="btn btn-success" disabled="@IsBusy" @onclick="PublishAsync">
+                Publish
+            </button>
+
+            @if (Item.Summary.PublishedVersionNumber is not null)
+            {
+                <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
+                        @onclick="UnpublishAsync">
+                    Unpublish
+                </button>
+            }
+        </AuthorizeView>
+
+        <AuthorizeView Roles="@CmsRoles.ContentDeleters" Context="deleter">
+            <button type="button" class="btn btn-outline-danger" disabled="@IsBusy" @onclick="DeleteAsync">
+                Delete
+            </button>
+        </AuthorizeView>
+    </div>
+
+    <h2 class="h5 mt-4">Versions</h2>
+    <p class="text-body-secondary">
+        A version's id is what a pinned placement names, so it is shown beside the number an editor
+        reads.
+    </p>
+
+    @if (Versions is null)
+    {
+        <p role="status">Loading history…</p>
+    }
+    else
+    {
+        <table class="table table-sm">
+            <caption>Every version of this item, newest first.</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Version</th>
+                    <th scope="col">Id</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Published</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var version in Versions)
+                {
+                    <tr>
+                        <th scope="row">
+                            v@version.VersionNumber
+                            @if (version.IsDraft)
+                            {
+                                <span class="badge text-bg-secondary ms-1">draft</span>
+                            }
+                            @if (version.IsPublished)
+                            {
+                                <span class="badge text-bg-success ms-1">live</span>
+                            }
+                        </th>
+                        <td><code>@version.Id</code></td>
+                        <td>@version.Status</td>
+                        <td>
+                            @if (version.PublishedOn is { } publishedOn)
+                            {
+                                @publishedOn.ToString("u")
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+}

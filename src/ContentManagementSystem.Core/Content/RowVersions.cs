@@ -23,10 +23,13 @@ public static class RowVersions
     /// <summary>Bytes a SQL Server <c>rowversion</c> occupies.</summary>
     private const int TokenLength = 8;
 
+    /// <summary>Name of the concurrency-token property, which every guarded entity spells alike.</summary>
+    private const string TokenProperty = nameof(PageVersion.RowVersion);
+
     /// <summary>
     /// Guards a write with the version the caller last saw.
     /// </summary>
-    /// <param name="entry">Change-tracker entry for the version being written.</param>
+    /// <param name="entry">Change-tracker entry for the row being written.</param>
     /// <param name="expected">The Base64 token, or null to write unconditionally.</param>
     /// <returns>
     /// <see langword="true"/> when the guard was applied, <see langword="null"/> when no token was
@@ -37,8 +40,19 @@ public static class RowVersions
     /// An unreadable token is distinguished from an absent one deliberately: silently treating
     /// garbage as "no precondition" would turn a client's encoding bug into an unguarded overwrite,
     /// which is the single failure the token exists to prevent.
+    /// <para>
+    /// The property is reached by name rather than by a typed lambda, so one implementation serves
+    /// every guarded entity — a page version, a reusable item, a reusable version. A typed overload
+    /// per entity would be four copies of the reasoning above, and the copy that drifted would be
+    /// the one that compared the token in code.
+    /// </para>
     /// </remarks>
-    public static bool? TryApply(EntityEntry<PageVersion> entry, string? expected)
+    /// <exception cref="InvalidOperationException">
+    /// The entity has no <c>RowVersion</c> property. That is a programming error rather than a bad
+    /// request: an entity without a concurrency token cannot be guarded, and quietly writing it
+    /// unguarded is the outcome this method exists to rule out.
+    /// </exception>
+    public static bool? TryApply(EntityEntry entry, string? expected)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
@@ -48,7 +62,7 @@ public static class RowVersions
 
         if (!Convert.TryFromBase64String(expected, buffer, out var written)) return false;
 
-        entry.Property(version => version.RowVersion).OriginalValue = buffer[..written].ToArray();
+        entry.Property(TokenProperty).OriginalValue = buffer[..written].ToArray();
 
         return true;
     }

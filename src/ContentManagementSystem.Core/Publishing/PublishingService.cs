@@ -420,6 +420,7 @@ public sealed class PublishingService(
             DraftService.ToValidationResult(report).Diagnostics);
 
         diagnostics.AddRange(await CheckReferencedPagesAsync(payload, cancellationToken));
+        diagnostics.AddRange(await CheckReferencedReusableAsync(payload, cancellationToken));
         diagnostics.AddRange(await CheckUrlAvailableAsync(page, cancellationToken));
 
         if (!page.Template.IsEnabled)
@@ -473,9 +474,9 @@ public sealed class PublishingService(
     /// Checks that every page this content links to still exists and is not in the recycle bin.
     /// </summary>
     /// <remarks>
-    /// The link-integrity half of spec section 5.5. Media and reusable content are checked the same
-    /// way once those tables exist (P5 and P4); their references are extracted already, so this
-    /// becomes two more queries rather than a new mechanism.
+    /// The link-integrity half of spec section 5.5. Reusable content is checked the same way by
+    /// <see cref="CheckReferencedReusableAsync"/>, and media joins them in P5 — the references are
+    /// extracted already, so each is one more query rather than a new mechanism.
     /// <para>
     /// A link to a page that exists but is not itself published is a <em>warning</em>, not an error.
     /// Publishing a section top-down is ordinary work, and refusing it would mean an editor could
@@ -537,6 +538,127 @@ public sealed class PublishingService(
     }
 
     /// <summary>
+    /// Checks that every reusable item this content places still exists, and is of a shape the
+    /// property accepts (task P4-04, spec section 9.2).
+    /// </summary>
+    /// <remarks>
+    /// A placement of an item that has been deleted is an error: the zone renders nothing, and the
+    /// editor's remedy is to restore the item or remove the placement. A placement of an item that
+    /// exists but is not published is a <em>warning</em>, for the reason a link to an unpublished
+    /// page is one — building a page around a banner that goes live next week is ordinary work, and
+    /// refusing it would make the two publishes have to happen in one order.
+    /// </remarks>
+    private async Task<IReadOnlyList<ValidationDiagnostic>> CheckReferencedReusableAsync(
+        ContentPayload payload,
+        CancellationToken cancellationToken)
+    {
+        var references = indexer.Extract(payload)
+            .Where(reference => reference.TargetType is ContentReferenceTargetType.ReusableContent)
+            .ToList();
+
+        if (references.Count == 0) return [];
+
+        var targets = references.Select(reference => reference.TargetId).ToHashSet();
+
+        var live = await context.ReusableContents
+            .AsNoTracking()
+            .Where(candidate => targets.Contains(candidate.Id))
+            .Select(candidate => new
+            {
+                candidate.Id,
+                candidate.Key,
+                BlockTypeKey = candidate.BlockType.Key,
+                IsPublished = candidate.PublishedVersionId != null,
+            })
+            .ToListAsync(cancellationToken);
+
+        var diagnostics = new List<ValidationDiagnostic>();
+
+        foreach (var target in targets.Order())
+        {
+            var match = live.FirstOrDefault(candidate => candidate.Id == target);
+
+            if (match is null)
+            {
+                diagnostics.Add(new ValidationDiagnostic(
+                    ReusableCodes.NotFound,
+                    $"This content places reusable item {target}, which no longer exists or is in " +
+                    "the recycle bin.",
+                    ValidationSeverity.Error));
+            }
+            else if (!match.IsPublished)
+            {
+                diagnostics.Add(new ValidationDiagnostic(
+                    ReusableCodes.NothingPublished,
+                    $"This content places reusable item {target} ('{match.Key}'), which is not " +
+                    "published yet. It will render nothing until it is.",
+                    ValidationSeverity.Warning));
+            }
+        }
+
+        diagnostics.AddRange(CheckAllowedReusableTypes(payload, references, live.ToDictionary(
+            row => row.Id,
+            row => (row.Key, row.BlockTypeKey))));
+
+        return diagnostics;
+    }
+
+    /// <summary>
+    /// Checks each placement against the <c>allowedTypes</c> its property declares.
+    /// </summary>
+    /// <remarks>
+    /// The reusable-content counterpart of <see cref="CheckAllowedTemplates"/>, enforced in the same
+    /// place and for the same structural reason: a field type is a stateless singleton with no
+    /// database, and "what shape is item 3" cannot be answered from the stored value alone.
+    /// <para>
+    /// The setting names <em>block type</em> keys, because a reusable item's shape is a block type
+    /// (spec section 9.1). An error rather than a warning: a property restricted to banner-shaped
+    /// items and filled with a footer renders a component the surrounding markup was not designed
+    /// for, and the failure surfaces on the public site rather than here.
+    /// </para>
+    /// </remarks>
+    private IReadOnlyList<ValidationDiagnostic> CheckAllowedReusableTypes(
+        ContentPayload payload,
+        IReadOnlyList<Shared.Contracts.Fields.ContentReference> references,
+        Dictionary<int, (string Key, string BlockTypeKey)> shapesByItemId)
+    {
+        var templateSchema = payload.TemplateKey is { } templateKey &&
+            payload.TemplateRevision is { } revision &&
+            schemas.TryGetTemplate(templateKey, revision, out var resolved)
+            ? resolved
+            : null;
+
+        var diagnostics = new List<ValidationDiagnostic>();
+
+        foreach (var reference in references)
+        {
+            // Resolved at whatever depth the reference sits, zone or nested block property alike —
+            // a footer placed inside a card is exactly as restricted as one placed in a zone.
+            if (ContentSlots.Resolve(reference.Path, payload, templateSchema, schemas) is not { } slot)
+            {
+                continue;
+            }
+
+            var allowed = slot.Configuration.GetStringArray("allowedTypes");
+
+            if (allowed.Length == 0) continue;
+
+            if (!shapesByItemId.TryGetValue(reference.TargetId, out var shape)) continue;
+
+            if (Array.IndexOf(allowed, shape.BlockTypeKey) >= 0) continue;
+
+            diagnostics.Add(new ValidationDiagnostic(
+                FieldValidationCodes.NotAllowed,
+                $"'{slot.Name}' accepts reusable content shaped by {string.Join(", ", allowed)}, but " +
+                $"'{shape.Key}' is shaped by '{shape.BlockTypeKey}'.",
+                ValidationSeverity.Error,
+                reference.Path));
+        }
+
+        return diagnostics;
+    }
+
+    /// <summary>
     /// Checks each page reference against the <c>allowedTemplates</c> its property declares.
     /// </summary>
     /// <remarks>
@@ -571,17 +693,11 @@ public sealed class PublishingService(
 
         foreach (var reference in references)
         {
-            var location = ReferencePath.Parse(reference.Path, payload);
-
-            if (location.ZoneKey is not { } zoneKey) continue;
-
-            // Only zone-level references are checked. A reference inside a block belongs to a block
-            // type property, and reaching its schema means resolving the block's own captured
-            // revision — which is P4's business, since that is where nested structure is walked for
-            // anything other than validation.
-            if (location.BlockId is not null) continue;
-
-            if (schema.FindZone(zoneKey) is not { } property) continue;
+            // Resolved at whatever depth the reference sits. Zone-level was all this could reach
+            // before P4 supplied ContentSlots; a page reference inside a card block is governed by
+            // the card's property configuration, and skipping it left the restriction enforced in
+            // one half of the content model and silently ignored in the other.
+            if (ContentSlots.Resolve(reference.Path, payload, schema, schemas) is not { } property) continue;
 
             var allowed = property.Configuration.GetStringArray("allowedTemplates");
 
@@ -594,7 +710,7 @@ public sealed class PublishingService(
             diagnostics.Add(new ValidationDiagnostic(
                 FieldValidationCodes.NotAllowed,
                 $"'{property.Name}' accepts pages using {string.Join(", ", allowed)}, but page " +
-                $"{reference.TargetId} uses '{templateKey}'.",
+                $"{reference.TargetId} uses '{targetTemplate}'.",
                 ValidationSeverity.Error,
                 reference.Path));
         }

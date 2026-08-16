@@ -1,0 +1,17 @@
+@* The affordance task P4-05 asks for, and the reason it is markup rather than a class: the document
+   this appears in is styled by the site's own stylesheet, which knows nothing about the CMS's class
+   names — so a badge that was only a class would be invisible on every deployment that had not been
+   told to add a rule for it. Same argument as CmsDraftBadge.
+
+   The "update to latest" action is an attribute rather than a control. This component renders inside
+   the previewed page, which is a static-SSR document with no interactivity beneath it (spec section
+   5.3); the backoffice reads these attributes out of the preview frame and offers the action in its
+   own chrome, where a button can actually do something. A form posting from inside the page would
+   need an interactive render mode here, which is the one thing the delivery path must not have. *@
+<span class="cms-reusable-badge"
+      data-cms-reusable-name="@Name"
+      data-cms-reusable-version="@VersionNumber"
+      data-cms-reusable-pinned="@(IsPinned ? "true" : "false")"
+      data-cms-reusable-stale="@(IsStale ? "true" : "false")"
+      data-cms-reusable-latest="@PublishedVersionNumber"
+      title="@Title">@Name@(IsPinned ? $" · pinned to v{VersionNumber}" : string.Empty)</span>

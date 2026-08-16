@@ -1,0 +1,17 @@
+@attribute [CmsBlockType(
+    "rawHtml",
+    "Raw HTML",
+    Description = "A single block of HTML, sanitized on save and again on render.",
+    IconKey = "bi-code",
+    SummaryTemplate = "{content}")]
+@inherits CmsBlockBase
+@* The one property goes through CmsBlockProperty rather than being interpolated here, and for this
+   block type that is load-bearing rather than stylistic: RawHtmlRenderer re-runs the sanitizer on
+   the way out (ADR-0008), and markup that emitted the stored string itself would put whatever is in
+   the database straight onto the page.
+
+   No wrapper element beyond the marker div. A footer authored as raw HTML brings its own structure,
+   and a <section> around it would put a landmark into every page that shows it. *@
+<div class="cms-block cms-raw-html" data-block-type="rawHtml" data-block="@BlockId">
+    <CmsBlockProperty Name="content" />
+</div>

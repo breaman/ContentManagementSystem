@@ -228,10 +228,12 @@ public class ReferenceFieldRendererTests : IDisposable
     }
 
     [Fact]
-    public void ReusableContentRendersNothingButStillDeclaresTheDependency()
+    public void AnUnresolvableReusablePlacementRendersNothingButStillDeclaresTheDependency()
     {
-        // One publish of a shared item has to update every page placing it, and it can only do that
-        // through a tag the page carried from the moment it was rendered.
+        // Nothing is registered in the resolver, so item 3 does not exist — which renders nothing
+        // and logs, per spec section 15.3. What must survive that is the tag: a page that rendered
+        // nothing because the item was missing has to be evicted when the item arrives, and a tag
+        // added only on a successful resolve would leave it stale forever.
         var context = RenderTagged("""{"type":"reusable","reusableContentId":3}""", out var markup);
 
         markup.Should().BeEmpty();

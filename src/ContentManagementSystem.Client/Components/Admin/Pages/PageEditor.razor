@@ -42,6 +42,11 @@ else
         <p class="alert alert-success" role="status">@Notice</p>
     }
 
+    @* The pinned-version affordance of spec section 9.2, on the page rather than on the item —
+       the pin is a property of the placement, so the person who can clear it is the person editing
+       the page. It renders nothing at all when no placement on this page is pinned. *@
+    <PinnedPlacements Page="Page" OnUpdated="ReloadAsync" />
+
     <h2 class="h5 mt-4">Content</h2>
 
     @if (Slots is null)

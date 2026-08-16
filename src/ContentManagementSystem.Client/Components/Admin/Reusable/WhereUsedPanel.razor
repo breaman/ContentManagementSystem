@@ -1,0 +1,109 @@
+@using ContentManagementSystem.Shared.Contracts.Content
+
+@if (Impact is null)
+{
+    <p role="status">Loading where this is used…</p>
+}
+else if (!Impact.IsReferenced)
+{
+    <p>Nothing places this item yet, so publishing it changes no page and deleting it breaks none.</p>
+}
+else
+{
+    <p role="status">
+        <strong>@Impact.AffectedPageCount</strong> published
+        page@(Impact.AffectedPageCount == 1 ? string.Empty : "s")
+        @Verb @(Impact.PinnedPageCount > 0
+            ? $", and {Impact.PinnedPageCount} pinned page{(Impact.PinnedPageCount == 1 ? string.Empty : "s")} will not."
+            : ".")
+    </p>
+
+    @if (Impact.AffectedPages.Count > 0)
+    {
+        <table class="table table-sm">
+            <caption>
+                Pages placing this item@(Impact.IsTruncated
+                    ? $" — the first {Impact.AffectedPages.Count} of them; the counts above are exact."
+                    : ".")
+            </caption>
+            <thead>
+                <tr>
+                    <th scope="col">Page</th>
+                    <th scope="col">URL</th>
+                    <th scope="col">Where</th>
+                    <th scope="col">State</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var usage in Impact.AffectedPages)
+                {
+                    <tr>
+                        <th scope="row">
+                            <a href="@($"/admin/pages/{usage.Id}")">
+                                @(string.IsNullOrEmpty(usage.Title) ? $"Page {usage.Id}" : usage.Title)
+                            </a>
+                        </th>
+                        <td>
+                            @if (usage.Url is { Length: > 0 })
+                            {
+                                <code>@usage.Url</code>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (usage.ZoneKey is { Length: > 0 })
+                            {
+                                <code>@usage.ZoneKey</code>
+                                @if (usage.PropertyKey is { Length: > 0 })
+                                {
+                                    <text> · </text><code>@usage.PropertyKey</code>
+                                }
+                            }
+                            else
+                            {
+                                @* Reached through another reusable item, so this walk never saw a
+                                   placement on the page itself. *@
+                                <span class="text-body-secondary">via another item</span>
+                            }
+                        </td>
+                        <td>
+                            @if (usage.IsPinned)
+                            {
+                                <span class="badge text-bg-secondary">pinned</span>
+                            }
+                            else if (usage.IsPublished)
+                            {
+                                <span class="badge text-bg-success">will change</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-light">draft only</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    @if (Impact.AffectedReusableItems.Count > 0)
+    {
+        <p>Also placed inside other reusable items, which carry it onto their own pages:</p>
+        <ul>
+            @foreach (var item in Impact.AffectedReusableItems)
+            {
+                <li>
+                    <a href="@($"/admin/reusable/{item.Id}")">@item.Name</a>
+                    <code class="ms-1 small">@item.Key</code>
+                    @if (!item.IsPublished)
+                    {
+                        <span class="badge text-bg-light ms-1">draft only</span>
+                    }
+                </li>
+            }
+        </ul>
+    }
+}

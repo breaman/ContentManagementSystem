@@ -2,12 +2,14 @@ using Bunit;
 
 using ContentManagementSystem.Core.Content.Markdown;
 using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Tests.Content;
 using ContentManagementSystem.Rendering;
+using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -62,6 +64,7 @@ internal sealed class FieldRendererHarness : IDisposable
         _bunit.Services.AddSingleton<IMarkdownRenderer>(new MarkdownRenderer(sanitizer));
         _bunit.Services.AddSingleton<IFieldRendererCatalog>(new FieldRendererCatalog(Registry));
         _bunit.Services.AddSingleton<ILinkResolver>(Links);
+        _bunit.Services.AddSingleton<IReusableContentResolver>(Reusable);
         _bunit.Services.AddSingleton<IContentSchemaCatalog>(provider => Schemas);
         _bunit.Services.AddSingleton<IFieldTypeRegistry>(Registry);
 
@@ -75,6 +78,7 @@ internal sealed class FieldRendererHarness : IDisposable
                     typeof(TestTemplate),
                     typeof(TestBlock),
                     typeof(QuoteBlock),
+                    typeof(NestableBlock),
                     .. typeof(RenderingAssemblyMarker).Assembly.GetTypes(),
                 ])));
     }
@@ -84,6 +88,9 @@ internal sealed class FieldRendererHarness : IDisposable
 
     /// <summary>The page ids this render can resolve, and what they resolve to.</summary>
     public TestLinkResolver Links { get; } = new();
+
+    /// <summary>The reusable items this render can resolve, and what they resolve to.</summary>
+    public TestReusableContentResolver Reusable { get; } = new();
 
     /// <summary>The block type revisions this render can resolve configuration from.</summary>
     public IContentSchemaCatalog Schemas { get; set; } = ContentSchemaCatalog.Empty;
@@ -190,6 +197,130 @@ internal sealed class TestLinkResolver : ILinkResolver
         }
 
         return Task.FromResult<IReadOnlyDictionary<int, ResolvedLink>>(resolved);
+    }
+}
+
+/// <summary>
+/// A reusable-content resolver a test states the contents of outright (task P4-06).
+/// </summary>
+/// <remarks>
+/// It enforces the guards the real one does — the pin has to name a version of the item it is
+/// placed against, an unpublished item resolves only under <c>includeUnpublished</c>, and the chain
+/// refuses a loop or a descent past the depth ceiling. A double that skipped them would make every
+/// one of those behaviours untestable at the renderer, which is the level where the consequence
+/// (half a page, or a stack overflow on a public request) actually appears.
+/// </remarks>
+internal sealed class TestReusableContentResolver : IReusableContentResolver
+{
+    private readonly Dictionary<int, Item> _items = [];
+
+    /// <summary>Adds an item this resolver can find.</summary>
+    /// <param name="id">The item id.</param>
+    /// <param name="blockTypeKey">Block type shaping it, which selects the component.</param>
+    /// <param name="versions">Version id and payload pairs, in the order they were published.</param>
+    /// <param name="publishedVersionId">The version late-bound placements render, or null.</param>
+    /// <param name="name">Display name, shown by the preview badge.</param>
+    public TestReusableContentResolver Add(
+        int id,
+        string blockTypeKey,
+        (int VersionId, ContentPayload Payload)[] versions,
+        int? publishedVersionId,
+        string name = "Site footer")
+    {
+        _items[id] = new Item(id, $"item-{id}", name, blockTypeKey, publishedVersionId, versions);
+
+        return this;
+    }
+
+    public Task<ResolvedReusableContent> ResolveAsync(
+        int reusableContentId,
+        int? pinnedVersionId,
+        ReusableResolutionChain chain,
+        bool includeUnpublished = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (chain.Contains(reusableContentId))
+        {
+            return Unresolved(ReusableResolutionStatus.Cycle, reusableContentId);
+        }
+
+        if (chain.IsAtMaxDepth) return Unresolved(ReusableResolutionStatus.TooDeep, reusableContentId);
+
+        if (!_items.TryGetValue(reusableContentId, out var item))
+        {
+            return Unresolved(ReusableResolutionStatus.NotFound, reusableContentId);
+        }
+
+        var versionId = pinnedVersionId ?? item.PublishedVersionId ??
+            (includeUnpublished ? item.Versions[^1].VersionId : null);
+
+        if (versionId is null) return Unresolved(ReusableResolutionStatus.NotPublished, reusableContentId);
+
+        var version = Array.FindIndex(item.Versions, candidate => candidate.VersionId == versionId);
+
+        if (version < 0)
+        {
+            return Unresolved(
+                pinnedVersionId is null
+                    ? ReusableResolutionStatus.NotPublished
+                    : ReusableResolutionStatus.PinnedVersionMissing,
+                reusableContentId);
+        }
+
+        return Task.FromResult(new ResolvedReusableContent(
+            ReusableResolutionStatus.Resolved,
+            item.Id,
+            item.Key,
+            item.Name,
+            item.Versions[version].VersionId,
+            version + 1,
+            pinnedVersionId is not null,
+            item.Versions[version].VersionId == item.PublishedVersionId,
+            item.PublishedVersionId is null
+                ? null
+                : Array.FindIndex(item.Versions, candidate => candidate.VersionId == item.PublishedVersionId) + 1,
+            item.BlockTypeKey,
+            1,
+            item.Versions[version].Payload,
+            null));
+    }
+
+    private static Task<ResolvedReusableContent> Unresolved(ReusableResolutionStatus status, int id) =>
+        Task.FromResult(ResolvedReusableContent.Unresolved(status, id));
+
+    private sealed record Item(
+        int Id,
+        string Key,
+        string Name,
+        string BlockTypeKey,
+        int? PublishedVersionId,
+        (int VersionId, ContentPayload Payload)[] Versions);
+}
+
+/// <summary>
+/// A block component that can hold another reusable placement inside it (task P4-06).
+/// </summary>
+/// <remarks>
+/// Nesting is a property of the <em>block type</em>, not of the reusable machinery: a component
+/// renders the properties its markup names, so an item shaped by a block type whose markup mentions
+/// no <c>reusable</c> property can never contain one however the payload is authored. The built-in
+/// <c>rawHtml</c> type is exactly that — one HTML property — so the depth and cycle guards need a
+/// shape that does nest to be reachable at all.
+/// </remarks>
+[CmsBlockType("nestable", "Nestable")]
+internal sealed class NestableBlock : CmsBlockBase
+{
+    protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        builder.OpenElement(0, "div");
+        builder.AddAttribute(1, "data-block", BlockId.ToString());
+        builder.OpenComponent<CmsBlockProperty>(2);
+        builder.AddComponentParameter(3, nameof(CmsBlockProperty.Name), "content");
+        builder.CloseComponent();
+        builder.OpenComponent<CmsBlockProperty>(4);
+        builder.AddComponentParameter(5, nameof(CmsBlockProperty.Name), "nested");
+        builder.CloseComponent();
+        builder.CloseElement();
     }
 }
 

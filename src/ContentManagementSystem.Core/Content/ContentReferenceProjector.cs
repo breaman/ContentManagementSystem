@@ -82,6 +82,12 @@ public sealed class ContentReferenceProjector(
                 ZoneKey = location.ZoneKey,
                 BlockId = location.BlockId,
                 PropertyKey = location.PropertyKey,
+                // Carried through rather than recomputed. Only the field type that wrote the value
+                // knows whether it names a version, and re-reading the payload here would be a
+                // second implementation of that question — one that a new reference-bearing field
+                // type would silently not be covered by.
+                IsPinned = reference.IsPinned,
+                PinnedVersionId = reference.PinnedVersionId,
             });
         }
 

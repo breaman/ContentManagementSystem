@@ -38,3 +38,4 @@ holds, without reading `spec.md` end to end.
 | [0018](0018-compositions-flattened-into-block-type-revisions.md) | D18 — Compositions flattened into block type revisions; editing one recuts every host | Accepted |
 | [0019](0019-schema-sync-is-additive-and-non-destructive.md) | D19 — The schema sync is additive and non-destructive; it refuses rather than applies | Accepted |
 | [0020](0020-catch-all-route-ordering-and-reserved-prefixes.md) | D20 — The content catch-all is mapped last; reserved prefixes are refused at both ends | Accepted |
+| [0021](0021-reusable-content-stored-as-a-payload-envelope.md) | D21 — A reusable item's content is an ordinary payload envelope over its block type's properties | Accepted |

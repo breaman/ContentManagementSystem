@@ -28,6 +28,7 @@ public static class DeliveryServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.TryAddScoped<IPublishedContentService, PublishedContentService>();
+        services.TryAddScoped<IReusableContentResolver, ReusableContentResolver>();
 
         return services;
     }

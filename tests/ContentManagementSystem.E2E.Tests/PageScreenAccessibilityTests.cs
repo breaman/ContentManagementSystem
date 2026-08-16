@@ -1,6 +1,7 @@
 using System.Security.Claims;
 
 using ContentManagementSystem.Client.Components.Admin.Pages;
+using ContentManagementSystem.Client.Components.Admin.Reusable;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Services;
 
@@ -63,6 +64,15 @@ public class PageScreenAccessibilityTests
             typeof(PagePreviewLinks),
             new() { ["Id"] = FakePageClient.Id },
             "Sent to the agency"
+        },
+        { "reusable content library", typeof(ReusableLibrary), [], "Spring banner" },
+        {
+            "reusable content editor",
+            typeof(ReusableEditor),
+            new() { ["Id"] = FakeReusableClient.Id },
+            // The where-used panel, which is the part of this screen with the most for axe to judge:
+            // a table of affected pages, three badge states, and a nested list of items.
+            "Enterprise"
         },
     };
 
@@ -149,6 +159,7 @@ public class PageScreenAccessibilityTests
 
         services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         services.AddScoped<IPageClient, FakePageClient>();
+        services.AddScoped<IReusableClient, FakeReusableClient>();
         services.AddAuthorizationCore();
         services.AddCascadingAuthenticationState();
         services.AddScoped<AuthenticationStateProvider, AdministratorStateProvider>();

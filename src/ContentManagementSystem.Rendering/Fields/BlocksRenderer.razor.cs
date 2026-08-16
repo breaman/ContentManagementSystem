@@ -105,29 +105,8 @@ public partial class BlocksRenderer : CmsFieldRendererBase
             ReadObject(item, BlocksFieldType.PropertiesMember),
             Schemas.TryGetBlockType(blockTypeKey, revision, out var schema) ? schema : null);
 
-        return new PlannedBlock(context, componentType, Parameters(componentType, context));
+        return new PlannedBlock(context, componentType, BlockParameters.For(componentType, context));
     }
-
-    /// <summary>
-    /// The parameters a block component is handed, when it is one that declares them.
-    /// </summary>
-    /// <remarks>
-    /// A <c>[CmsBlockType]</c> attribute can sit on any component, and <c>DynamicComponent</c>
-    /// throws when handed a parameter the target does not declare. Passing these only to components
-    /// deriving from <see cref="CmsBlockBase"/> keeps that from turning a component someone wrote
-    /// against a different base into an exception on a public request. Such a component still
-    /// receives the cascading <see cref="BlockRenderContext"/>, since a cascading value is bound only
-    /// where it is declared.
-    /// </remarks>
-    private static Dictionary<string, object?> Parameters(Type componentType, BlockRenderContext context) =>
-        typeof(CmsBlockBase).IsAssignableFrom(componentType)
-            ? new Dictionary<string, object?>(StringComparer.Ordinal)
-            {
-                [nameof(CmsBlockBase.Properties)] = context.Properties,
-                [nameof(CmsBlockBase.BlockId)] = context.BlockId,
-                [nameof(CmsBlockBase.BlockTypeRevision)] = context.BlockTypeRevision ?? 0,
-            }
-            : [];
 
     private static string? ReadString(JsonElement item, string member) =>
         item.TryGetProperty(member, out var value) && value.ValueKind is JsonValueKind.String

@@ -1,8 +1,12 @@
+using System.Text.Json;
+
+using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
+using ContentManagementSystem.Data.Seeding;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -273,6 +277,152 @@ public sealed class PageWorkbench : IAsyncDisposable
     /// <summary>A zone definition holding blocks.</summary>
     public static Zone BlocksZone(string key) =>
         new() { Key = key, Name = key, FieldTypeKey = FieldTypeKeys.Blocks };
+
+    /// <summary>A zone definition holding a placement of reusable content.</summary>
+    /// <param name="key">The zone key.</param>
+    /// <param name="allowedTypes">
+    /// Block type keys the placement may be shaped by, or empty to allow any. Written as the field
+    /// type's captured configuration, which is where the publish check reads it from.
+    /// </param>
+    public static Zone ReusableZone(string key, params string[] allowedTypes) =>
+        new()
+        {
+            Key = key,
+            Name = key,
+            FieldTypeKey = FieldTypeKeys.Reusable,
+            ConfigurationJson = allowedTypes.Length == 0
+                ? null
+                : $$"""{"allowedTypes":[{{string.Join(',', allowedTypes.Select(type => $"\"{type}\""))}}]}""",
+        };
+
+    /// <summary>
+    /// The seeded built-in <c>rawHtml</c> block type, which is every reusable fixture's shape.
+    /// </summary>
+    /// <remarks>
+    /// Read from the database rather than assumed to be id 1: the seed states an id, but a test that
+    /// hard-coded it would fail silently and confusingly the first time seeding changes.
+    /// </remarks>
+    public Task<BlockType> RawHtmlBlockTypeAsync(CancellationToken cancellationToken) =>
+        Context.BlockTypes
+            .AsNoTracking()
+            .SingleAsync(candidate => candidate.Key == CmsSeedData.RawHtmlBlockTypeKey, cancellationToken);
+
+    /// <summary>Creates a reusable item through the real service, failing loudly if it was refused.</summary>
+    /// <param name="name">Display name; the key is generated from it.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <param name="blockTypeId">Shape, defaulting to the built-in <c>rawHtml</c> type.</param>
+    public async Task<ReusableContentDetail> AddReusableAsync(
+        string name,
+        CancellationToken cancellationToken,
+        int? blockTypeId = null)
+    {
+        var shape = blockTypeId ?? (await RawHtmlBlockTypeAsync(cancellationToken)).Id;
+
+        var result = await Resolve<IReusableContentService>().CreateAsync(
+            new CreateReusableContentRequest(shape, name),
+            cancellationToken);
+
+        result.IsSuccess.Should().BeTrue(Because(result));
+
+        return result.Value!;
+    }
+
+    /// <summary>Writes an HTML fragment into a <c>rawHtml</c> item's draft.</summary>
+    /// <param name="item">The item as it currently stands, for its row version.</param>
+    /// <param name="html">The fragment to store.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>The item reloaded, so a caller can chain another write.</returns>
+    public async Task<ReusableContentDetail> SetReusableHtmlAsync(
+        ReusableContentDetail item,
+        string html,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+
+        var reusable = Resolve<IReusableContentService>();
+
+        var payload = $$"""
+            { "schemaVersion": 1, "templateKey": "{{item.Summary.BlockTypeKey}}",
+              "templateRevision": {{item.BlockTypeRevision}},
+              "zones": { "{{CmsSeedData.RawHtmlContentPropertyKey}}":
+                { "type": "html", "value": {{JsonSerializer.Serialize(html)}} } } }
+            """;
+
+        var saved = await reusable.SaveDraftAsync(
+            item.Summary.Id,
+            new SaveDraftRequest(payload, item.RowVersion),
+            cancellationToken);
+
+        saved.IsSuccess.Should().BeTrue(Because(saved));
+
+        var reloaded = await reusable.GetAsync(item.Summary.Id, cancellationToken);
+
+        return reloaded.Value!;
+    }
+
+    /// <summary>Publishes a reusable item, acknowledging the blast radius as a person would.</summary>
+    /// <param name="reusableContentId">Identity of the item.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    public async Task<ReusablePublishResult> PublishReusableAsync(
+        int reusableContentId,
+        CancellationToken cancellationToken)
+    {
+        var result = await Resolve<IReusableContentService>().PublishAsync(
+            reusableContentId,
+            acknowledgeWarnings: true,
+            cancellationToken);
+
+        result.IsSuccess.Should().BeTrue(Because(result));
+
+        return result.Value!;
+    }
+
+    /// <summary>Puts a placement of a reusable item into a page's draft zone.</summary>
+    /// <param name="page">The page as it currently stands, for its row version.</param>
+    /// <param name="zoneKey">The zone to fill.</param>
+    /// <param name="reusableContentId">The item to place.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <param name="pinnedVersionId">
+    /// The version to pin to, or null for late binding — the default, and the one that delivers G4.
+    /// </param>
+    /// <returns>The page reloaded.</returns>
+    public async Task<PageDetail> PlaceReusableAsync(
+        PageDetail page,
+        string zoneKey,
+        int reusableContentId,
+        CancellationToken cancellationToken,
+        int? pinnedVersionId = null)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+
+        var pinned = pinnedVersionId is null ? "null" : pinnedVersionId.Value.ToString();
+
+        var payload = $$"""
+            { "schemaVersion": 1, "templateKey": "{{page.Summary.TemplateKey}}",
+              "templateRevision": {{page.TemplateRevision}},
+              "zones": { "{{zoneKey}}":
+                { "type": "reusable", "reusableContentId": {{reusableContentId}},
+                  "pinnedVersionId": {{pinned}} } } }
+            """;
+
+        var saved = await Resolve<IDraftService>().SaveAsync(
+            page.Summary.Id,
+            new SaveDraftRequest(payload, page.RowVersion),
+            cancellationToken);
+
+        saved.IsSuccess.Should().BeTrue(Because(saved));
+
+        return (await Resolve<IPageService>().GetAsync(page.Summary.Id, cancellationToken)).Value!;
+    }
+
+    /// <summary>Flattens a result's diagnostics into an assertion message.</summary>
+    public static string Because<T>(CmsResult<T> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        return string.Join("; ", result.Diagnostics.Diagnostics.Select(
+            diagnostic => $"{diagnostic.Code}: {diagnostic.Message}"));
+    }
 }
 
 /// <summary>

@@ -24,4 +24,7 @@ builder.Services.AddScoped<IStructureClient, HttpStructureClient>();
 // The page admin screens, likewise, with ServerPageClient behind the same interface on the server.
 builder.Services.AddScoped<IPageClient, HttpPageClient>();
 
+// The reusable content library, and its server twin ServerReusableClient.
+builder.Services.AddScoped<IReusableClient, HttpReusableClient>();
+
 await builder.Build().RunAsync();

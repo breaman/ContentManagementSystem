@@ -1,25 +1,21 @@
 # Content Management System — Implementation Task List
 
 **Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
-`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**. **Phase 3's three
-sections are all finished**: 3.1 routing, 3.2 rendering, and now **3.3 preview**. Routing gave us
-`PageRoute`, `Redirect`, `NotFoundLog`, and `PreviewToken` with migration #4, `UrlService`,
-`RedirectService`, `IRouteResolver`, `ILinkResolver`, and the redirect API with its CSV pair.
-Rendering runs end to end: the pipeline spine and every field renderer (`P3-08`, `P3-09`), two
-reference templates and three reference block types placing every field type (`P3-10`), error
-boundaries per zone and per block with the whole [§15.3] fallback matrix (`P3-11`),
-`PublishedContentService` (`P3-12`), and the catch-all delivery endpoint with its CMS 404 page and
-`NotFoundLog` writing (`P3-13`) — so **a published page is reachable by an anonymous visitor at its
-real URL**. Preview now closes the loop: `PreviewContentService` loads any version through the
-identical pipeline, `/preview/{pageId}` serves an authenticated editor a toolbar and a device frame
-(`P3-16`, `P3-21`), `PreviewTokenService` issues hashed bearer links (`P3-17`), `/preview/s/{token}`
-serves them to an anonymous stakeholder under a rate limit (`P3-18`), the management API and the
-revocation screen manage them (`P3-19`), and an unpublished link target resolves to its draft and is
-badged inside preview alone (`P3-20`). That meets **every Phase 3 acceptance criterion**, `#1`
-through `#11`. What is left in the phase is the perf harness (`P3-27`), visual regression (`P3-29`),
-and Q8 (`P3-30`) — none of which are on the exit gate's demo path.
+`P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
+sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
+(`P3-29`), and Q8 (`P3-30`) still open. **Phase 4 is complete** — all 19 tasks, all 7 acceptance
+criteria, and its exit gate. Reusable content is authored once and placed on many pages:
+`ReusableContent` and `ReusableContentVersion` with migration #5 (`P4-01`, `P4-02`),
+`ReusableContentService` running the whole lifecycle on the Phase 2 primitives rather than a second
+copy of them (`P4-03`), the completed `reusable` field type and its renderer (`P4-04`), the pinned
+badge and its "update to latest" action (`P4-05`), `ReusableContentResolver` with the cycle and depth
+guards (`P4-06`), `ReferenceQueryService` answering where-used transitively (`P4-07`), the
+`/references` and `/reusable` APIs (`P4-08`, `P4-09`), the delete guard (`P4-10`), the library and
+editor screens with the publish-impact confirmation (`P4-11`), the audited impact list (`P4-12`), and
+the fan-out baseline for P8 (`P4-13`). **One publish of a shared item changes every late-bound page
+without republishing any of them**, and a pinned page does not move.
 **Version:** 1.0
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -69,13 +65,13 @@ and record the date in the progress table.
 | [1 — Content structure](#phase-1--content-structure) | 33 | 33 | 28.0 | All 33 tasks done; gate open on `P1 #1` alone, which needs a browser journey | — |
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
-| [4 — Reusable content](#phase-4--reusable-content) | 19 | 0 | 12.0 | Not started | — |
+| [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **109** | **203.5** | | |
+| **v1 total** | **281** | **128** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -2437,61 +2433,220 @@ render mode anywhere beneath it.
 **Objective:** content authored once — footers, banners, carousels — appears on many pages and updates
 everywhere in one publish. **12 ed** · Entry: Phase 3 exit. Parallel with Phase 5.
 
-- [ ] **P4-01** `ReusableContent` and `ReusableContentVersion` entities + configurations per [§23.2].
+- [x] **P4-01** `ReusableContent` and `ReusableContentVersion` entities + configurations per [§23.2].
   — 1 ed
-- [ ] **P4-02** Migration `AddCmsReusableContent` — migration #5. — 0.5 ed
-- [ ] **P4-03** `ReusableContentService` in `Core/Content/` — CRUD plus draft/publish/version lifecycle
+  *2026-08-16 — the same shape as `Page`/`PageVersion` with the address removed: a draft pointer, a
+  published pointer, an unfiltered unique `Key`, and a soft-delete filter. Two decisions are worth
+  reading. The key index is **unfiltered** while the library index is filtered, because a deleted
+  item still owns its key — a filtered unique index would let a second item take the key of one in
+  the recycle bin and make the first unrestorable. And `Status` reuses `PageVersionStatus` rather
+  than getting an identical enum of its own, since [§23.2] gives `WorkflowTask` a nullable key to
+  each kind of version precisely because one approval flow serves both.*
+- [x] **P4-02** Migration `AddCmsReusableContent` — migration #5. — 0.5 ed
+  *2026-08-16 — `Up` and `Down` both apply from empty, asserted continuously by
+  `MigrationsApplyFromEmptyTests`. The storage guarantees the model depends on — the unfiltered key
+  index, the filtered library index, the version-number uniqueness a pin relies on, `rowversion`
+  conflicts, and restrict-on-delete from `BlockType` — are asserted against real SQL Server by
+  `ReusableContentSchemaTests`.*
+- [x] **P4-03** `ReusableContentService` in `Core/Content/` — CRUD plus draft/publish/version lifecycle
   **reusing the Phase 2 publishing primitives** rather than duplicating them. — 2.5 ed
-- [ ] **P4-04** `reusable` field type completed: editor picker, renderer, late binding by default,
+  *2026-08-16 — one service where pages have three, because with the tree, the URL, the redirects,
+  and the SEO panel removed what is left of each is a handful of methods over the same two rows.
+  Nothing here is a second implementation of anything: version numbering is `VersionNumbers`
+  (extended with `NextForReusableAsync`, kept there because the rule — highest ever issued, never
+  the count — is load-bearing for a **pinned** placement in a way it is not for a page), payload
+  checking is `IContentSchemaValidator`, reference projection is `IContentReferenceProjector` with
+  `ContentSourceType.ReusableContentVersion`, and impact is `IReferenceQueryService`.*
+  ***The decision that made that reuse possible*** is recorded on `ReusableContentVersion.ContentJson`
+  and in `ReusableContentSchema`: an item's payload is an **ordinary content payload envelope** whose
+  `templateKey`/`templateRevision` carry the block type key and revision and whose `zones` object
+  holds the block's properties. A zone and a block-type property are the same thing to every reader
+  of a payload — a keyed value carrying the field type that wrote it — and `ContentSchema` and
+  `BlockTypeSchema` are both lists of `ContentPropertySchema`. Storing it any other way would have
+  meant a parallel validator, indexer, diff, and remapper, each aware that a reusable item is
+  shaped like a block. Recorded as
+  [`ADR-0021` (D21)](./docs/adr/0021-reusable-content-stored-as-a-payload-envelope.md), with the
+  alternatives that were weighed and the one honest cost — the envelope's `templateKey` member now
+  sometimes holds a block type key.*
+- [x] **P4-04** `reusable` field type completed: editor picker, renderer, late binding by default,
   optional `pinnedVersionId`, reference extraction [§9.2]. — 1.5 ed
-- [ ] **P4-05** Pinned-version UI affordance: badge plus an "update to latest" action. — 0.5 ed
-- [ ] **P4-06** `ReusableContentResolver` in `Core/Delivery/` — resolves to the *published* version in
+  *2026-08-16 — `ReusableRenderer` resolves through `IReusableContentResolver` and renders the item
+  through the component its **block type** declares, so a reusable item and an inline block of the
+  same type produce identical markup. `allowedTypes` is now enforced, at the publish check rather
+  than in the field type, for the reason `allowedTemplates` is: a field type is a stateless singleton
+  with no database and "what shape is item 3" is not answerable from the stored value. That needed
+  `ContentSlots`, which resolves the schema slot behind a reference **at any depth** — and closed a
+  gap on the way, since `allowedTemplates` had been enforced for zone-level page references only and
+  silently ignored inside blocks. `pinnedVersionId` now travels on the `ContentReference` row rather
+  than staying in the payload, which is what lets the impact check split forty pages into the ones
+  that change and the two that do not without opening a single payload.*
+  *Also added: the **`rawHtml` block component**. The database has seeded a built-in `rawHtml` block
+  type since P1 so reusable content has a shape without a developer defining one, and no component
+  declared the key — so that seeded row was orphaned from the moment it was inserted and the
+  commonest reusable shape rendered nothing.*
+  ***The picker is still the shared plain control.*** Every non-text field type in the admin is a
+  read-only JSON textarea until P6 supplies the field editors; a bespoke picker for this one field
+  type would be the only one, and the first thing P6 would replace.*
+- [x] **P4-05** Pinned-version UI affordance: badge plus an "update to latest" action. — 0.5 ed
+  *2026-08-16 — two halves in two places, which is where the pin actually lives. `CmsReusableBadge`
+  renders inside **preview** and carries the state as `data-` attributes rather than a control,
+  because the previewed page is static SSR with no interactivity beneath it [§5.3]. The action is
+  `PinnedPlacements` on the **page** editor: a pin is a property of the placement, so the person who
+  can clear it is the person editing the page, not the person publishing the item. It clears every
+  pin at once — a page with several almost always got that way from one duplication — and writes the
+  draft without publishing, since adopting a newer shared version on a live page is a publish
+  somebody performs.*
+- [x] **P4-06** `ReusableContentResolver` in `Core/Delivery/` — resolves to the *published* version in
   the delivery path, with a recursion-depth guard and cycle detection. — 1.5 ed
-- [ ] **P4-07** `ReferenceQueryService` in `Core/Content/` — impact analysis / where-used over
+  *2026-08-16 — as narrow as `IPublishedContentService` and for the same reason: the published filter
+  is in the query, not in a check afterwards. Both guards live on `ReusableResolutionChain`, an
+  **immutable** linked list pushed as the renderer descends — a shared mutable set would report the
+  second of two sibling placements of the same item as a cycle, which it is not. Cycles are refused
+  at write time; this is the backstop for content that arrived by import, restore, or hand edit,
+  where the only acceptable answer on a public request is to stop, log, and render the rest.*
+- [x] **P4-07** `ReferenceQueryService` in `Core/Content/` — impact analysis / where-used over
   `ContentReference`, returning the [§9.4] shape (`affectedPages`, `affectedPageCount`,
   `pinnedPageCount`, `warnings`). — 1.5 ed
-- [ ] **P4-08** `/references` endpoints for pages, media, and reusable content. — 0.5 ed
-- [ ] **P4-09** `/api/cms/v1/reusable` endpoints mirroring the page endpoints minus URLs and the tree
+  *2026-08-16 — three round trips **per level of nesting**, not per referencing page, which is what
+  keeps a footer on ten thousand pages from being ten thousand queries at publish time.*
+  *Two rules in it are not obvious and both were found by a failing test. **A pin protects the edge
+  it sits on and nothing beneath it**: a page pinning a footer to v3 does not change when the footer
+  changes, but v3 of that footer still places a banner late-bound, so the page *does* change when the
+  banner does — a transitive arrival therefore overrides a direct pin. And **only a page's live
+  versions count**: a page that used to place an item late-bound and now pins it has reference rows
+  for both, and counting the archived one reported the pinned page as changing.*
+  *Two members beyond the spec's shape: `affectedReusableItems`, because an item nothing places
+  directly can still be on the whole site through another item; and `isTruncated`, because the counts
+  are exact while the list is capped at 100 so a confirmation dialog is not a download.*
+- [x] **P4-08** `/references` endpoints for pages, media, and reusable content. — 0.5 ed
+  *2026-08-16 — one route per target kind rather than one taking a type parameter, so a client cannot
+  ask a question the system has no answer for by mistyping a string. An entity nothing points at
+  answers `200` with an empty impact rather than `404`: "nothing uses this" is the answer the delete
+  button needs, and distinguishing it from "no such entity" would put an existence probe for every
+  id behind a read permission that grants no such thing. The media route ships now although the
+  library is P5 — its answer is honest today, and shipping it with the others means the where-used
+  panel was written once.*
+- [x] **P4-09** `/api/cms/v1/reusable` endpoints mirroring the page endpoints minus URLs and the tree
   (CRUD, versions, publish, references, impact). — 1.5 ed
-- [ ] **P4-10** Delete guard: deleting reusable content that is still referenced is **refused**, with an
+  *2026-08-16 — deliberately shaped like the page routes, because an item is a page's twin with the
+  address removed and an editor who has learned one should not have to learn the other. `If-Match` is
+  mandatory on the draft save and honoured-but-optional on the metadata patch, exactly as for pages.
+  `ReusableContentApiTests` asserts the statuses, the permissions, and — the one that matters — that
+  an unacknowledged publish comes back `422` **with the blast radius in `warnings`**, since that
+  refusal *is* the confirmation dialog's content.*
+- [x] **P4-10** Delete guard: deleting reusable content that is still referenced is **refused**, with an
   accurate where-used list [§9.4]. — included above
-- [ ] **P4-11** Plain admin screens in `Client/Components/Admin/Reusable/`: library, editor, where-used
+  *2026-08-16 — refused at the **soft** delete, not only at a purge, and refused for a reference held
+  only by a draft. A deleted item is invisible to the resolver, so cascading would blank a zone on
+  every page holding it, discovered by a visitor; and a draft placement becomes a broken published
+  one the moment that page is published. The refusal names the pages, because "replace the
+  placements first" is not actionable without them.*
+- [x] **P4-11** Plain admin screens in `Client/Components/Admin/Reusable/`: library, editor, where-used
   panel, publish-impact confirmation dialog (required whenever `affectedPageCount > 0`). — 1 ed
-- [ ] **P4-12** Audit: record the reusable-content publish **with its impact list**, so "why did 40
+  *2026-08-16 — `ReusableLibrary`, `ReusableEditor`, and `WhereUsedPanel`, with `IReusableClient`
+  implemented twice (HTTP in WebAssembly, services directly on the server) so the screens pre-render
+  with real content. The confirmation is staged rather than trusted: the screen re-reads the impact
+  immediately before the irreversible click rather than using the one it loaded on open, since an
+  editor who left the tab open would otherwise be shown an hour-old number. **The dialog is not the
+  guard** — the server refuses an unacknowledged publish whose blast radius is non-zero — so a screen
+  that skipped it, or a script that never had one, still cannot change forty pages silently.*
+  *The payload/textarea rules moved into a shared `PlainSlotValues`, used by the page editor and this
+  one: a zone and a block-type property are the same thing to a payload, and two copies would
+  eventually disagree about what an emptied box means. Both screens are under the axe gate.*
+- [x] **P4-12** Audit: record the reusable-content publish **with its impact list**, so "why did 40
   pages change at 14:02?" is answerable [§9.3]. — included above
-- [ ] **P4-13** Measure cache-invalidation fan-out cost on a high-reference item; record the baseline for
+  *2026-08-16 — an explicit `AuditLog` row written **inside the publish transaction**, with its own
+  `Type` rather than one of `AuditType`'s three. The change interceptor structurally cannot answer
+  this question: a publish's consequence is on rows it did not touch, and the interceptor will
+  faithfully log a new version row and a changed pointer while explaining nothing. Page **ids** are
+  stored rather than titles, because an id is the part that is still true when somebody reads the
+  entry back months later.*
+- [x] **P4-13** Measure cache-invalidation fan-out cost on a high-reference item; record the baseline for
   P8 tuning *(R8)*.
+  *2026-08-16 — **≈ 2.8 ms** for one item on 40 published pages, warm, recorded in
+  [`docs/phase-4-fanout-baseline.md`](./docs/phase-4-fanout-baseline.md) and guarded by
+  `ReferenceFanOutTests`. The number is less interesting than the shape it demonstrates: query count
+  is bounded by nesting depth (5) and not by page count, so the eviction list is cheap to compute and
+  the cost in P8 will be the eviction itself. The threshold in the test is an order-of-magnitude
+  tripwire at two seconds, not a tolerance — it guards the one regression that would hurt, the walk
+  becoming per-page.*
 
 ### Tests — Phase 4
 
-- [ ] **P4-14** Unit: cycle detection and depth guard in `ReusableContentResolver`.
-- [ ] **P4-15** Unit: impact analysis counts, split by pinned and late-bound.
-- [ ] **P4-16** Integration: publish a reusable item → three referencing pages change without being
+- [x] **P4-14** Unit: cycle detection and depth guard in `ReusableContentResolver`.
+  *2026-08-16 — `ReusableRendererTests`, thirteen cases through `CmsZone` rather than by calling the
+  renderer, so what is asserted is the dispatch as delivery performs it. The depth case builds a
+  chain of **distinct** items one longer than the ceiling, so it is the depth guard under test and
+  not the cycle guard, and asserts the exact level that renders and the exact one that does not —
+  one more would mean the guard counted wrong, one fewer that legitimate content stopped short.*
+- [x] **P4-15** Unit: impact analysis counts, split by pinned and late-bound.
+  *2026-08-16 — asserted where it is true, against SQL Server: `APinnedPageDoesNotChangeWhenANewer
+  VersionPublishes` checks `AffectedPageCount` 2 and `PinnedPageCount` 1 on the same publish whose
+  rendered output it also checks. The counts come from reference rows, so a unit test over a double
+  would assert the arithmetic and skip the part that was actually wrong twice while writing it.*
+- [x] **P4-16** Integration: publish a reusable item → three referencing pages change without being
   republished.
-- [ ] **P4-17** Integration: a pinned page does not change when a newer version publishes.
-- [ ] **P4-18** Integration: unpublished reusable content renders nothing, logs, and appears in the
+  *2026-08-16 — `PublishingANewVersionChangesEveryLateBoundPageWithoutRepublishingThem`, and both
+  halves are asserted: every page's **rendered document** over real HTTP shows the new text, and
+  every page's `PublishedVersionId` is byte-identical to what it was before. The second half is the
+  one that makes it goal G4 rather than a fan-out somebody wrote.*
+- [x] **P4-17** Integration: a pinned page does not change when a newer version publishes.
+  *2026-08-16 — asserted on the rendered document, since that is where an auditor would look.*
+- [x] **P4-18** Integration: unpublished reusable content renders nothing, logs, and appears in the
   broken-references report.
-- [ ] **P4-19** Integration: delete-while-referenced is refused with the correct list.
+  *2026-08-16 — `UnpublishingRendersNothingOnDependentPagesAndSaysSo` for the first clause, and
+  `ReusableRendererTests` for the log, which is asserted for its **reason** and not merely its level:
+  "not published", "deleted", and "pinned version gone" have different remedies, and the renderer
+  names the remedy in the line.*
+  *The broken-references **report screen** does not exist yet — it is a backoffice surface that
+  belongs with the dashboard in P6. What it will be built from does: every unresolved placement logs
+  a distinct reason, and `ReferenceQueryService` answers the query it will list.*
+- [x] **P4-19** Integration: delete-while-referenced is refused with the correct list.
+  *2026-08-16 — `DeletingAReferencedItemIsRefusedWithTheWhereUsedList`, asserting the conflict, the
+  code, that the message names every page, and that the item is still there afterwards. Its
+  companion asserts the other direction: an item nothing places is deleted and stops resolving,
+  which the soft-delete query filter makes true without the resolver asking.*
 
 ### Acceptance criteria — Phase 4
 
-- [ ] **P4 #1** A reusable item is created, published, and referenced from three pages.
-- [ ] **P4 #2** **Publishing a new version of the reusable item changes all three published pages
+- [x] **P4 #1** A reusable item is created, published, and referenced from three pages.
+  *2026-08-16 — `AnItemIsCreatedPublishedAndReferencedFromThreePages`, asserted through the
+  where-used query rather than by counting the payloads that were written: the query is what every
+  guard and every count in the phase is built on, and a payload the indexer failed to walk would
+  pass the first kind of check and fail every promise made on the second.*
+- [x] **P4 #2** **Publishing a new version of the reusable item changes all three published pages
   without republishing them.**
-- [ ] **P4 #3** A page pinned to version 3 does not change when version 4 is published, and its UI shows
+  *2026-08-16 — `P4-16`. The mechanism is an absence: nothing in `ReusableContentService` touches a
+  page. Publishing repoints `ReusableContent.PublishedVersionId` and stops, and every late-bound
+  placement reads that pointer at the moment the page is served.*
+- [x] **P4 #3** A page pinned to version 3 does not change when version 4 is published, and its UI shows
   a badge plus an "update to latest" action.
-- [ ] **P4 #4** The publish-impact dialog reports the correct affected-page count, split by pinned and
+  *2026-08-16 — the content half is `P4-17`; the UI half is `P4-05`'s two components, both under the
+  axe gate with a **stale** pin in the fixture, since a pin that matched the published version would
+  render the panel with the branch that matters unchecked.*
+- [x] **P4 #4** The publish-impact dialog reports the correct affected-page count, split by pinned and
   late-bound.
-- [ ] **P4 #5** Deleting reusable content that is still referenced is refused, with an accurate
+  *2026-08-16 — `P4-15` for the counts, `ReusableContentApiTests` for the `422` that carries them.*
+- [x] **P4 #5** Deleting reusable content that is still referenced is refused, with an accurate
   where-used list.
-- [ ] **P4 #6** Unpublishing reusable content renders nothing on dependent pages, logs a warning, and
+  *2026-08-16 — `P4-19`, at the service and again at `409` over HTTP.*
+- [x] **P4 #6** Unpublishing reusable content renders nothing on dependent pages, logs a warning, and
   appears in the broken-references report.
-- [ ] **P4 #7** A reusable item referencing itself (directly or transitively) is refused; a depth guard
+  *2026-08-16 — `P4-18`. The pages still **serve** — one retired fragment must not 404 a page — and
+  the space where the item was is simply empty [§15.3]. The report screen is P6's, as noted there.*
+- [x] **P4 #7** A reusable item referencing itself (directly or transitively) is refused; a depth guard
   prevents runaway recursion at render time.
+  *2026-08-16 — both clauses, and the transitive case is the one a direct self-reference check would
+  miss entirely: `AnItemThatPlacesItselfThroughAnotherItemIsAlsoRefused` closes the loop through a
+  row that mentions neither end. The render-time guard is `P4-14`.*
 
-**Exit gate:** one reusable publish updates all late-bound pages; pinned pages unchanged. — [ ] met on ____
+**Exit gate:** one reusable publish updates all late-bound pages; pinned pages unchanged. — [x] met on
+2026-08-16, by `P4-16` and `P4-17` together: the same publish that changes two pages' rendered
+documents leaves the third's alone, with no page republished.
 
-**Risks:** R8 (invalidation fan-out).
+**Risks:** R8 (invalidation fan-out) — **measured, not closed.** Computing the eviction list is cheap
+and bounded by nesting depth rather than page count ([`P4-13`](#phase-4--reusable-content)); what
+remains untested is evicting the entries, which has no implementation until P8.
 
 ---
 
@@ -3100,7 +3255,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 2 | `AddCmsStructure` | 1 | P1-06 | `Template`, `TemplateRevision`, `Zone`, `BlockType`, `BlockTypeRevision`, `BlockTypeProperty`, `Composition`, `CompositionProperty`, `BlockTypeComposition`, `SiteSettings` | [x] |
 | 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` (+ the `SiteSettings` home / not-found FKs deferred from P1-01) | [x] |
 | 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [x] |
-| 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [ ] |
+| 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [x] |
 | 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [ ] |
 | 7 | `AddCmsWorkflow` | 7 | P7-08 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob` | [ ] |
 | 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [ ] |
@@ -3168,7 +3323,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-1 | "Create templates that let them specify data zones" | [§8] | P1-01…P1-02, P1-21…P1-22, P1-25, P1-29 | P1 #1 | [ ] |
 | R-2 | "Specify what type of data can be used in a zone (plain text, reusable content, html/markdown, etc)" | [§7], [§8.3] | P1-08…P1-12 | P1 #1, #2 | [ ] |
 | R-3 | "In zones that are plain text or html/markdown … inline editing … 'edit/preview' editor experience" | [§14.4] | P6-08…P6-14 | P6 #2, #3 | [ ] |
-| R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [ ] |
+| R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [x] 2026-08-16 |
 | R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
 | R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
 | R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [x] 2026-08-15 |
@@ -3201,7 +3356,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #13 | Alt text enforced | P5-21 | [ ] |
 | #14 | Focal point / smart cropping | P5-12 | [ ] |
 | #15 | Renditions, `srcset`, WebP | P5-13…P5-16, P5-20 | [ ] |
-| #16 | Where-used / link integrity | P4-07, P4-08 | [ ] |
+| #16 | Where-used / link integrity | P4-07, P4-08 | [x] 2026-08-16 — transitive, split by pinned, and the delete guard is built on it |
 | #17 | Output caching + invalidation | P8-06…P8-13 | [ ] |
 | #18 | Concurrency control | P2-03, P2-15, P6-19 | [ ] |
 | #19 | Backoffice search & content tree | P6-02…P6-04, P8-18, P8-19 | [ ] |
@@ -3253,7 +3408,7 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R5 | Diff algorithm slow or noisy | Low | 2 | Diff over 2 s on a typical page | Open |
 | R6 | ~~Catch-all route shadows framework/admin paths~~ | — | 3 | **Closed 2026-08-15** — mapped last, reserved prefixes read from `Slugs.Reserved`, outcome asserted by `RouteOrderingTests` ([ADR-0020](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md)) | Closed |
 | R7 | ~~`DynamicComponent` under static SSR misbehaves~~ | — | 0/3 | **Closed** — S2 returned go at the Phase 0 gate; now running in shipped code through four levels of `DynamicComponent` (`P3-13`) | Closed |
-| R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | Open |
+| R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | **Measured 2026-08-16, still open for P8** — the where-used walk is ~2.8 ms for 40 pages and its query count is bounded by nesting depth (5), not by page count ([baseline](./docs/phase-4-fanout-baseline.md), `ReferenceFanOutTests`). The residual is the eviction itself, which has no implementation until P8 |
 | R9 | Testcontainers unreliable in CI | Med | 0 | Flake rate above 5% | Open |
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |
 | R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | Open |

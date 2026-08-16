@@ -13,7 +13,21 @@ namespace ContentManagementSystem.Core.Content;
 /// Stable GUID of the block instance holding it, or null when the zone holds it directly.
 /// </param>
 /// <param name="PropertyKey">Property within that block, or null.</param>
-public readonly record struct ReferenceLocation(string? ZoneKey, Guid? BlockId, string? PropertyKey);
+/// <param name="BlockTypeKey">
+/// Block type the enclosing block instance names, or null when the zone holds the reference
+/// directly. Read out of the payload rather than looked up: it is what a caller needs to reach the
+/// block type revision's captured schema, and a reference inside a block cannot be judged against
+/// its property's configuration without it.
+/// </param>
+/// <param name="BlockTypeRevision">
+/// The revision that block instance captured, or null when it carries none.
+/// </param>
+public readonly record struct ReferenceLocation(
+    string? ZoneKey,
+    Guid? BlockId,
+    string? PropertyKey,
+    string? BlockTypeKey = null,
+    int? BlockTypeRevision = null);
 
 /// <summary>
 /// Turns a payload path such as <c>zones.body.items[1].properties.image</c> into the coordinates the
@@ -55,6 +69,8 @@ public static class ReferencePath
 
         Guid? blockId = null;
         string? propertyKey = null;
+        string? blockTypeKey = null;
+        int? blockTypeRevision = null;
 
         for (var i = 2; i < segments.Count && value.ValueKind is not JsonValueKind.Undefined; i++)
         {
@@ -76,6 +92,8 @@ public static class ReferencePath
             {
                 blockId = parsed;
                 propertyKey = null;
+                blockTypeKey = Text(value, BlocksFieldType.BlockTypeKeyMember);
+                blockTypeRevision = Number(value, BlocksFieldType.BlockTypeRevisionMember);
             }
 
             // The member immediately after "properties" is the property key; anything deeper is
@@ -89,7 +107,7 @@ public static class ReferencePath
             }
         }
 
-        return new ReferenceLocation(zoneKey, blockId, propertyKey);
+        return new ReferenceLocation(zoneKey, blockId, propertyKey, blockTypeKey, blockTypeRevision);
     }
 
     /// <summary>One step of a path: a member name, optionally indexed.</summary>
@@ -126,6 +144,14 @@ public static class ReferencePath
 
         return segments;
     }
+
+    private static string? Text(JsonElement owner, string name) =>
+        Member(owner, name) is { ValueKind: JsonValueKind.String } value ? value.GetString() : null;
+
+    private static int? Number(JsonElement owner, string name) =>
+        Member(owner, name) is { ValueKind: JsonValueKind.Number } value && value.TryGetInt32(out var number)
+            ? number
+            : null;
 
     private static JsonElement Member(JsonElement owner, string name) =>
         owner.ValueKind is JsonValueKind.Object && owner.TryGetProperty(name, out var value)

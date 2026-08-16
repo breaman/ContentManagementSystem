@@ -41,6 +41,13 @@ public static class PageServiceCollectionExtensions
         services.TryAddScoped<IContentDiffService, ContentDiffService>();
         services.TryAddScoped<IContentReferenceProjector, ContentReferenceProjector>();
 
+        // Reusable content shares the pages' registration rather than getting a call of its own,
+        // because it shares their dependencies exactly: the same validator, the same projector, the
+        // same version numbering. A separate AddCmsReusableContent() would be a second door into the
+        // same room, and the failure it invites is a host that calls one and not the other.
+        services.TryAddScoped<IReferenceQueryService, ReferenceQueryService>();
+        services.TryAddScoped<IReusableContentService, ReusableContentService>();
+
         // The clock is a dependency rather than a static call so edit-lock expiry and the retention
         // window can be tested without waiting two minutes or ninety days.
         services.TryAddSingleton(TimeProvider.System);

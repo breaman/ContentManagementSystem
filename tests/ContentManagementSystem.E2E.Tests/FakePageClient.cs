@@ -68,7 +68,8 @@ public sealed class FakePageClient : IPageClient
               "zones": {
                 "heroTitle": { "type": "plainText", "value": "What our plans cost" },
                 "body": { "type": "richText", "format": "markdown", "value": "Three tiers." },
-                "photo": { "type": "media", "mediaId": 7 }
+                "photo": { "type": "media", "mediaId": 7 },
+                "footer": { "type": "reusable", "reusableContentId": 3, "pinnedVersionId": 41 }
               }
             }
             """,
@@ -93,6 +94,9 @@ public sealed class FakePageClient : IPageClient
             new CapturedSlot("body", "Body", "richText", IsRequired: false, 1, null),
             // A field type the plain editor shows read-only, so that branch is rendered too.
             new CapturedSlot("photo", "Photo", "media", IsRequired: false, 2, null),
+            // A placement, pinned in the payload above, so the pinned-version affordance of task
+            // P4-05 is on the page axe inspects rather than only in a unit test.
+            new CapturedSlot("footer", "Footer", "reusable", IsRequired: false, 3, null),
         ]);
 
     /// <inheritdoc />

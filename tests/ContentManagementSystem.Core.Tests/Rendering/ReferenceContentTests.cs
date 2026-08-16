@@ -38,7 +38,13 @@ public class ReferenceContentTests : IDisposable
         // The keys, not the class names. A payload stores the key, so renaming a class is free and
         // changing one of these strings orphans every page authored against it.
         declarations.Templates.Keys.Should().BeEquivalentTo(["marketing-landing", "article"]);
-        declarations.BlockTypes.Keys.Should().BeEquivalentTo(["hero-banner", "rich-text", "feature-grid"]);
+
+        // Four, not three. The first three are the reference content of P3-10; 'rawHtml' is not a
+        // sample at all — the database seeds a built-in block type under that key so reusable content
+        // has a shape without a developer defining one first (spec section 9.1), and a component has
+        // to declare it or that seeded row is orphaned from the moment it is inserted.
+        declarations.BlockTypes.Keys.Should().BeEquivalentTo(
+            ["hero-banner", "rich-text", "feature-grid", "rawHtml"]);
     }
 
     [Fact]

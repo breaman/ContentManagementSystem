@@ -1,0 +1,125 @@
+@page "/admin/reusable"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Reusable content</PageTitle>
+
+<h1>Reusable content</h1>
+<p class="text-body-secondary">
+    Content authored once and placed on many pages — a footer, a banner, a carousel. Publishing a new
+    version changes every page showing it, without any of them being republished.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The item was not created" />
+<DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Created, with warnings" />
+
+<div class="mb-3">
+    <label class="form-label" for="library-search">Search</label>
+    <input id="library-search" class="form-control" value="@Search"
+           placeholder="Name or key"
+           @onchange="OnSearchChangedAsync" />
+</div>
+
+@if (Items is null)
+{
+    <p role="status">Loading the library…</p>
+}
+else if (Items.Count == 0)
+{
+    <p>Nothing here yet. Create an item below.</p>
+}
+else
+{
+    <table class="table">
+        <caption>Every reusable item, by name.</caption>
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Key</th>
+                <th scope="col">Shape</th>
+                <th scope="col">Draft</th>
+                <th scope="col">Published</th>
+                <th scope="col">State</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Items)
+            {
+                <tr>
+                    <th scope="row"><a href="@($"/admin/reusable/{item.Id}")">@item.Name</a></th>
+                    <td><code>@item.Key</code></td>
+                    <td><code>@item.BlockTypeKey</code></td>
+                    <td>v@item.DraftVersionNumber</td>
+                    <td>
+                        @if (item.PublishedVersionNumber is { } published)
+                        {
+                            @($"v{published}")
+                        }
+                        else
+                        {
+                            <span class="text-body-secondary">—</span>
+                        }
+                    </td>
+                    <td>
+                        @if (item.PublishedVersionNumber is null)
+                        {
+                            <span class="badge text-bg-secondary">never published</span>
+                        }
+                        else if (item.HasUnpublishedChanges)
+                        {
+                            <span class="badge text-bg-warning">unpublished changes</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-success">live</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+    <h2 class="h5 mt-4">New item</h2>
+    <p class="text-body-secondary">
+        An item's shape is a block type, and it is fixed once the item exists — the same rule a page's
+        template obeys, for the same reason.
+    </p>
+
+    <EditForm Model="Draft" OnValidSubmit="CreateAsync" FormName="create-reusable">
+        <fieldset disabled="@IsBusy">
+            <div class="mb-3">
+                <label class="form-label" for="new-name">Name</label>
+                <input id="new-name" class="form-control" @bind="Draft.Name" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="new-key">Key</label>
+                <input id="new-key" class="form-control" @bind="Draft.Key" />
+                <div class="form-text">Leave blank to generate one from the name. Immutable afterwards.</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="new-block-type">Shape</label>
+                <select id="new-block-type" class="form-select" @bind="Draft.BlockTypeId">
+                    <option value="0">Choose a block type…</option>
+                    @foreach (var blockType in BlockTypes ?? [])
+                    {
+                        <option value="@blockType.Id">@blockType.Name (@blockType.Key)</option>
+                    }
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label" for="new-description">Description</label>
+                <input id="new-description" class="form-control" @bind="Draft.Description" />
+            </div>
+
+            <button type="submit" class="btn btn-primary">Create</button>
+        </fieldset>
+    </EditForm>
+</AuthorizeView>

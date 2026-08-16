@@ -928,6 +928,155 @@ namespace ContentManagementSystem.Data.Migrations
                     b.ToTable("Redirects");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BlockTypeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int?>("DeletedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("DeletedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int?>("DraftVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("FolderId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int?>("PublishedVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlockTypeId");
+
+                    b.HasIndex("DraftVersionId");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.HasIndex("PublishedVersionId");
+
+                    b.HasIndex("FolderId", "Name")
+                        .HasDatabaseName("IX_ReusableContents_FolderId_Name_Live")
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("ReusableContents");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContentVersion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BlockTypeRevision")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ContentJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<DateTimeOffset?>("PublishOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int?>("PublishedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("PublishedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("ReusableContentId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<byte>("Status")
+                        .HasColumnType("tinyint");
+
+                    b.Property<DateTimeOffset?>("UnpublishOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("VersionNumber")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReusableContentId", "Status");
+
+                    b.HasIndex("ReusableContentId", "VersionNumber")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "PublishOn");
+
+                    b.ToTable("ReusableContentVersions");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -1575,6 +1724,42 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("ToPage");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContent", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.BlockType", "BlockType")
+                        .WithMany()
+                        .HasForeignKey("BlockTypeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.ReusableContentVersion", "DraftVersion")
+                        .WithMany()
+                        .HasForeignKey("DraftVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.ReusableContentVersion", "PublishedVersion")
+                        .WithMany()
+                        .HasForeignKey("PublishedVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("BlockType");
+
+                    b.Navigation("DraftVersion");
+
+                    b.Navigation("PublishedVersion");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContentVersion", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.ReusableContent", "ReusableContent")
+                        .WithMany("Versions")
+                        .HasForeignKey("ReusableContentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ReusableContent");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteSettings", b =>
                 {
                     b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", null)
@@ -1733,6 +1918,11 @@ namespace ContentManagementSystem.Data.Migrations
                 {
                     b.Navigation("Children");
 
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContent", b =>
+                {
                     b.Navigation("Versions");
                 });
 

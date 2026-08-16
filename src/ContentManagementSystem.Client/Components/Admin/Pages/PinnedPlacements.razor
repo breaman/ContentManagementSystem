@@ -1,0 +1,50 @@
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+@if (Placements.Count > 0)
+{
+    <div class="alert alert-info" role="status">
+        @* h2, not h3: this panel sits directly under the page's h1 and above the "Content" and
+           "Publishing" sections, so an h3 here would skip a level — which is a real navigation
+           problem for anyone moving through the page by heading, and one axe fails the screen for. *@
+        <h2 class="h6">Pinned shared content</h2>
+        <p class="mb-2">
+            @(Placements.Count == 1 ? "A zone on this page pins" : "Zones on this page pin")
+            an exact version of a shared item, so
+            @(Placements.Count == 1 ? "it does" : "they do")
+            not change when that item is republished. That is deliberate for content that has to stay
+            reproducible; everywhere else it is usually a leftover.
+        </p>
+        <ul>
+            @foreach (var placement in Placements)
+            {
+                <li>
+                    <code>@placement.ZoneKey</code> —
+                    <a href="@($"/admin/reusable/{placement.ReusableContentId}")">
+                        @(placement.Name is { Length: > 0 } name ? name : $"item {placement.ReusableContentId}")
+                    </a>
+                    @if (placement.PinnedVersionId is { } version)
+                    {
+                        <text>, pinned to version </text><code>@version</code>
+                    }
+                    @if (placement.IsStale)
+                    {
+                        <span class="badge text-bg-warning ms-1">a newer version is published</span>
+                    }
+                </li>
+            }
+        </ul>
+
+        <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+            <button type="button" class="btn btn-outline-primary" disabled="@IsBusy"
+                    @onclick="UpdateAllAsync">
+                Update @(Placements.Count == 1 ? "it" : "them all") to latest
+            </button>
+        </AuthorizeView>
+
+        <div class="form-text">
+            Clears the pin so the placement follows the item again. It writes the draft; the public
+            page is unchanged until you publish.
+        </div>
+    </div>
+}

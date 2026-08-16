@@ -1,10 +1,5 @@
-using System.Text;
-using System.Text.Json;
-
-using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
-using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Contracts.Structure;
 using ContentManagementSystem.Shared.Services;
@@ -32,26 +27,6 @@ namespace ContentManagementSystem.Client.Components.Admin.Pages;
 /// </remarks>
 public partial class PageEditor : ComponentBase
 {
-    /// <summary>
-    /// Field types whose stored value is a single string this screen can safely round-trip.
-    /// </summary>
-    /// <remarks>
-    /// Everything else is shown as stored JSON and written back verbatim. That is the honest
-    /// behaviour for a plain editor: inventing a control for a media reference or a block list would
-    /// mean inventing a shape for its value, and the first thing a real editor in Phase 6 would have
-    /// to do is repair what this one wrote.
-    /// </remarks>
-    private static readonly HashSet<string> TextFieldTypes = new(StringComparer.Ordinal)
-    {
-        FieldTypeKeys.PlainText,
-        FieldTypeKeys.MultilineText,
-        FieldTypeKeys.RichText,
-        FieldTypeKeys.Html,
-    };
-
-    /// <summary>Formatting for the read-only view of a value this screen cannot edit.</summary>
-    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
-
     /// <summary>Identity of the page being edited, from the route.</summary>
     [Parameter]
     public int Id { get; set; }
@@ -119,129 +94,32 @@ public partial class PageEditor : ComponentBase
         if (Page is null) return;
 
         Slots ??= await Client.GetZonesAsync(Page.Summary.TemplateId, Page.TemplateRevision);
-        Values = ReadValues(Page.ContentJson, Slots);
+        Values = PlainSlotValues.Read(Page.ContentJson, Slots);
 
         CanEdit = await HoldsAnyAsync(CmsRoles.ContentEditors);
     }
 
     /// <summary>Whether the zone gets a plain editable control rather than a read-only one.</summary>
-    private static bool Editable(string fieldTypeKey) => TextFieldTypes.Contains(fieldTypeKey);
-
-    /// <summary>
-    /// Pulls each zone's stored value into the string its control binds to.
-    /// </summary>
-    /// <param name="contentJson">The draft payload, as stored.</param>
-    /// <param name="slots">The zones the captured revision declares.</param>
-    /// <returns>One entry per zone, empty for one that has never been authored.</returns>
     /// <remarks>
-    /// An unparseable payload yields empty controls rather than an exception. The alternative is an
-    /// editor who cannot open the one page that needs fixing, which is the failure spec section 15.3
-    /// forbids on the delivery side and which is no more acceptable here.
+    /// The rules for moving values between a payload and a textarea live in
+    /// <see cref="PlainSlotValues"/>, shared with the reusable-content editor: a zone and a
+    /// block-type property are the same thing to a payload, and two copies of those rules would
+    /// eventually disagree about what an emptied box means.
     /// </remarks>
-    private static Dictionary<string, string> ReadValues(
-        string contentJson,
-        IReadOnlyList<CapturedSlot> slots)
-    {
-        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+    private static bool Editable(string fieldTypeKey) => PlainSlotValues.Editable(fieldTypeKey);
 
-        ContentPayload.TryParse(contentJson, out var payload);
-
-        foreach (var slot in slots)
-        {
-            values[slot.Key] = payload?.TryGetZone(slot.Key, out var zone) is true
-                ? ReadValue(zone, slot.FieldTypeKey)
-                : string.Empty;
-        }
-
-        return values;
-    }
-
-    private static string ReadValue(JsonElement zone, string fieldTypeKey)
-    {
-        if (zone.ValueKind is not JsonValueKind.Object) return string.Empty;
-
-        if (Editable(fieldTypeKey))
-        {
-            return zone.TryGetProperty("value", out var value) && value.ValueKind is JsonValueKind.String
-                ? value.GetString() ?? string.Empty
-                : string.Empty;
-        }
-
-        // Indented, because the only thing to do with a value this screen cannot render is read it.
-        return JsonSerializer.Serialize(zone, IndentedJson);
-    }
-
-    /// <summary>
-    /// Folds the controls back into a payload envelope.
-    /// </summary>
+    /// <summary>Re-reads the page and rebuilds the form from what the server now holds.</summary>
     /// <remarks>
-    /// An emptied control <em>removes</em> the zone rather than storing null. Absent means never
-    /// authored and null means deliberately cleared, and the payload reader keeps them apart on
-    /// purpose (spec section 6.2); writing null for a box somebody simply never filled in would tell
-    /// the renderer a fallback was declined.
+    /// The row version above all: a save can normalise the payload, and the next save's precondition
+    /// has to be the token the server just issued rather than the one the form was built with.
     /// </remarks>
-    private string BuildPayload()
+    private async Task ReloadAsync()
     {
-        var builder = ContentPayload.TryParse(Page!.ContentJson, out var current) && current.IsObject
-            ? new ContentPayloadBuilder(current)
-            : new ContentPayloadBuilder(Page.Summary.TemplateKey, Page.TemplateRevision);
+        Page = await Client.GetAsync(Id);
+        Slots = null;
 
-        foreach (var slot in Slots ?? [])
-        {
-            var typed = Values.GetValueOrDefault(slot.Key, string.Empty);
-
-            if (string.IsNullOrEmpty(typed))
-            {
-                builder.RemoveZone(slot.Key);
-
-                continue;
-            }
-
-            builder.SetZone(slot.Key, WriteValue(slot, typed, current));
-        }
-
-        return builder.BuildJson();
+        await OnParametersSetAsync();
     }
-
-    /// <summary>Builds one zone's stored value from what its control holds.</summary>
-    private static string WriteValue(CapturedSlot slot, string typed, ContentPayload? current)
-    {
-        if (!Editable(slot.FieldTypeKey))
-        {
-            // Written back exactly as it was read, so a field type this screen cannot edit survives
-            // a save made for some other zone.
-            return typed;
-        }
-
-        using var stream = new MemoryStream();
-        using (var writer = new Utf8JsonWriter(stream))
-        {
-            writer.WriteStartObject();
-            writer.WriteString(ContentPayloadMembers.Type, slot.FieldTypeKey);
-
-            if (slot.FieldTypeKey == FieldTypeKeys.RichText)
-            {
-                // Rich text is uninterpretable without its format, and the stored one is kept so a
-                // save from this screen cannot silently reinterpret an author's HTML as markdown.
-                writer.WriteString("format", StoredFormat(slot.Key, current));
-            }
-
-            writer.WriteString("value", typed);
-            writer.WriteEndObject();
-        }
-
-        return Encoding.UTF8.GetString(stream.ToArray());
-    }
-
-    /// <summary>The rich-text format already stored for a zone, defaulting to markdown.</summary>
-    private static string StoredFormat(string zoneKey, ContentPayload? current) =>
-        current?.TryGetZone(zoneKey, out var zone) is true &&
-        zone.ValueKind is JsonValueKind.Object &&
-        zone.TryGetProperty("format", out var format) &&
-        format.ValueKind is JsonValueKind.String &&
-        format.GetString() is { Length: > 0 } stored
-            ? stored
-            : "markdown";
 
     private async Task SaveAsync() => await WriteAsync(
         "The draft was not saved",
@@ -249,18 +127,22 @@ public partial class PageEditor : ComponentBase
         {
             var result = await Client.SaveDraftAsync(
                 Id,
-                new SaveDraftRequest(BuildPayload(), Page!.RowVersion));
+                new SaveDraftRequest(
+                    PlainSlotValues.Build(
+                        Page!.ContentJson,
+                        Page.Summary.TemplateKey,
+                        Page.TemplateRevision,
+                        Slots ?? [],
+                        Values),
+                    Page.RowVersion));
 
             if (!result.IsSuccess) return result.Errors;
 
             Warnings = result.Warnings;
             Notice = "Draft saved. The published version is untouched.";
 
-            // Re-read rather than patching the row version in place: a save can normalise the
-            // payload, and the next save's precondition has to be the token the server just issued.
-            Page = await Client.GetAsync(Id);
-            Slots = null;
-            await OnParametersSetAsync();
+            // Re-read rather than patching the row version in place; see ReloadAsync.
+            await ReloadAsync();
 
             return null;
         });

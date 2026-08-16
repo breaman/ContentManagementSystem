@@ -1,5 +1,6 @@
 using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Preview;
+using ContentManagementSystem.Server.Api.Cms.Reusable;
 using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
@@ -56,6 +57,9 @@ public static class CmsApiEndpoints
         group.MapPageLifecycleEndpoints();
         group.MapPageVersionEndpoints();
         group.MapPageLockEndpoints();
+
+        group.MapReusableContentEndpoints();
+        group.MapReferenceEndpoints();
 
         group.MapRedirectEndpoints();
 
