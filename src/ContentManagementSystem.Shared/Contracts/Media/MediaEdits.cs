@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace ContentManagementSystem.Core.Media.Processing;
+namespace ContentManagementSystem.Shared.Contracts.Media;
 
 /// <summary>A point in an image, in fractions of its width and height.</summary>
 /// <param name="X">Horizontal position, 0 at the left edge and 1 at the right.</param>
@@ -61,7 +61,9 @@ public enum FlipDirection
 /// The same shape at both scopes: a library edit is this document on
 /// <c>MediaItem.EditsJson</c> and a usage edit is this document on the <c>media</c> field value in a
 /// page payload. One type, so "what a crop means" cannot come to mean two things
-/// (spec section 13.4).
+/// (spec section 13.4). It lives in <c>Shared</c> for the same reason it is one type: the editor
+/// that composes a crop, the request body that submits it, the column that stores it, and the
+/// processor that applies it all name this record rather than four spellings of it.
 /// <para>
 /// <strong>Free rotation is deliberately absent.</strong> Anything other than a right angle leaves
 /// triangular gaps that have to be filled with something, and there is no answer to "with what" that

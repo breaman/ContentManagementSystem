@@ -249,6 +249,10 @@ public static class MediaDeliveryEndpoint
     {
         RenditionFailure.NotAnImage => HttpStatusCode.BadRequest,
 
+        // 410 rather than 404: the rendition existed at that address and deliberately does not any
+        // more, which is what a client re-fetching the page needs to be told apart from a typo.
+        RenditionFailure.Stale => HttpStatusCode.Gone,
+
         // A missing original or a failed encode is the server's problem, not the caller's, and it
         // must not be reported as "no such image" — that would hide a lost storage container behind
         // a plausible-looking 404.
@@ -261,6 +265,7 @@ public static class MediaDeliveryEndpoint
     private static string DescribeFailure(RenditionFailure? failure) => failure switch
     {
         RenditionFailure.NotAnImage => "That media item is not an image.",
+        RenditionFailure.Stale => "This image has been edited since that link was made.",
         RenditionFailure.OriginalMissing => "The stored original is missing.",
         RenditionFailure.ProcessingFailed => "The image could not be processed.",
         _ => "No such media item.",

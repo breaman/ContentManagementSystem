@@ -5,6 +5,7 @@ using ContentManagementSystem.Core.Media.Stores;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
+using ContentManagementSystem.Shared.Contracts.Media;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -31,6 +32,19 @@ public enum RenditionFailure
 {
     /// <summary>The item does not exist, or is in the recycle bin.</summary>
     NotFound = 0,
+
+    /// <summary>
+    /// The URL was signed against an older generation of the item's edits.
+    /// </summary>
+    /// <remarks>
+    /// The refusal that makes non-destructive editing safe to cache for a year. A stale URL is
+    /// perfectly well signed — it was signed by this site — so serving it would be easy and wrong:
+    /// the rendition would be produced from the item's <em>current</em> edits and then cached under
+    /// the <em>old</em> version's key, which is a permanently wrong picture at a URL that says
+    /// <c>immutable</c>. Refusing means an old link stops working, and the page that emits links
+    /// re-signs them on its next render (ADR 0007).
+    /// </remarks>
+    Stale,
 
     /// <summary>The item is not an image, so there is nothing to render.</summary>
     NotAnImage,
@@ -104,6 +118,21 @@ public sealed class RenditionService(
 
         if (item.MediaKind is not MediaKind.Image) return (null, RenditionFailure.NotAnImage);
 
+        // The check that keeps a year-long immutable cache honest. Rendering here would apply the
+        // item's current edits and then store the result under a hash containing the old version,
+        // which is the one failure the version counter exists to make impossible (ADR 0007).
+        if (spec.EditsVersion != item.EditsVersion)
+        {
+            logger.LogDebug(
+                "Rendition of media item {MediaItemId} was asked for at edits version {Requested}; " +
+                "the item is at {Current}.",
+                item.Id,
+                spec.EditsVersion,
+                item.EditsVersion);
+
+            return (null, RenditionFailure.Stale);
+        }
+
         using var handle = await locks.AcquireAsync(spec.ToCanonicalString(), cancellationToken).ConfigureAwait(false);
 
         // Re-checked while holding the lock. Nineteen of twenty concurrent cold requests take this
@@ -128,6 +157,12 @@ public sealed class RenditionService(
     /// A row whose object has gone is treated as absent rather than as an error. Renditions are
     /// derived data that is explicitly not backed up, so an emptied container or a wiped disk should
     /// cost a regeneration, not a broken image on every page.
+    /// <para>
+    /// The item's current edits version is part of the predicate, so a row left behind by an earlier
+    /// generation is invisible here rather than served. It is a join rather than a second query on
+    /// purpose: this is the path every image request after the first takes, and paying two round
+    /// trips to serve a cached rendition would be the most expensive line in the delivery path.
+    /// </para>
     /// </remarks>
     private async Task<RenditionContent?> TryServeStoredAsync(
         RenditionSpec spec,
@@ -137,7 +172,9 @@ public sealed class RenditionService(
         var stored = await context.MediaRenditions
             .AsNoTracking()
             .FirstOrDefaultAsync(
-                rendition => rendition.MediaItemId == spec.MediaItemId && rendition.SpecHash == specHash,
+                rendition => rendition.MediaItemId == spec.MediaItemId &&
+                    rendition.SpecHash == specHash &&
+                    rendition.EditsVersion == rendition.MediaItem.EditsVersion,
                 cancellationToken)
             .ConfigureAwait(false);
 

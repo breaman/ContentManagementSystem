@@ -6,6 +6,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ContentManagementSystem.Core\ContentManagementSystem.Core.csproj" />
     <ProjectReference Include="..\..\src\ContentManagementSystem.Rendering\ContentManagementSystem.Rendering.csproj" />
+    <ProjectReference Include="..\ContentManagementSystem.TestSupport\ContentManagementSystem.TestSupport.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,5 +1,6 @@
 using ContentManagementSystem.Core.Media.Processing;
 using ContentManagementSystem.Core.Media.Upload;
+using ContentManagementSystem.Shared.Contracts.Media;
 
 using MetadataExtractor;
 using MetadataExtractor.Formats.Exif;
@@ -7,6 +8,8 @@ using MetadataExtractor.Formats.Exif;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using SkiaSharp;
+
+using ContentManagementSystem.TestSupport;
 
 namespace ContentManagementSystem.Core.Tests.Media;
 

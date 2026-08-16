@@ -46,4 +46,29 @@ public interface IMediaUploadService
     Task<CmsResult<MediaUploadResult>> UploadAsync(
         MediaUploadRequest request,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Puts new bytes behind an existing item, keeping its id and everything pointing at it
+    /// (task P5-23, spec section 22.1).
+    /// </summary>
+    /// <param name="mediaItemId">Identity of the item to re-point.</param>
+    /// <param name="request">The new file. Metadata members left empty keep what the item has.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The re-pointed item, or why the replacement was refused.</returns>
+    /// <remarks>
+    /// The operation an editor reaches for when the logo changed: forty pages point at this item and
+    /// all forty should show the new file without anyone opening them. It runs the same screening as
+    /// an upload — same allowlist, same sniff, same decode-bomb guard, same scan — because a
+    /// replacement path that checked less would be the way to get a hostile file into the library.
+    /// <para>
+    /// The item's <c>EditsVersion</c> is incremented, which is what makes the change visible: the
+    /// counter is folded into every rendition signature, so the URLs emitted after this call differ
+    /// from the ones browsers and CDNs already hold (ADR 0007). Without that, the pages would keep
+    /// showing the old picture for as long as their caches lasted.
+    /// </para>
+    /// </remarks>
+    Task<CmsResult<MediaUploadResult>> ReplaceAsync(
+        int mediaItemId,
+        MediaUploadRequest request,
+        CancellationToken cancellationToken = default);
 }

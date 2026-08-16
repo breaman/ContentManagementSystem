@@ -1,6 +1,6 @@
 using SkiaSharp;
 
-namespace ContentManagementSystem.Core.Tests.Media;
+namespace ContentManagementSystem.TestSupport;
 
 /// <summary>
 /// Builds the images the media tests need, including one carrying real EXIF.

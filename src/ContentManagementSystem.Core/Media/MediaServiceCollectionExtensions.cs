@@ -1,6 +1,7 @@
 using Azure.Storage.Blobs;
 
 using ContentManagementSystem.Core.Media.Delivery;
+using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Media.Processing;
 using ContentManagementSystem.Core.Media.Renditions;
 using ContentManagementSystem.Core.Media.Stores;
@@ -59,6 +60,16 @@ public static class MediaServiceCollectionExtensions
         services.TryAddSingleton<IMalwareScanner, NoOpMalwareScanner>();
 
         services.TryAddScoped<IMediaUploadService, MediaUploadService>();
+
+        // The read and metadata half. Registered here rather than in a call of its own because the
+        // two are one feature from a host's point of view: a deployment that accepts uploads and
+        // cannot browse or describe them has a write-only library.
+        services.TryAddScoped<IMediaLibraryService, MediaLibraryService>();
+        services.TryAddScoped<IMediaFolderService, MediaFolderService>();
+
+        // Shared with the page, routing, and preview services; TryAdd means whichever call runs
+        // first wins and every timestamp in the system comes from one clock.
+        services.TryAddSingleton(TimeProvider.System);
 
         return services;
     }

@@ -482,3 +482,8 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Local media store (FileSystemMediaStore's default root). Uploaded originals, generated
+# renditions, and quarantined bytes — all of it is either a developer's own test upload or
+# derived data, and none of it belongs in the repository.
+src/ContentManagementSystem.Server/App_Data/

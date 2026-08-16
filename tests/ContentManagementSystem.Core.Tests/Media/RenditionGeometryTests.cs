@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Media.Processing;
+using ContentManagementSystem.Shared.Contracts.Media;
 
 namespace ContentManagementSystem.Core.Tests.Media;
 

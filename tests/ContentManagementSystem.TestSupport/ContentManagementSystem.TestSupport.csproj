@@ -8,6 +8,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The image fixtures are generated rather than checked in, so the helper library that owns
+         them encodes them for real. -->
+    <PackageReference Include="SkiaSharp" />
     <PackageReference Include="Testcontainers.MsSql" />
     <PackageReference Include="xunit.v3.extensibility.core" />
   </ItemGroup>

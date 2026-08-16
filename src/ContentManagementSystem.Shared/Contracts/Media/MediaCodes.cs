@@ -99,6 +99,37 @@ public static class MediaCodes
     /// <summary>The edit document is not one of the operations spec section 13.4 defines.</summary>
     public const string EditsInvalid = "media.edits-invalid";
 
+    /// <summary>Geometry was applied to something that has no pixels.</summary>
+    /// <remarks>
+    /// Its own code rather than <see cref="EditsInvalid"/>: the document was perfectly well formed
+    /// and the remedy is not to fix it but to stop pointing it at a PDF.
+    /// </remarks>
+    public const string NotAnImage = "media.not-an-image";
+
+    /// <summary>
+    /// The bytes offered are already in the library under a different item.
+    /// </summary>
+    /// <remarks>
+    /// Raised by replace rather than by upload, and the asymmetry is the point: an upload of known
+    /// bytes is answered with the existing item, which is what the editor wanted anyway. A
+    /// <em>replace</em> with known bytes would merge two identities into one and silently redirect
+    /// every page pointing at the loser, so it is refused with the id of the item that already
+    /// holds them (spec section 13.1).
+    /// </remarks>
+    public const string Duplicate = "media.duplicate";
+
+    /// <summary>The item is not in the recycle bin, so there is nothing to restore.</summary>
+    public const string NotDeleted = "media.not-deleted";
+
+    /// <summary>A folder was created or renamed with no name at all.</summary>
+    public const string NameRequired = "media.name-required";
+
+    /// <summary>A folder still holds items or child folders and was not deleted.</summary>
+    public const string FolderNotEmpty = "media.folder-not-empty";
+
+    /// <summary>The folder move names a parent that does not exist, or one beneath the folder itself.</summary>
+    public const string FolderInvalidParent = "media.folder-invalid-parent";
+
     /// <summary>The save lost a concurrency race and was refused rather than overwriting the winner.</summary>
     public const string Conflict = "media.conflict";
 }

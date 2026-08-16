@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Media.Upload;
+using ContentManagementSystem.Shared.Contracts.Media;
 
 namespace ContentManagementSystem.Core.Media.Processing;
 

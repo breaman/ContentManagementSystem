@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 
 using ContentManagementSystem.Core.Media.Upload;
+using ContentManagementSystem.Shared.Contracts.Media;
 
 using Microsoft.Extensions.Logging;
 

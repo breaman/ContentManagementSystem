@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
+using ContentManagementSystem.Shared.Contracts.Media;
+
 namespace ContentManagementSystem.Core.Media.Processing;
 
 /// <summary>How a rendition fills the box it was asked for (spec section 13.5).</summary>

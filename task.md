@@ -4,18 +4,22 @@
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
 sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
 (`P3-29`), and Q8 (`P3-30`) still open. **Phase 4 is complete** — all 19 tasks, all 7 acceptance
-criteria, and its exit gate. **Phase 5 is under way: 20 of 33 tasks are done**, covering the whole
-of the storage, processing, and delivery spine. Media is uploaded through the ten-step pipeline
-(`P5-05` to `P5-07`) into a store that is a local directory or a blob container behind one interface
-(`P5-03`, `P5-04`), with the schema and migration #6 beneath it (`P5-01`, `P5-02`). Uploads are
-judged by their bytes rather than their names, capped before they are decoded, stripped of every
-metadata block, and deduplicated by content hash. SkiaSharp is the sole processor and asserts its own
-encoders at startup (`P5-09`); renditions are signed, allowlisted, lazily generated behind a per-key
-semaphore, and served with a year of immutable caching, `nosniff`, and a pinned content type
-(`P5-13` to `P5-18`, `P5-25`). **A rendition URL that was not signed by this site is refused, and a
-library edit changes every URL the site emits without a purge.** What remains is the authoring
-surface — the API, the picker, the `<picture>` renderer, the admin screens, chunked upload — and the
-integration tests behind the phase's acceptance criteria.
+criteria, and its exit gate. **Phase 5 is under way: 26 of 33 tasks are done**, covering the storage,
+processing, and delivery spine and now the whole management API. Media is uploaded through the
+ten-step pipeline (`P5-05` to `P5-07`) into a store that is a local directory or a blob container
+behind one interface (`P5-03`, `P5-04`), with the schema and migration #6 beneath it (`P5-01`,
+`P5-02`). Uploads are judged by their bytes rather than their names, capped before they are decoded,
+stripped of every metadata block, and deduplicated by content hash. SkiaSharp is the sole processor
+and asserts its own encoders at startup (`P5-09`); renditions are signed, allowlisted, lazily
+generated behind a per-key semaphore, and served with a year of immutable caching, `nosniff`, and a
+pinned content type (`P5-13` to `P5-18`, `P5-25`). **The API an editor drives now exists** (`P5-23`):
+browse and search, metadata, non-destructive edits and revert (`P5-10`), replace-keeping-id, the
+folder tree, soft delete with a bin, and a permanent delete guarded by where-used (`P5-24`).
+**A rendition URL that was not signed by this site is refused, a library edit changes every URL the
+site emits without a purge, and a URL signed against a superseded edit is refused with `410` rather
+than served the newer picture under the old cache key.** What remains is the authoring surface — the
+picker, the `<picture>` renderer, the admin screens, chunked upload — and the two criteria that
+depend on the `media` field type existing.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -68,12 +72,12 @@ and record the date in the progress table.
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
-| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 20 | 23.5 | Storage, processing, and signed delivery done; API, editors, and UI remain | — |
+| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 26 | 23.5 | Storage, processing, signed delivery, and the management API done; editors and UI remain | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **148** | **203.5** | | |
+| **v1 total** | **281** | **154** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -2682,8 +2686,10 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   sniffing (declared MIME must match actual bytes), decode-bomb guard (reject `width*height > 100 MP`).
   AVIF **uploads** rejected in v1. — 1.5 ed
   *Done in `MediaUploadService` + `MediaTypeSniffer` + `MediaTypeCatalog`. The service enforces its
-  own size ceilings so the CLI and tests get them too; the ASP.NET-layer `RequestSizeLimit` and
-  `FormOptions` land with the upload endpoint in `P5-23`.*
+  own size ceilings so the CLI and tests get them too. 2026-08-16 — the ASP.NET half landed with
+  `P5-23`: a `MediaBodySizeLimit` on the endpoint (so Kestrel refuses an oversized body before any
+  middleware reads it, including the antiforgery filter) plus `FormOptions.MultipartBodyLengthLimit`
+  on the form read, both derived from the same `MediaUploadOptions` the pipeline reads.*
 - [x] **P5-06** Upload pipeline step 5 — SVG policy per **Q7**: strict sanitization profile (no
   `<script>`, `<foreignObject>`, external refs, event handlers) **or** outright rejection. — 0.75 ed
   *Both branches ship. `SvgUploadPolicy` defaults to `Reject`; `SvgSanitizer` implements the strict
@@ -2704,11 +2710,14 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
 - [x] **P5-09** `IImageProcessor` abstraction + `SkiaSharpImageProcessor` (sole v1 implementation) in
   `Core/Media/Processing/`, with a `SupportedOutputFormats` capability set **asserted at startup**
   [§13.9]. — 2 ed
-- [~] **P5-10** Non-destructive edit model: `MediaItem.EditsJson`, `EditsVersion`, library-scope vs.
+- [x] **P5-10** Non-destructive edit model: `MediaItem.EditsJson`, `EditsVersion`, library-scope vs.
   usage-scope edits, revert-to-original. Original bytes never modified [§13.4]. — 2 ed
-  *Model and rendering done — `MediaEdits` is one type at both scopes, the columns exist, and
-  `Render` applies library edits then usage edits in a fixed order. The write side (`PUT
-  /media/{id}/edits`, `POST /media/{id}/revert`, the `EditsVersion` bump) arrives with `P5-23`.*
+  *2026-08-16 — write side landed with `P5-23`. `MediaEdits` moved to `Shared/Contracts/Media/` so
+  the editor, the request body, the column, and the processor all name one type. `PUT
+  /media/{id}/edits` and `POST /media/{id}/revert` both increment `EditsVersion` — the revert too,
+  or caches would go on serving the cropped version under URLs the site still emits.
+  `EditingAnItemLeavesItsStoredOriginalByteForByteIdentical` fetches the original through its signed
+  URL before and after an edit and compares the bytes.*
 - [x] **P5-11** Operation set: `rotate 0|90|180|270`, `flip h|v`, normalized `crop {x,y,w,h}`, resize
   per rendition, normalized `focalPoint {x,y}`. — included above
 - [x] **P5-12** Focal-point cropping math and rendition spec normalization in
@@ -2716,8 +2725,9 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
 - [x] **P5-13** Rendition generation in `Core/Media/Renditions/` — **per-key semaphore** so N concurrent
   cold requests produce one encode, persistence to `MediaRendition`, lazy population. — 2 ed
   *`RenditionKeyLocks` is a reference-counted per-key lock registered as a singleton; the unique
-  index on `(MediaItemId, SpecHash)` is the backstop for a race between two instances. `P5-30` still
-  has to prove the twenty-concurrent-requests case end to end.*
+  index on `(MediaItemId, SpecHash)` is the backstop for a race between two instances. `P5-30` now
+  proves the twenty-concurrent-requests case end to end, counting the `cms.media.rendition.generated`
+  measurements rather than a stub.*
 
 ### 5.3 Delivery — 7 ed
 
@@ -2728,6 +2738,11 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   layer**, never silently producing an empty response. — 0.75 ed
 - [x] **P5-16** Cache headers `public, max-age=31536000, immutable`; `EditsVersion` folded into the
   signature so a library edit changes every URL and busts client and CDN caches. — 0.5 ed
+  *2026-08-16 — hardened once `P5-10`'s write side made stale URLs reachable. A URL signed against a
+  superseded generation is validly signed, so it had to be refused on the strength of the version it
+  names: `RenditionService` answers `RenditionFailure.Stale` and the endpoint returns `410`. Serving
+  it would have rendered the item's current edits and cached them under the old version's key —
+  a permanently wrong picture at a URL that says `immutable`.*
 - [x] **P5-17** Media serving safety [§20.7]: `Content-Type` pinned to the **sniffed** type,
   `X-Content-Type-Options: nosniff`, `Content-Disposition: inline` for images and `attachment` for
   documents. — 0.25 ed
@@ -2741,15 +2756,30 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   [§13.6]. — 1.5 ed
 - [~] **P5-21** Alt-text policy [§13.7]: `AltText` required at upload **or** `IsDecorative = true`;
   usage-level override; **publish-time validation error** when neither is present. — 0.5 ed
-  *Upload-time half done and configurable (`RequireAltTextOnUpload`). The publish-time validation
-  error needs the `media` field type to resolve the item, which is `P5-19`.*
+  *Upload-time half done and configurable (`RequireAltTextOnUpload`), and `PATCH /media/{id}` now
+  enforces the same rule — without it an editor could satisfy the upload check and then clear the
+  field, and publish-time validation would be the first thing to notice, on somebody else's page.
+  The publish-time error itself still needs the `media` field type to resolve the item, which is
+  `P5-19`.*
 - [ ] **P5-22** Media admin in `Client/Components/Admin/Media/`: browser (grid/list, folders, filters),
   detail/metadata panel, image editor, replace-keeping-id, where-used, soft delete + bin. — 0.5 ed
-- [ ] **P5-23** Media API endpoints per [§22.1]: `POST /media`, `GET /media`, `GET /media/{id}`,
+- [x] **P5-23** Media API endpoints per [§22.1]: `POST /media`, `GET /media`, `GET /media/{id}`,
   `PATCH /media/{id}`, `PUT /media/{id}/edits`, `POST /media/{id}/revert`, `POST /media/{id}/replace`,
   `DELETE /media/{id}`, `GET /media/{id}/references`, `/media/folders…`. — included above
-- [ ] **P5-24** Media deletion rules [§13.8]: soft delete first; permanent deletion blocked while
+  *2026-08-16 — `Server/Api/Cms/Media/MediaEndpoints.cs` over `IMediaLibraryService`,
+  `IMediaFolderService`, and the upload pipeline. Also `POST /media/{id}/restore` and
+  `DELETE /media/{id}/permanent`. The upload and replace routes take `HttpRequest` and read the
+  multipart body themselves, which is what lets both body limits — Kestrel's
+  `IHttpMaxRequestBodySizeFeature` and `FormOptions.MultipartBodyLengthLimit` — be set from
+  `MediaUploadOptions` before a byte is buffered, finishing the HTTP half of `P5-05`. Replace runs
+  the identical screening as upload (one `ScreenAsync`, shared), because a replace path that sniffed
+  less would be a back door into the library that looked like a working feature.*
+- [x] **P5-24** Media deletion rules [§13.8]: soft delete first; permanent deletion blocked while
   `ContentReference` rows exist, with a where-used list. — included above
+  *2026-08-16 — `DELETE /media/{id}` bins, `POST /media/{id}/restore` brings it back, and
+  `DELETE /media/{id}/permanent` refuses unless the item is already in the bin and nothing points at
+  it. The soft delete is deliberately **not** reference-guarded: it is reversible, so the right
+  answer to "this is on twelve pages" is to hide it and let the editor find them.*
 - [x] **P5-25** `cms-media-store` health check — write/read/delete round trip [§24.2]. — included above
 
 ### Tests — Phase 5
@@ -2760,15 +2790,25 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
 - [x] **P5-27** Security: upload type-confusion corpus (HTML renamed `.jpg`, mismatched magic bytes).
   *`MediaTypeSnifferTests` and `SvgSanitizerTests`. Asserted against the sniffer and the sanitizer
   rather than an endpoint, so the decision is proven once for every route that shares it.*
-- [ ] **P5-28** Security: decode-bomb rejection before decode. *The guard ships in `P5-05` and
-  `ImageProbe` reads dimensions without decoding; the end-to-end rejection test needs the upload
-  endpoint from `P5-23`.*
+- [x] **P5-28** Security: decode-bomb rejection before decode.
+  *`ADecodeBombIsRefusedFromItsHeaderRatherThanDecoded` posts a real, tiny PNG whose `IHDR` has been
+  rewritten to declare 40,000 × 40,000 — under 4 KB on the wire, six gigabytes decoded — and asserts
+  `media.dimensions-too-large`. Built by patching a genuine file rather than hand-assembling one, so
+  the codec reads the header exactly as it would read a hostile upload.*
 - [x] **P5-29** Security: unsigned and tampered rendition URLs rejected; path-traversal probes.
   *`MediaUrlSignerTests` covers unsigned, tampered width/quality/crop, another site's key, and the
   rotation grace period; `MediaStorageKeyTests` covers traversal, absolute paths, and a root inside
   `wwwroot`.*
-- [ ] **P5-30** Integration: 20 concurrent cold requests for one rendition produce exactly one encode.
-- [ ] **P5-31** Integration: dedupe returns the existing item on identical bytes.
+- [x] **P5-30** Integration: 20 concurrent cold requests for one rendition produce exactly one encode.
+  *`MediaRenditionTests` fires twenty concurrent GETs at one signed URL through the whole pipeline and
+  asserts the `cms.media.rendition.generated` counter reads 1 and exactly one `MediaRendition` row
+  exists. The counter rather than a stubbed processor: it is the instrument an operator watches, so a
+  test that counted something else could pass while the dashboard stayed at zero.*
+- [x] **P5-31** Integration: dedupe returns the existing item on identical bytes.
+  *`ReuploadingIdenticalBytesReturnsTheExistingItemRatherThanCreatingASecond` — identical pixels
+  under two different file names. The second upload answers `200` rather than `201` with
+  `deduplicated: true`, because nothing was created and the editor needs to be told which file they
+  already had.*
 - [ ] **P5-32** Benchmark NFR-8 — cold 4000 px source → 1280 px WebP under 800 ms p95; telemetry
   `cms.media.rendition.generated` / `.duration` [§24.1].
 - [ ] **P5-33** Confirm Q9 (retention/compliance on versions and audit logs) is answered and reflected in
@@ -2776,26 +2816,48 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
 
 ### Acceptance criteria — Phase 5
 
-- [ ] **P5 #1** A JPEG upload produces a `MediaItem` with correct dimensions, size, hash, and stripped
+- [x] **P5 #1** A JPEG upload produces a `MediaItem` with correct dimensions, size, hash, and stripped
   EXIF; GPS data is absent from the stored original.
-- [ ] **P5 #2** Re-uploading identical bytes returns the existing item rather than creating a duplicate.
-- [ ] **P5 #3** A file whose extension and magic bytes disagree is rejected; an HTML file renamed `.jpg`
-  is rejected.
-- [ ] **P5 #4** An oversized-dimension decode bomb is rejected before decoding.
-- [ ] **P5 #5** SVG uploads follow the configured policy — sanitized to the strict profile, or refused.
-- [ ] **P5 #6** Rotating an image in the library updates every usage; the original bytes are unchanged
+  *`APhotographsGpsCoordinatesAreGoneFromTheStoredOriginal` uploads a fixture carrying orientation 6
+  and GPS, then fetches the stored original back through its own signed URL — what the site would
+  hand a visitor, not a copy the test kept in memory. The recorded size is the upright 600×800, so
+  the rotation is in the pixels, and no `GpsDirectory` survives.*
+- [x] **P5 #2** Re-uploading identical bytes returns the existing item rather than creating a duplicate.
+- [x] **P5 #3** A file whose extension and magic bytes disagree is rejected; an HTML file renamed `.jpg`
+  is rejected. *Proven at the sniffer in `P5-27` and now end to end through the upload endpoint.*
+- [x] **P5 #4** An oversized-dimension decode bomb is rejected before decoding. *`P5-28`.*
+- [x] **P5 #5** SVG uploads follow the configured policy — sanitized to the strict profile, or refused.
+  *Both branches are proven: `SvgSanitizerTests` covers the strict profile, and
+  `AnSvgUploadFollowsTheDeploymentsPolicyWhichDefaultsToRefusingIt` covers the shipped default. Q7
+  now selects a setting rather than gating code.*
+- [~] **P5 #6** Rotating an image in the library updates every usage; the original bytes are unchanged
   and revert-to-original restores it.
+  *Two of the three halves proven. The original is byte-for-byte identical across an edit, and revert
+  restores it and moves the counter again. "Updates every usage" is proven structurally — the counter
+  is in every signature, so every URL changes — but not yet through a page showing the image, which
+  needs the `media` field type (`P5-19`).*
 - [ ] **P5 #7** A usage-level crop affects only that page; other usages are unchanged.
-- [ ] **P5 #8** An unsigned or tampered rendition URL returns 400/403; a valid one returns the image.
-- [ ] **P5 #9** A rendition is generated once — twenty concurrent cold requests produce one encode.
+- [x] **P5 #8** An unsigned or tampered rendition URL returns 400/403; a valid one returns the image.
+  *`MediaUrlSignerTests` at the unit level; `ARenditionUrlWithATamperedWidthIsRefusedWithoutEncodingAnything`
+  end to end, which also asserts the refusal cost zero encodes — a signature that refused *after*
+  generating would have moved the denial of service rather than prevented it.*
+- [x] **P5 #9** A rendition is generated once — twenty concurrent cold requests produce one encode. *`P5-30`.*
 - [ ] **P5 #10** `<picture>` output includes a WebP source, an accurate `srcset`, explicit
   `width`/`height`, and `loading="lazy"` on non-LCP images. Requesting AVIF is rejected at the
   spec-parsing layer.
 - [ ] **P5 #11** Publishing a page whose image has neither alt text nor a decorative flag fails
   validation.
-- [ ] **P5 #12** Permanent deletion of referenced media is refused with a correct where-used list.
-- [ ] **P5 #13** A library-level edit bumps `EditsVersion`, changing rendition URLs and thereby busting
+- [~] **P5 #12** Permanent deletion of referenced media is refused with a correct where-used list.
+  *The guard and the endpoint ship in `P5-24`, and `GET /media/{id}/references` answers the list.
+  The refusal cannot be exercised end to end yet: creating a media reference means placing an image
+  in a payload, and the `media` field type is `P5-19`. What is asserted today is the other refusal —
+  permanent deletion of an item that is not in the bin.*
+- [x] **P5 #13** A library-level edit bumps `EditsVersion`, changing rendition URLs and thereby busting
   client and CDN caches.
+  *`ALibraryEditBumpsEditsVersionAndRevertingBumpsItAgain` from the API side and
+  `ALibraryEditChangesTheRenditionUrlAndRetiresTheOldOne` from the delivery side — the new URL serves
+  and the old one is `410`, so a superseded link cannot quietly deliver the new picture under the old
+  cache key.*
 
 **Exit gate:** safe upload, non-destructive edits, signed responsive renditions. — [ ] met on ____
 
@@ -3362,7 +3424,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [x] 2026-08-15 |
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
 | R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [x] `P2 #4` 2026-08-14; `P3 #3` 2026-08-15 |
-| R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [ ] |
+| R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [x] 2026-08-16 — `P5 #1`–`#5` all met; `P5-08` (chunked upload) is a comfort feature over a working upload, not a gate |
 | R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [ ] |
 | R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [ ] |
 | R-14 | "do plenty of research and add elements that are clearly missing" | [§4.2] — 30 gaps | see below | per gap | [ ] |

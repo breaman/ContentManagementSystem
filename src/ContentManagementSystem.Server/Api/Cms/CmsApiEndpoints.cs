@@ -1,3 +1,4 @@
+using ContentManagementSystem.Server.Api.Cms.Media;
 using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Preview;
 using ContentManagementSystem.Server.Api.Cms.Reusable;
@@ -60,6 +61,8 @@ public static class CmsApiEndpoints
 
         group.MapReusableContentEndpoints();
         group.MapReferenceEndpoints();
+
+        group.MapMediaEndpoints();
 
         group.MapRedirectEndpoints();
 

@@ -20,7 +20,12 @@ namespace ContentManagementSystem.Shared.Contracts.Media;
 /// <param name="FocalPointX">Horizontal focal point as a fraction of the width.</param>
 /// <param name="FocalPointY">Vertical focal point as a fraction of the height.</param>
 /// <param name="EditsVersion">Generation counter for the library-scope edits.</param>
+/// <param name="Edits">The library-scope edits themselves, or null on an unedited item.</param>
 /// <param name="UploadedOn">When the item was created.</param>
+/// <param name="RowVersion">
+/// The row's concurrency token, Base64-encoded, which the API carries as an <c>ETag</c> and a
+/// metadata write sends back as <c>If-Match</c>.
+/// </param>
 /// <remarks>
 /// <strong>No URL and no storage key.</strong> A client addresses an item by id and gets its picture
 /// through signed rendition URLs the server generates; handing out the storage key would expose the
@@ -44,7 +49,9 @@ public sealed record MediaDetail(
     double? FocalPointX,
     double? FocalPointY,
     int EditsVersion,
-    DateTimeOffset? UploadedOn);
+    MediaEdits? Edits,
+    DateTimeOffset? UploadedOn,
+    string RowVersion);
 
 /// <summary>
 /// What an upload did.
