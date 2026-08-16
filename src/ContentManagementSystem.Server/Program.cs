@@ -3,6 +3,9 @@ using System.Diagnostics;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Media;
+using ContentManagementSystem.Core.Media.Delivery;
+using ContentManagementSystem.Core.Media.Stores;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
@@ -17,6 +20,7 @@ using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
 using ContentManagementSystem.Server.Delivery.Preview;
 using ContentManagementSystem.Server.HealthChecks;
+using ContentManagementSystem.Server.Media;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
 using ContentManagementSystem.Server.Components.Email;
@@ -133,6 +137,30 @@ try
     // (spec section 12.1). Also registers the rate limiter the shared-link routes require.
     builder.Services.AddCmsPreviewEndpoint();
 
+    // The media library (tasks P5-03 to P5-09). The store follows the same condition the blob client
+    // registration above uses: a host given a storage account uses it, and one without — the API
+    // integration harness, a developer without Docker — falls back to the local disk under a root
+    // outside wwwroot. The two are interchangeable to everything above IMediaStore.
+    builder.Services.AddCmsMedia();
+
+    // The signing key is a secret and belongs in user secrets or a key vault, never in
+    // appsettings.json: anyone holding it can make this server encode arbitrary renditions, which is
+    // the denial of service the signature exists to prevent (spec section 20.8). A host with none
+    // configured generates a per-process key and says so loudly.
+    builder.Services.AddCmsMediaDelivery(options =>
+        builder.Configuration.GetSection(MediaSigningOptions.SectionName).Bind(options));
+
+    if (!string.IsNullOrWhiteSpace(
+            builder.Configuration.GetConnectionString(Constants.MediaBlobConnectionString)))
+    {
+        builder.Services.AddCmsBlobMediaStore();
+    }
+    else
+    {
+        builder.Services.AddCmsFileSystemMediaStore(
+            Path.Combine(builder.Environment.ContentRootPath, new MediaStorageOptions().FileSystemRoot));
+    }
+
     // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
     // instruments is not enough on its own: an unlisted meter records measurements that no exporter
     // ever collects, which looks identical to code that was never instrumented.
@@ -160,7 +188,12 @@ try
     builder.Services.AddHealthChecks()
         .AddCheck<CmsTemplatesHealthCheck>(
             CmsTemplatesHealthCheck.Name,
-            tags: ["ready", "cms"]);
+            tags: ["ready", "cms"])
+        // The media store round trip of spec section 24.2. Unhealthy rather than degraded: an
+        // unwritable store means no upload succeeds and no cold rendition can be generated.
+        .AddCheck<CmsMediaStoreHealthCheck>(
+            CmsMediaStoreHealthCheck.Name,
+            tags: ["ready", "cms", "media"]);
 
     // The management API is cookie-authenticated, so every write carries an antiforgery token in a
     // header. Naming the header here is what lets the JSON endpoints validate one at all — the
@@ -193,6 +226,11 @@ try
     });
 
     var app = builder.Build();
+
+    // Proves the image library can encode everything it claims to (task P5-09). SkiaSharp answers an
+    // unsupported encode with null rather than an exception, so without this a native build missing
+    // the WebP encoder would serve empty image responses and log nothing (spec section 13.9.1).
+    app.Services.AssertCmsMediaCapabilities();
 
     // `dotnet run -- cms schema ...` (task P1-28). Handled after Build so the verbs use exactly the
     // services the site uses, and before anything is mapped so no request pipeline is ever started.
@@ -254,6 +292,12 @@ try
     // Before the catch-all, like every other route. /preview is a reserved first segment
     // (Slugs.Reserved), so no page can ever be published at one of these addresses.
     app.MapCmsPreview();
+
+    // Signed renditions and stored originals (tasks P5-14 to P5-17). /media is reserved for the
+    // same reason, and every byte of media the site emits goes through here rather than through
+    // static file middleware — which is what makes content-type pinning and nosniff universal
+    // rather than per-path (spec section 20.7).
+    app.MapCmsMedia();
 
     // Last, and it must stay last (task P3-13, spec section 15.1). This is the catch-all that serves
     // every content URL, and anything mapped after it is a route a visitor could shadow with a page

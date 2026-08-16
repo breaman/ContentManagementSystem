@@ -9,10 +9,25 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Azure.Storage.Blobs" />
     <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="Markdig" />
+    <PackageReference Include="MetadataExtractor" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="SkiaSharp" />
+  </ItemGroup>
+
+  <!--
+    SkiaSharp ships Windows natives in its base package and nothing else; each other platform needs
+    its own asset package or the first encode fails at runtime with a missing-library error rather
+    than at build. Both are referenced unconditionally and deliberately so: this repository is
+    developed on macOS and deployed to Linux containers, so conditioning on the build machine's OS
+    would produce a publish that works everywhere except in production.
+    -->
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
+    <PackageReference Include="SkiaSharp.NativeAssets.macOS" />
   </ItemGroup>
 
 </Project>

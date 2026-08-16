@@ -35,6 +35,25 @@
       -->
     <PackageVersion Include="HtmlSanitizer" Version="9.2.995" />
     <PackageVersion Include="Markdig" Version="1.3.2" />
+    <!--
+      Media pipeline (phase 5). Azure.Storage.Blobs backs AzureBlobMediaStore; it arrives
+      transitively through Aspire.Azure.Storage.Blobs already, and is declared here because the Core
+      project programs against it directly rather than through the Aspire integration.
+
+      SkiaSharp (MIT) is the image processor, chosen over ImageSharp on licensing grounds — see
+      ADR 0011. The native asset packages are what make it work off Windows: the base package ships
+      Windows binaries only, so the macOS development machines and the Linux containers each need
+      theirs listed explicitly or every encode fails at runtime with a missing-library error.
+
+      MetadataExtractor (Apache 2.0) reads EXIF orientation. SkiaSharp's own SKCodec.EncodedOrigin
+      has known reliability defects across formats and platforms (spec section 13.9.1), so
+      orientation is read here and falls back to Skia rather than trusting either alone.
+      -->
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.28.0" />
+    <PackageVersion Include="MetadataExtractor" Version="2.9.3" />
+    <PackageVersion Include="SkiaSharp" Version="4.151.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.Linux" Version="4.151.1" />
+    <PackageVersion Include="SkiaSharp.NativeAssets.macOS" Version="4.151.1" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.Web" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Authentication" Version="10.0.10" />
@@ -68,6 +87,12 @@
     <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.13.0" />
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <!--
+      FakeTimeProvider. Already reaching the Server suite transitively; declared and referenced
+      explicitly so the unit suite can use it too — a test that advances the clock must not depend on
+      whether some other package happened to pull the assembly in.
+      -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.9.0" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.62.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />

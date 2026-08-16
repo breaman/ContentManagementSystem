@@ -96,6 +96,15 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>Bearer capabilities to view one unpublished page version.</summary>
     public DbSet<PreviewToken> PreviewTokens => Set<PreviewToken>();
 
+    /// <summary>The media library's organizing tree.</summary>
+    public DbSet<MediaFolder> MediaFolders => Set<MediaFolder>();
+
+    /// <summary>Uploaded files, their metadata, and their non-destructive edits.</summary>
+    public DbSet<MediaItem> MediaItems => Set<MediaItem>();
+
+    /// <summary>Derived encodings of media items. Regenerable; excluded from the audit log.</summary>
+    public DbSet<MediaRendition> MediaRenditions => Set<MediaRendition>();
+
     /// <inheritdoc />
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

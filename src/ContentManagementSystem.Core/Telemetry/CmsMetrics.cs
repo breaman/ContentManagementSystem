@@ -30,6 +30,15 @@ public sealed class CmsMetrics
     /// <summary>Name of the counter of URLs that resolved to nothing (task P3-28).</summary>
     public const string RouteResolutionMissName = "cms.route.resolution.miss";
 
+    /// <summary>Name of the counter of image renditions encoded (task P5-32, spec section 24.1).</summary>
+    public const string RenditionGeneratedName = "cms.media.rendition.generated";
+
+    /// <summary>Name of the histogram of rendition encode durations (task P5-32).</summary>
+    public const string RenditionDurationName = "cms.media.rendition.duration";
+
+    /// <summary>Tag naming the output format a rendition was encoded in.</summary>
+    public const string FormatTag = "format";
+
     /// <summary>Tag naming how the attempt ended (spec section 24.1).</summary>
     public const string ResultTag = "result";
 
@@ -43,6 +52,8 @@ public sealed class CmsMetrics
     private readonly Histogram<double> _publishDuration;
     private readonly Histogram<double> _pageRenderDuration;
     private readonly Counter<long> _routeResolutionMiss;
+    private readonly Counter<long> _renditionGenerated;
+    private readonly Histogram<double> _renditionDuration;
 
     /// <summary>Creates the instruments on the CMS meter.</summary>
     /// <param name="meterFactory">Factory supplying the container-scoped meter.</param>
@@ -71,6 +82,16 @@ public sealed class CmsMetrics
             RouteResolutionMissName,
             unit: "{request}",
             description: "Requests whose URL resolved to neither a page nor a redirect.");
+
+        _renditionGenerated = meter.CreateCounter<long>(
+            RenditionGeneratedName,
+            unit: "{rendition}",
+            description: "Image renditions actually encoded, as opposed to served from storage.");
+
+        _renditionDuration = meter.CreateHistogram<double>(
+            RenditionDurationName,
+            unit: "ms",
+            description: "Wall-clock time one rendition encode took, tagged by output format.");
     }
 
     /// <summary>
@@ -125,4 +146,27 @@ public sealed class CmsMetrics
     /// counter answers the different question of whether the rate has changed.
     /// </remarks>
     public void RecordRouteMiss() => _routeResolutionMiss.Add(1);
+
+    /// <summary>
+    /// Records one rendition encode (task P5-32, spec section 24.1).
+    /// </summary>
+    /// <param name="format">The output format, such as <c>webp</c>.</param>
+    /// <param name="elapsed">How long the encode took.</param>
+    /// <remarks>
+    /// Only actual encodes are counted, never the far more numerous requests served from storage.
+    /// That is what makes the counter mean something operationally: a rising rate is renditions
+    /// being regenerated — a mass library edit, a lost store, a cache key that changes when it should
+    /// not — rather than the site merely getting more traffic.
+    /// <para>
+    /// Tagged by format and by nothing else. The item id would be one time series per image, which
+    /// is the same unbounded-cardinality trap the route-miss counter avoids.
+    /// </para>
+    /// </remarks>
+    public void RecordRenditionGenerated(string format, TimeSpan elapsed)
+    {
+        var tag = new KeyValuePair<string, object?>(FormatTag, format);
+
+        _renditionGenerated.Add(1, tag);
+        _renditionDuration.Record(elapsed.TotalMilliseconds, tag);
+    }
 }

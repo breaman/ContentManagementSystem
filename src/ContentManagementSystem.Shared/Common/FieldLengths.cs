@@ -151,4 +151,31 @@ public static class FieldLengths
 
     /// <summary>Sitemap change-frequency hint, such as <c>weekly</c>.</summary>
     public const int ChangeFrequency = 20;
+
+    /// <summary>File name of an uploaded media item, server-generated and as originally sent.</summary>
+    /// <remarks>
+    /// 255 is what every filesystem this may be stored on agrees to. The server-generated name is far
+    /// shorter; the length is here for the client-supplied original, which is displayed but never
+    /// used to address anything (spec section 23.3).
+    /// </remarks>
+    public const int FileName = 255;
+
+    /// <summary>An IANA media type, such as <c>image/jpeg</c>.</summary>
+    public const int MimeType = 100;
+
+    /// <summary>Key an object is stored under in the media store.</summary>
+    /// <remarks>
+    /// Wide enough for a container prefix plus a content-addressed name. Keys are server-generated
+    /// from content hashes and never contain a client-supplied path (spec section 13.2).
+    /// </remarks>
+    public const int StorageKey = 500;
+
+    /// <summary>Caption rendered alongside a media item.</summary>
+    public const int Caption = 1000;
+
+    /// <summary>Normalized rendition spec — size, mode, format, quality, and geometry.</summary>
+    public const int RenditionSpec = 500;
+
+    /// <summary>Short image format token, such as <c>webp</c>.</summary>
+    public const int ImageFormat = 10;
 }

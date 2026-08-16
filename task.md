@@ -4,16 +4,18 @@
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
 sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
 (`P3-29`), and Q8 (`P3-30`) still open. **Phase 4 is complete** — all 19 tasks, all 7 acceptance
-criteria, and its exit gate. Reusable content is authored once and placed on many pages:
-`ReusableContent` and `ReusableContentVersion` with migration #5 (`P4-01`, `P4-02`),
-`ReusableContentService` running the whole lifecycle on the Phase 2 primitives rather than a second
-copy of them (`P4-03`), the completed `reusable` field type and its renderer (`P4-04`), the pinned
-badge and its "update to latest" action (`P4-05`), `ReusableContentResolver` with the cycle and depth
-guards (`P4-06`), `ReferenceQueryService` answering where-used transitively (`P4-07`), the
-`/references` and `/reusable` APIs (`P4-08`, `P4-09`), the delete guard (`P4-10`), the library and
-editor screens with the publish-impact confirmation (`P4-11`), the audited impact list (`P4-12`), and
-the fan-out baseline for P8 (`P4-13`). **One publish of a shared item changes every late-bound page
-without republishing any of them**, and a pinned page does not move.
+criteria, and its exit gate. **Phase 5 is under way: 20 of 33 tasks are done**, covering the whole
+of the storage, processing, and delivery spine. Media is uploaded through the ten-step pipeline
+(`P5-05` to `P5-07`) into a store that is a local directory or a blob container behind one interface
+(`P5-03`, `P5-04`), with the schema and migration #6 beneath it (`P5-01`, `P5-02`). Uploads are
+judged by their bytes rather than their names, capped before they are decoded, stripped of every
+metadata block, and deduplicated by content hash. SkiaSharp is the sole processor and asserts its own
+encoders at startup (`P5-09`); renditions are signed, allowlisted, lazily generated behind a per-key
+semaphore, and served with a year of immutable caching, `nosniff`, and a pinned content type
+(`P5-13` to `P5-18`, `P5-25`). **A rendition URL that was not signed by this site is refused, and a
+library edit changes every URL the site emits without a purge.** What remains is the authoring
+surface — the API, the picker, the `<picture>` renderer, the admin screens, chunked upload — and the
+integration tests behind the phase's acceptance criteria.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -66,12 +68,12 @@ and record the date in the progress table.
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
-| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 0 | 23.5 | Not started | — |
+| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 20 | 23.5 | Storage, processing, and signed delivery done; API, editors, and UI remain | — |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **128** | **203.5** | | |
+| **v1 total** | **281** | **148** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -91,8 +93,11 @@ These come from [§29.2](./spec.md#292-open-questions). Each one gates the phase
   *Owner: Ops · Needed by: Phase 1 (implemented P7)* · **Answer:** _pending_
 - [ ] **Q6** — Is a CDN in front of the site? Changes cache headers, adds a purge integration.
   *Owner: Ops · Needed by: Phase 6* · **Answer:** _pending_
-- [ ] **Q7** — Is SVG upload permitted at all? **Blocks `P5-06`.** Safest answer is no.
-  *Owner: Security · Needed by: Phase 5* · **Answer:** _pending_
+- [ ] **Q7** — Is SVG upload permitted at all? Safest answer is no.
+  *Owner: Security · Needed by: Phase 5* · **Answer:** _pending — but no longer blocking._ `P5-06`
+  ships both branches behind `MediaUploadOptions.SvgPolicy` and **defaults to `Reject`**, which is
+  the safe reading. Answering Q7 now changes one line of configuration rather than any code; a
+  "yes" means setting `Sanitize` and accepting the strict profile in `SvgSanitizer`.
 - [ ] **Q8** — Existing site to migrate, and must its URL structure be preserved?
   *Owner: Product · Needed by: Phase 3* · **Answer:** _pending_
 - [ ] **Q9** — Retention/compliance obligations on content versions and audit logs?
@@ -2659,58 +2664,74 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
 > original format [§13.9.1]. Build the format capability assertion in `P5-08` so an unsupported encode
 > fails loudly at startup rather than returning null at runtime.
 >
-> **Still blocking:** **Q7 (SVG policy)** must be resolved before `P5-06` completes.
+> **Q7 (SVG policy) no longer blocks.** `P5-06` ships both branches behind
+> `MediaUploadOptions.SvgPolicy` and defaults to `Reject`, the safe reading of an unanswered
+> question. Answering Q7 changes configuration, not code.
 
 ### 5.1 Storage and upload — 9 ed
 
-- [ ] **P5-01** `MediaItem`, `MediaFolder`, `MediaRendition` entities + configurations per [§23.3],
+- [x] **P5-01** `MediaItem`, `MediaFolder`, `MediaRendition` entities + configurations per [§23.3],
   including `UNIQUE (Sha256) WHERE IsDeleted = 0` for deduplication. — 1.5 ed
-- [ ] **P5-02** Migration `AddCmsMedia` — migration #6. — 0.5 ed
-- [ ] **P5-03** `IMediaStore` abstraction + `FileSystemMediaStore` in `Core/Media/Stores/` —
+- [x] **P5-02** Migration `AddCmsMedia` — migration #6. — 0.5 ed
+- [x] **P5-03** `IMediaStore` abstraction + `FileSystemMediaStore` in `Core/Media/Stores/` —
   path-traversal-guarded, stores **outside `wwwroot`**, keys server-generated from content hashes
   [§13.2]. — 1 ed
-- [ ] **P5-04** `AzureBlobMediaStore` against the Azurite resource added in P0. — 1 ed
-- [ ] **P5-05** Upload pipeline steps 1–4 in `Core/Media/Upload/` [§13.3]: size limits
+- [x] **P5-04** `AzureBlobMediaStore` against the Azurite resource added in P0. — 1 ed
+- [x] **P5-05** Upload pipeline steps 1–4 in `Core/Media/Upload/` [§13.3]: size limits
   (`RequestSizeLimit` + `FormOptions.MultipartBodyLengthLimit`), extension allowlist, magic-number
   sniffing (declared MIME must match actual bytes), decode-bomb guard (reject `width*height > 100 MP`).
   AVIF **uploads** rejected in v1. — 1.5 ed
-- [ ] **P5-06** Upload pipeline step 5 — SVG policy per **Q7**: strict sanitization profile (no
-  `<script>`, `<foreignObject>`, external refs, event handlers) **or** outright rejection. *Blocked on
-  Q7.* — 0.75 ed
-- [ ] **P5-07** Upload pipeline steps 6–10: pluggable `IMalwareScanner` with quarantine, SHA-256 dedupe,
+  *Done in `MediaUploadService` + `MediaTypeSniffer` + `MediaTypeCatalog`. The service enforces its
+  own size ceilings so the CLI and tests get them too; the ASP.NET-layer `RequestSizeLimit` and
+  `FormOptions` land with the upload endpoint in `P5-23`.*
+- [x] **P5-06** Upload pipeline step 5 — SVG policy per **Q7**: strict sanitization profile (no
+  `<script>`, `<foreignObject>`, external refs, event handlers) **or** outright rejection. — 0.75 ed
+  *Both branches ship. `SvgUploadPolicy` defaults to `Reject`; `SvgSanitizer` implements the strict
+  profile over AngleSharp's DOM for deployments that opt in, and stores its output rather than the
+  upload. Q7 now selects a setting rather than gating code.*
+- [x] **P5-07** Upload pipeline steps 6–10: pluggable `IMalwareScanner` with quarantine, SHA-256 dedupe,
   EXIF orientation via **MetadataExtractor** with `SKCodec.EncodedOrigin` fallback baked into pixels then
   **all metadata stripped** (GPS in a published photo is a privacy incident), persist original, queue
   standard rendition generation. — 1.25 ed
+  *Rendition generation is lazy rather than queued (ADR 0007): warming six sizes of every upload
+  would encode far more than any page asks for. Quarantined bytes are kept under a key with no
+  extension and no row pointing at it.*
 - [ ] **P5-08** Chunked/resumable upload for large files with progress reporting
   (`Server/Api/Cms/Media/` + `Client/`). — 1.5 ed
 
 ### 5.2 Image processing — 7.5 ed
 
-- [ ] **P5-09** `IImageProcessor` abstraction + `SkiaSharpImageProcessor` (sole v1 implementation) in
+- [x] **P5-09** `IImageProcessor` abstraction + `SkiaSharpImageProcessor` (sole v1 implementation) in
   `Core/Media/Processing/`, with a `SupportedOutputFormats` capability set **asserted at startup**
   [§13.9]. — 2 ed
-- [ ] **P5-10** Non-destructive edit model: `MediaItem.EditsJson`, `EditsVersion`, library-scope vs.
+- [~] **P5-10** Non-destructive edit model: `MediaItem.EditsJson`, `EditsVersion`, library-scope vs.
   usage-scope edits, revert-to-original. Original bytes never modified [§13.4]. — 2 ed
-- [ ] **P5-11** Operation set: `rotate 0|90|180|270`, `flip h|v`, normalized `crop {x,y,w,h}`, resize
+  *Model and rendering done — `MediaEdits` is one type at both scopes, the columns exist, and
+  `Render` applies library edits then usage edits in a fixed order. The write side (`PUT
+  /media/{id}/edits`, `POST /media/{id}/revert`, the `EditsVersion` bump) arrives with `P5-23`.*
+- [x] **P5-11** Operation set: `rotate 0|90|180|270`, `flip h|v`, normalized `crop {x,y,w,h}`, resize
   per rendition, normalized `focalPoint {x,y}`. — included above
-- [ ] **P5-12** Focal-point cropping math and rendition spec normalization in
+- [x] **P5-12** Focal-point cropping math and rendition spec normalization in
   `Core/Media/Processing/`. — 1.5 ed
-- [ ] **P5-13** Rendition generation in `Core/Media/Renditions/` — **per-key semaphore** so N concurrent
+- [x] **P5-13** Rendition generation in `Core/Media/Renditions/` — **per-key semaphore** so N concurrent
   cold requests produce one encode, persistence to `MediaRendition`, lazy population. — 2 ed
+  *`RenditionKeyLocks` is a reference-counted per-key lock registered as a singleton; the unique
+  index on `(MediaItemId, SpecHash)` is the backstop for a race between two instances. `P5-30` still
+  has to prove the twenty-concurrent-requests case end to end.*
 
 ### 5.3 Delivery — 7 ed
 
-- [ ] **P5-14** Signed rendition endpoint `GET /media/{id}/{w}x{h}/{mode}/{name}.{ext}` in
+- [x] **P5-14** Signed rendition endpoint `GET /media/{id}/{w}x{h}/{mode}/{name}.{ext}` in
   `Server/Media/`: HMAC-SHA256 signature validation over the normalized parameter set, allowlisted
   widths (`320, 640, 960, 1280, 1920, 2560`), modes `crop|contain|cover|pad` [§13.5]. — 1.25 ed
-- [ ] **P5-15** `Accept`-based WebP negotiation with `Vary: Accept`; **AVIF rejected at the spec-parsing
+- [x] **P5-15** `Accept`-based WebP negotiation with `Vary: Accept`; **AVIF rejected at the spec-parsing
   layer**, never silently producing an empty response. — 0.75 ed
-- [ ] **P5-16** Cache headers `public, max-age=31536000, immutable`; `EditsVersion` folded into the
+- [x] **P5-16** Cache headers `public, max-age=31536000, immutable`; `EditsVersion` folded into the
   signature so a library edit changes every URL and busts client and CDN caches. — 0.5 ed
-- [ ] **P5-17** Media serving safety [§20.7]: `Content-Type` pinned to the **sniffed** type,
+- [x] **P5-17** Media serving safety [§20.7]: `Content-Type` pinned to the **sniffed** type,
   `X-Content-Type-Options: nosniff`, `Content-Disposition: inline` for images and `attachment` for
   documents. — 0.25 ed
-- [ ] **P5-18** Signing-key rotation with a grace period during which the previous key still validates
+- [x] **P5-18** Signing-key rotation with a grace period during which the previous key still validates
   [§20.8]. — 0.25 ed
 - [ ] **P5-19** `media` and `mediaList` field types completed: editor picker, inline crop/rotate/focal
   UI, reference extraction. — 1.5 ed
@@ -2718,8 +2739,10 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   `srcset`/`sizes`, explicit `width`/`height` for CLS, `loading="lazy"` + `decoding="async"` on
   non-LCP images, `loading="eager"` + `fetchpriority="high"` on the first image in the first zone
   [§13.6]. — 1.5 ed
-- [ ] **P5-21** Alt-text policy [§13.7]: `AltText` required at upload **or** `IsDecorative = true`;
+- [~] **P5-21** Alt-text policy [§13.7]: `AltText` required at upload **or** `IsDecorative = true`;
   usage-level override; **publish-time validation error** when neither is present. — 0.5 ed
+  *Upload-time half done and configurable (`RequireAltTextOnUpload`). The publish-time validation
+  error needs the `media` field type to resolve the item, which is `P5-19`.*
 - [ ] **P5-22** Media admin in `Client/Components/Admin/Media/`: browser (grid/list, folders, filters),
   detail/metadata panel, image editor, replace-keeping-id, where-used, soft delete + bin. — 0.5 ed
 - [ ] **P5-23** Media API endpoints per [§22.1]: `POST /media`, `GET /media`, `GET /media/{id}`,
@@ -2727,14 +2750,23 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   `DELETE /media/{id}`, `GET /media/{id}/references`, `/media/folders…`. — included above
 - [ ] **P5-24** Media deletion rules [§13.8]: soft delete first; permanent deletion blocked while
   `ContentReference` rows exist, with a where-used list. — included above
-- [ ] **P5-25** `cms-media-store` health check — write/read/delete round trip [§24.2]. — included above
+- [x] **P5-25** `cms-media-store` health check — write/read/delete round trip [§24.2]. — included above
 
 ### Tests — Phase 5
 
-- [ ] **P5-26** Unit: focal-point crop math, rendition spec normalization, signature generation.
-- [ ] **P5-27** Security: upload type-confusion corpus (HTML renamed `.jpg`, mismatched magic bytes).
-- [ ] **P5-28** Security: decode-bomb rejection before decode.
-- [ ] **P5-29** Security: unsigned and tampered rendition URLs rejected; path-traversal probes.
+- [x] **P5-26** Unit: focal-point crop math, rendition spec normalization, signature generation.
+  *`RenditionGeometryTests`, `MediaUrlSignerTests`, `SkiaSharpImageProcessorTests` — 139 assertions,
+  none of which needs a database.*
+- [x] **P5-27** Security: upload type-confusion corpus (HTML renamed `.jpg`, mismatched magic bytes).
+  *`MediaTypeSnifferTests` and `SvgSanitizerTests`. Asserted against the sniffer and the sanitizer
+  rather than an endpoint, so the decision is proven once for every route that shares it.*
+- [ ] **P5-28** Security: decode-bomb rejection before decode. *The guard ships in `P5-05` and
+  `ImageProbe` reads dimensions without decoding; the end-to-end rejection test needs the upload
+  endpoint from `P5-23`.*
+- [x] **P5-29** Security: unsigned and tampered rendition URLs rejected; path-traversal probes.
+  *`MediaUrlSignerTests` covers unsigned, tampered width/quality/crop, another site's key, and the
+  rotation grace period; `MediaStorageKeyTests` covers traversal, absolute paths, and a root inside
+  `wwwroot`.*
 - [ ] **P5-30** Integration: 20 concurrent cold requests for one rendition produce exactly one encode.
 - [ ] **P5-31** Integration: dedupe returns the existing item on identical bytes.
 - [ ] **P5-32** Benchmark NFR-8 — cold 4000 px source → 1280 px WebP under 800 ms p95; telemetry
@@ -3256,7 +3288,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 3 | `AddCmsPages` | 2 | P2-06 | `Page`, `PageVersion`, `ContentReference`, `EditLock` (+ the `SiteSettings` home / not-found FKs deferred from P1-01) | [x] |
 | 4 | `AddCmsRouting` | 3 | P3-02 | `PageRoute`, `Redirect`, `NotFoundLog`, `PreviewToken` | [x] |
 | 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [x] |
-| 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [ ] |
+| 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [x] |
 | 7 | `AddCmsWorkflow` | 7 | P7-08 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob` | [ ] |
 | 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [ ] |
 

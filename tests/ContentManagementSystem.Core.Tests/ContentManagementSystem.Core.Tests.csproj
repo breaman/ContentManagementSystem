@@ -12,6 +12,7 @@
     <!-- bUnit lives here rather than in a project of its own: rendering unit tests exercise the
          same field types and payload models as the rest of the Core suite. -->
     <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NSubstitute" />
   </ItemGroup>
 
