@@ -218,6 +218,10 @@ try
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
+    // The shell's layout store, which can do nothing here: static rendering has no JavaScript, so it
+    // answers with the default geometry and the browser restores the editor's own on hydration.
+    builder.Services.AddScoped<IShellLayoutStore, BrowserShellLayoutStore>();
+
     // Add route configuration to enforce lowercase URLs for better SEO
     builder.Services.Configure<RouteOptions>(options =>
     {

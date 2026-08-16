@@ -1,0 +1,95 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Tree
+@using ContentManagementSystem.Shared.Contracts.Content
+
+@* The gap above this row. Every row draws its own, and the level draws one more after the last, so
+   there is a drop target at both ends of every level (task P6-03). *@
+<DropGap ParentId="ParentId" Position="Position - 1" Tree="Tree" />
+
+<li class="cms-tree__item"
+    role="treeitem"
+    tabindex="@(Tree.IsActive(Page.Id) ? 0 : -1)"
+    aria-level="@Level"
+    aria-posinset="@Position"
+    aria-setsize="@SetSize"
+    aria-selected="@Aria(Tree.IsSelected(Page.Id))"
+    aria-expanded="@ExpandedAttribute"
+    @ref="Row"
+    @onclick="ActivateAsync"
+    @onclick:stopPropagation="true">
+
+    <span class="cms-tree__row @(Tree.IsSelected(Page.Id) ? "cms-tree__row--selected" : null) @(Tree.IsDragged(Page.Id) ? "cms-tree__row--dragging" : null) @(_dropTarget ? "cms-tree__row--drop" : null)"
+          style="@Indent"
+          draggable="true"
+          @ondragstart="() => Tree.BeginDrag(Page)"
+          @ondragend="Tree.EndDrag"
+          @ondragenter="() => _dropTarget = !Tree.IsDragged(Page.Id)"
+          @ondragleave="() => _dropTarget = false"
+          @ondragover:preventDefault="true"
+          @ondrop="DropIntoAsync">
+
+        @if (Page.HasChildren)
+        {
+            @* Not a button. A treeitem's own children are its group and its label, and a control
+               inside one is both an extra Tab stop per row and an ARIA violation. The keyboard path
+               to expansion is the right arrow key, handled by the tree (spec section 28). *@
+            <span class="cms-tree__expander bi @(Tree.IsExpanded(Page.Id) ? "bi-chevron-down" : "bi-chevron-right")"
+                  aria-hidden="true"
+                  @onclick="ToggleAsync"
+                  @onclick:stopPropagation="true"></span>
+        }
+        else
+        {
+            <span class="cms-tree__expander" aria-hidden="true"></span>
+        }
+
+        <span class="cms-tree__title">@Page.Title</span>
+
+        <PageStatusIndicator Page="Page" Now="Tree.Now" />
+    </span>
+
+    @if (Tree.IsExpanded(Page.Id))
+    {
+        var children = Tree.ChildrenOf(Page.Id);
+
+        if (children.Count == 0)
+        {
+            <span class="cms-tree__pending" role="status">
+                @(Tree.IsLoading(Page.Id) ? "Loading…" : "No pages here.")
+            </span>
+        }
+        else
+        {
+            <ul class="cms-tree__level" role="group">
+                @if (children.Count > ContentTree.VirtualizeThreshold)
+                {
+                    @* Virtualized only past the threshold, and against the pane's own scrollbar
+                       rather than a nested one: two scroll regions inside a tree is a way to lose a
+                       row you were looking at (task P6-35). *@
+                    <Virtualize Items="Indexed(children)" ItemSize="30" SpacerElement="li" Context="child">
+                        <ContentTreeNode Page="child.Page"
+                                         Level="Level + 1"
+                                         Position="child.Position"
+                                         SetSize="children.Count"
+                                         ParentId="Page.Id"
+                                         @key="child.Page.Id" />
+                    </Virtualize>
+                }
+                else
+                {
+                    @foreach (var child in Indexed(children))
+                    {
+                        <ContentTreeNode Page="child.Page"
+                                         Level="Level + 1"
+                                         Position="child.Position"
+                                         SetSize="children.Count"
+                                         ParentId="Page.Id"
+                                         @key="child.Page.Id" />
+                    }
+                }
+
+                <DropGap ParentId="Page.Id" Position="children.Count" Tree="Tree" />
+            </ul>
+        }
+    }
+
+</li>

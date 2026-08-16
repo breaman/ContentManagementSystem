@@ -95,6 +95,13 @@ public sealed class ServerPageClient(
         Project(await pages.PatchMetadataAsync(id, request, cancellationToken: cancellationToken));
 
     /// <inheritdoc />
+    public async Task<StructureClientResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default) =>
+        Project(await pages.MoveAsync(id, request, cancellationToken));
+
+    /// <inheritdoc />
     public async Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

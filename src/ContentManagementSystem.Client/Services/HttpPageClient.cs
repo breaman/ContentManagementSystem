@@ -119,6 +119,17 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
             cancellationToken);
 
     /// <inheritdoc />
+    public Task<StructureClientResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<MovePageRequest, PageMoveResult>(
+            HttpMethod.Post,
+            $"{Base}/pages/{id}/move",
+            request,
+            cancellationToken);
+
+    /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

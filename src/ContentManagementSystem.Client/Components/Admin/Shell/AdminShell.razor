@@ -1,0 +1,90 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Shell
+
+<div class="cms-shell" style="@GeometryStyle" @ref="Host">
+
+    <section class="cms-shell__pane cms-shell__pane--tree @(Layout.TreeCollapsed ? "cms-shell__pane--collapsed" : null)"
+             aria-label="@TreeLabel">
+        <header class="cms-shell__pane-header">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary cms-shell__toggle"
+                    aria-expanded="@Aria(!Layout.TreeCollapsed)"
+                    aria-controls="cms-shell-tree-body"
+                    @onclick="ToggleTreeAsync">
+                <span class="bi @(Layout.TreeCollapsed ? "bi-chevron-double-right" : "bi-chevron-double-left")"
+                      aria-hidden="true"></span>
+                <span class="visually-hidden">
+                    @(Layout.TreeCollapsed ? $"Show {TreeLabel}" : $"Hide {TreeLabel}")
+                </span>
+            </button>
+            @if (!Layout.TreeCollapsed)
+            {
+                <h2 class="cms-shell__pane-title">@TreeLabel</h2>
+            }
+        </header>
+        <div id="cms-shell-tree-body" class="cms-shell__pane-body" hidden="@Layout.TreeCollapsed">
+            @Navigation
+        </div>
+    </section>
+
+    <div class="cms-shell__handle cms-shell__handle--tree"
+         role="separator"
+         aria-orientation="vertical"
+         aria-label="@($"Resize {TreeLabel}")"
+         aria-valuemin="@Width(ShellLayout.MinPaneWidth)"
+         aria-valuemax="@Width(ShellLayout.MaxPaneWidth)"
+         aria-valuenow="@Width(Layout.TreeWidth)"
+         aria-valuetext="@($"{Width(Layout.TreeWidth)} pixels")"
+         tabindex="0"
+         hidden="@Layout.TreeCollapsed"
+         @ref="TreeHandle"
+         @onkeydown="OnTreeHandleKeyDownAsync"></div>
+
+    <main class="cms-shell__canvas" aria-label="@CanvasLabel">
+        @Canvas
+    </main>
+
+    <div class="cms-shell__handle cms-shell__handle--properties"
+         role="separator"
+         aria-orientation="vertical"
+         aria-label="@($"Resize {PropertiesLabel}")"
+         aria-valuemin="@Width(ShellLayout.MinPaneWidth)"
+         aria-valuemax="@Width(ShellLayout.MaxPaneWidth)"
+         aria-valuenow="@Width(Layout.PropertiesWidth)"
+         aria-valuetext="@($"{Width(Layout.PropertiesWidth)} pixels")"
+         tabindex="0"
+         hidden="@Layout.PropertiesCollapsed"
+         @ref="PropertiesHandle"
+         @onkeydown="OnPropertiesHandleKeyDownAsync"></div>
+
+    <section class="cms-shell__pane cms-shell__pane--properties @(Layout.PropertiesCollapsed ? "cms-shell__pane--collapsed" : null)"
+             aria-label="@PropertiesLabel">
+        <header class="cms-shell__pane-header">
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary cms-shell__toggle"
+                    aria-expanded="@Aria(!Layout.PropertiesCollapsed)"
+                    aria-controls="cms-shell-properties-body"
+                    @onclick="TogglePropertiesAsync">
+                <span class="bi @(Layout.PropertiesCollapsed ? "bi-chevron-double-left" : "bi-chevron-double-right")"
+                      aria-hidden="true"></span>
+                <span class="visually-hidden">
+                    @(Layout.PropertiesCollapsed ? $"Show {PropertiesLabel}" : $"Hide {PropertiesLabel}")
+                </span>
+            </button>
+            @if (!Layout.PropertiesCollapsed)
+            {
+                <h2 class="cms-shell__pane-title">@PropertiesLabel</h2>
+            }
+        </header>
+        <div id="cms-shell-properties-body" class="cms-shell__pane-body" hidden="@Layout.PropertiesCollapsed">
+            @Properties
+        </div>
+    </section>
+
+    @if (StatusBar is not null)
+    {
+        <footer class="cms-shell__status">
+            @StatusBar
+        </footer>
+    }
+
+</div>

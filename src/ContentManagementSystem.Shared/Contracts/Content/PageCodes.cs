@@ -92,6 +92,17 @@ public static class PageCodes
     public const string TooDeep = "page.too-deep";
 
     /// <summary>
+    /// A move would put a page inside its own subtree.
+    /// </summary>
+    /// <remarks>
+    /// The whole subtree would be detached from the site: nothing above it would reach it, and the
+    /// materialized path it depends on would contain a cycle. The ordinary way to reach this is a
+    /// drag that let go over a descendant, which is why the refusal is worth a code of its own
+    /// rather than being reported as a bad parent.
+    /// </remarks>
+    public const string MoveWouldCreateCycle = "page.move-cycle";
+
+    /// <summary>
     /// The user named as the page's owner does not exist.
     /// </summary>
     /// <remarks>

@@ -22,6 +22,7 @@
     <Project Path="src/ContentManagementSystem.Shared/ContentManagementSystem.Shared.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ContentManagementSystem.Client.Tests/ContentManagementSystem.Client.Tests.csproj" />
     <Project Path="tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj" />
     <Project Path="tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj" />
     <Project Path="tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj" />

@@ -26,6 +26,16 @@ namespace ContentManagementSystem.Shared.Contracts.Content;
 /// <param name="ShowInNavigation">Whether generated navigation menus include the page.</param>
 /// <param name="HasChildren">Whether the page has any live children, for the tree's expander.</param>
 /// <param name="ModifiedOn">When the page row itself last changed.</param>
+/// <param name="ScheduledPublishOn">
+/// When the draft is due to go live, or null when it publishes on request. Carried here rather than
+/// folded into <paramref name="Status"/> because a scheduled page is a draft — the schedule is an
+/// additional fact about it, not a different lifecycle state (spec section 11.6).
+/// </param>
+/// <param name="LockedBy">
+/// Display name of whoever currently has the page open in the editor, or null when nobody does. A
+/// lock never prevents editing (ADR 0012); this is here so the tree can say who is in there before
+/// somebody opens the same page.
+/// </param>
 public sealed record PageSummary(
     int Id,
     Guid PublicId,
@@ -42,7 +52,9 @@ public sealed record PageSummary(
     int? PublishedVersionNumber,
     bool ShowInNavigation,
     bool HasChildren,
-    DateTimeOffset? ModifiedOn);
+    DateTimeOffset? ModifiedOn,
+    DateTimeOffset? ScheduledPublishOn = null,
+    string? LockedBy = null);
 
 /// <summary>
 /// A page's metadata and its draft payload, as <c>GET /api/cms/v1/pages/{id}</c> returns them.

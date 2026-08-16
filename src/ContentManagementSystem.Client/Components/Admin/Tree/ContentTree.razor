@@ -1,0 +1,124 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Tree
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Shared.Contracts.Content
+
+<div class="cms-tree" @onkeydown="OnKeyDownAsync">
+
+    @if (_error is not null)
+    {
+        <p class="alert alert-warning py-2 px-3 small" role="alert">
+            The tree could not be loaded. @_error
+        </p>
+    }
+
+    @if (_moveErrors is { Count: > 0 })
+    {
+        <div class="alert alert-danger py-2 px-3 small" role="alert">
+            <p class="mb-1 fw-semibold">The page was not moved.</p>
+            <ul class="mb-0 ps-3">
+                @foreach (var diagnostic in _moveErrors)
+                {
+                    <li>@diagnostic.Message</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (Roots is null)
+    {
+        <p class="text-body-secondary small" role="status">Loading the tree…</p>
+    }
+    else if (Roots.Count == 0)
+    {
+        <p class="text-body-secondary small">No pages yet.</p>
+    }
+    else
+    {
+        <CascadingValue Value="this" IsFixed="true">
+            <ul class="cms-tree__level" role="tree" aria-label="@Label">
+                @for (var index = 0; index < Roots.Count; index++)
+                {
+                    var root = Roots[index];
+
+                    <ContentTreeNode Page="root.Page"
+                                     Level="1"
+                                     Position="index + 1"
+                                     SetSize="Roots.Count"
+                                     ParentId="null"
+                                     @key="root.Page.Id" />
+                }
+
+                @* The gap after the last root, so a page can be dragged to the very bottom of the
+                   site. Every other gap is drawn by the row that follows it. *@
+                <DropGap ParentId="null" Position="Roots.Count" Tree="this" />
+            </ul>
+        </CascadingValue>
+    }
+
+    <ModalDialog IsOpen="_pending is not null"
+                 Title="This move changes URLs"
+                 ConfirmLabel="Move the page"
+                 ConfirmClass="btn-warning"
+                 IsBusy="_moving"
+                 SizeClass="modal-lg"
+                 OnConfirm="ConfirmMoveAsync"
+                 OnCancel="CancelMove">
+        @if (_pending is { } pending)
+        {
+            <p>
+                Moving <strong>@pending.Page.Title</strong> changes
+                @pending.Preview.UrlChanges.Count address(es).
+                @if (pending.Preview.RedirectCount > 0)
+                {
+                    <text>
+                        @pending.Preview.RedirectCount of them are published, so a redirect will be
+                        left behind at each old address.
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        None of them are published, so nothing is redirected — no visitor has ever
+                        seen these addresses.
+                    </text>
+                }
+            </p>
+
+            <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                    <caption class="visually-hidden">Every page whose URL this move changes.</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Page</th>
+                            <th scope="col">Was</th>
+                            <th scope="col">Becomes</th>
+                            <th scope="col">Redirect</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var change in pending.Preview.UrlChanges)
+                        {
+                            <tr>
+                                <th scope="row" class="fw-normal">@change.Title</th>
+                                <td><code>@(change.OldUrl ?? "—")</code></td>
+                                <td><code>@change.NewUrl</code></td>
+                                <td>
+                                    @if (change.RedirectCreated)
+                                    {
+                                        <span class="bi bi-signpost-split" aria-hidden="true"></span>
+                                        <span>Created</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-body-secondary">None</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </ModalDialog>
+
+</div>

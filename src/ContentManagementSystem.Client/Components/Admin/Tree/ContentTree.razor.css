@@ -1,0 +1,108 @@
+/* The content tree of spec section 14.2 (task P6-02).
+
+   Scoped to ContentTree, which is why the row styles are reachable through ::deep — the rows are
+   rendered by ContentTreeNode, a different component, and scoped CSS stops at a component boundary
+   unless it is asked not to. */
+
+.cms-tree {
+    font-size: 0.9375rem;
+}
+
+.cms-tree ::deep .cms-tree__level {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.cms-tree ::deep .cms-tree__item {
+    /* The focus ring belongs on the row, not on the item — an item wraps its whole subtree, and an
+       outline around forty descendants tells a keyboard user nothing about where they are. */
+    outline: none;
+}
+
+.cms-tree ::deep .cms-tree__row {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding-block: 0.1875rem;
+    padding-inline-end: 0.375rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    min-block-size: 1.75rem;
+}
+
+.cms-tree ::deep .cms-tree__row:hover {
+    background-color: var(--bs-secondary-bg);
+}
+
+.cms-tree ::deep .cms-tree__row--selected {
+    background-color: var(--bs-primary-bg-subtle);
+    font-weight: 600;
+}
+
+.cms-tree ::deep .cms-tree__item:focus-visible > .cms-tree__row {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: -2px;
+}
+
+.cms-tree ::deep .cms-tree__expander {
+    inline-size: 1rem;
+    flex: 0 0 1rem;
+    text-align: center;
+    color: var(--bs-secondary-color);
+    font-size: 0.75rem;
+}
+
+.cms-tree ::deep .cms-tree__title {
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cms-tree ::deep .cms-tree__status {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+}
+
+/* The page being dragged stays visible but recedes, so the tree does not appear to lose a row. */
+.cms-tree ::deep .cms-tree__row--dragging {
+    opacity: 0.5;
+}
+
+/* Dropping onto a row means "inside this page", which is drawn as the row swallowing the item. */
+.cms-tree ::deep .cms-tree__row--drop {
+    outline: 2px dashed var(--bs-primary);
+    outline-offset: -2px;
+}
+
+/* Dropping into a gap means "here, among these siblings". Four pixels of hit area is thin, so the
+   strip is taller than the line it draws. */
+.cms-tree ::deep .cms-tree__gap {
+    list-style: none;
+    block-size: 0.5rem;
+    margin-block: -0.25rem;
+    position: relative;
+    z-index: 1;
+}
+
+.cms-tree ::deep .cms-tree__gap--over::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    inset-block-start: 50%;
+    block-size: 2px;
+    background-color: var(--bs-primary);
+}
+
+.cms-tree ::deep .cms-tree__pending {
+    display: block;
+    padding-block: 0.25rem;
+    padding-inline-start: 2rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+}

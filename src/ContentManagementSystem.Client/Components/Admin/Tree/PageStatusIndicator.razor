@@ -1,0 +1,22 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Tree
+@using ContentManagementSystem.Shared.Contracts.Content
+
+@{
+    var status = PageTreeStatuses.Classify(Page, Now);
+    var label = PageTreeStatuses.Label(status);
+}
+
+<span class="cms-tree__status">
+
+    <span class="bi @PageTreeStatuses.Icon(status) @PageTreeStatuses.CssClass(status)" aria-hidden="true"></span>
+    <span class="visually-hidden">@label</span>
+
+    @if (Page.LockedBy is { Length: > 0 } holder)
+    {
+        @* Shown alongside the publishing state rather than instead of it: a locked page still has a
+           state, and losing it would be the more expensive omission (ADR 0012). *@
+        <span class="bi bi-lock-fill text-body-secondary" aria-hidden="true"></span>
+        <span class="visually-hidden">Open in the editor by @holder</span>
+    }
+
+</span>

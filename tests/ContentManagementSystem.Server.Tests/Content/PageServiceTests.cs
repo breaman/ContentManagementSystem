@@ -497,6 +497,7 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             // page service's own SaveChanges, which is the arrangement production runs.
             scope.ServiceProvider.GetRequiredService<IUrlService>(),
             new StubAuthorization(permissions),
+            TimeProvider.System,
             NullLogger<PageService>.Instance);
 
     /// <summary>Builds a validator over the field types this deployment registered.</summary>

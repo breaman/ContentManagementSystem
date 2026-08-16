@@ -1,0 +1,172 @@
+/* The three-pane backoffice frame of spec section 14.1 (task P6-01).
+
+   Scoped to this component, so nothing here can reach into a pane's contents: the tree, the canvas,
+   and the properties panel each style themselves. What this file owns is the grid, the separators,
+   and what happens to all of it on a narrow screen. */
+
+.cms-shell {
+    display: grid;
+    grid-template-columns:
+        var(--cms-shell-tree-col, 18rem)
+        auto
+        minmax(0, 1fr)
+        auto
+        var(--cms-shell-properties-col, 22rem);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas:
+        "tree tree-handle canvas properties-handle properties"
+        "status status status status status";
+
+    /* Fills what is left of the viewport under the site header. Each pane then scrolls on its own,
+       which is the whole point of the layout: an editor scrolling a twelve-block canvas must not
+       lose sight of the tree they are working through. */
+    block-size: calc(100dvh - var(--cms-shell-offset, 4rem));
+    min-block-size: 0;
+}
+
+.cms-shell__pane {
+    display: flex;
+    flex-direction: column;
+    min-inline-size: 0;
+    min-block-size: 0;
+    border-inline-end: 1px solid var(--bs-border-color);
+    background-color: var(--bs-body-bg);
+}
+
+.cms-shell__pane--tree {
+    grid-area: tree;
+}
+
+.cms-shell__pane--properties {
+    grid-area: properties;
+    border-inline-end: 0;
+    border-inline-start: 1px solid var(--bs-border-color);
+}
+
+.cms-shell__pane-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    border-block-end: 1px solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+/* A collapsed pane keeps only its toggle, so the rail is as wide as one small button and no wider. */
+.cms-shell__pane--collapsed .cms-shell__pane-header {
+    padding-inline: 0.25rem;
+}
+
+.cms-shell__pane-title {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cms-shell__pane-body {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow: auto;
+    padding: 0.75rem;
+}
+
+.cms-shell__canvas {
+    grid-area: canvas;
+    min-inline-size: 0;
+    min-block-size: 0;
+    overflow: auto;
+    padding: 1rem;
+}
+
+.cms-shell__status {
+    grid-area: status;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.375rem 0.75rem;
+    border-block-start: 1px solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg);
+    font-size: 0.875rem;
+}
+
+/* The separators. Four pixels of hit area is too mean for a pointer, so the visible line is drawn
+   with a pseudo-element inside a wider grab zone. */
+.cms-shell__handle {
+    inline-size: 0.5rem;
+    cursor: col-resize;
+    background-color: transparent;
+    border: 0;
+    padding: 0;
+    position: relative;
+    touch-action: none;
+}
+
+.cms-shell__handle--tree {
+    grid-area: tree-handle;
+}
+
+.cms-shell__handle--properties {
+    grid-area: properties-handle;
+}
+
+.cms-shell__handle::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 50%;
+    inline-size: 2px;
+    transform: translateX(-50%);
+    background-color: transparent;
+}
+
+.cms-shell__handle:hover::after,
+.cms-shell__handle:focus-visible::after {
+    background-color: var(--bs-primary);
+}
+
+/* Focus has to be visible on an element with no content of its own to outline. */
+.cms-shell__handle:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: -2px;
+}
+
+/* Tablet and below: the three panes stack in reading order and the separators go away.
+
+   Stacking rather than sliding the side panes over the canvas as drawers is a deliberate choice.
+   An overlay has to trap focus, restore it on close, and be dismissible — three things that are
+   easy to get subtly wrong — where a stack is simply the document, in the order it is written. */
+@media (max-width: 62em) {
+    .cms-shell {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas:
+            "tree"
+            "canvas"
+            "properties"
+            "status";
+        block-size: auto;
+    }
+
+    .cms-shell__handle {
+        display: none;
+    }
+
+    .cms-shell__pane {
+        border-inline: 0;
+        border-block-end: 1px solid var(--bs-border-color);
+    }
+
+    .cms-shell__pane--properties {
+        border-inline-start: 0;
+    }
+
+    /* Each pane keeps its own scroll, capped so that no one of them pushes the others off screen. */
+    .cms-shell__pane-body {
+        max-block-size: 60vh;
+    }
+}

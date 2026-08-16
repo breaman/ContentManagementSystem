@@ -115,4 +115,32 @@ public interface IPageService
         PatchPageMetadataRequest request,
         string? expectedRowVersion = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Repositions a page in the tree, rebuilding the URLs of everything below it (task P6-03).
+    /// </summary>
+    /// <param name="id">Identity of the page to move.</param>
+    /// <param name="request">The new parent and position, and whether this is a preview.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>
+    /// What moved and what redirects were left behind, a not-found result, or an invalid result
+    /// naming the rule the move broke.
+    /// </returns>
+    /// <remarks>
+    /// The one exception to this interface's rule that nothing here changes a page's parent. It is
+    /// here rather than on <c>IPageTreeService</c> because a move is three things at once — the tree
+    /// position, the sibling ordering, and every route beneath it — and only a service holding the
+    /// transaction can make those one act (spec section 10.4).
+    /// <para>
+    /// <strong>A preview is the move.</strong> <c>request.Preview</c> runs every step and then rolls
+    /// the transaction back rather than committing it, so the confirmation an editor is shown cannot
+    /// disagree with what pressing the button then does. The alternative — a second implementation
+    /// that computes URLs without writing them — is a second implementation to keep in step, and the
+    /// first time it drifts an editor approves five redirects and gets fifty.
+    /// </para>
+    /// </remarks>
+    Task<CmsResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default);
 }

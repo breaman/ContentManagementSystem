@@ -86,6 +86,14 @@ public static class PageEndpoints
             .RequireAuthorization(CmsPermissions.ContentEdit)
             .RequireCmsAntiforgery();
 
+        pages.MapPost("/{id:int}/move", MoveAsync)
+            .WithName("MovePage")
+            .WithSummary(
+                "Reparents or reorders a page, rebuilding the URLs beneath it. " +
+                "Send preview=true to be told what would happen without it happening.")
+            .RequireAuthorization(CmsPermissions.ContentEdit)
+            .RequireCmsAntiforgery();
+
         return group;
     }
 
@@ -233,4 +241,18 @@ public static class PageEndpoints
 
             return Results.Ok(page);
         });
+
+    /// <remarks>
+    /// A <c>POST</c> rather than a <c>PATCH</c> of the parent, and antiforgery-guarded like every
+    /// other write, because a preview is a write in every respect except that it is rolled back: it
+    /// opens a transaction, moves rows, and rebuilds routes. Treating it as a read would leave the
+    /// most expensive operation in the page API reachable without a token.
+    /// </remarks>
+    private static async Task<IResult> MoveAsync(
+        int id,
+        MovePageRequest request,
+        IPageService pages,
+        CancellationToken cancellationToken) =>
+        (await pages.MoveAsync(id, request, cancellationToken))
+        .ToHttpResult(Results.Ok);
 }

@@ -2,6 +2,7 @@ using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Shared.Services;
 
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
@@ -15,7 +16,16 @@ builder.Services.AddScoped(sp =>
         BaseAddress = new Uri(builder.HostEnvironment.BaseAddress)
     });
 
+// The clock the backoffice screens read. The server registers the same instance through
+// AddCmsPages, so a component that asks "is this schedule in the future" gets an answer of the same
+// kind whether it is pre-rendering or running in the browser.
+builder.Services.TryAddSingleton(TimeProvider.System);
+
 builder.Services.AddScoped<IToastService, ToastService>();
+
+// The backoffice shell's pane geometry, kept in localStorage (task P6-01). Registered on the server
+// too, where every call is a no-op, so the shell pre-renders with the default layout.
+builder.Services.AddScoped<IShellLayoutStore, BrowserShellLayoutStore>();
 
 // The structure admin screens talk to the management API from the browser. Its server-side twin,
 // ServerStructureClient, backs the same screens during pre-render.

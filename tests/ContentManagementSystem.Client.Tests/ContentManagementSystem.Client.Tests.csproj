@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The backoffice is Blazor WebAssembly, so its components are tested by rendering them rather
+         than by driving a browser. The browser journeys that need a real DOM — editor teardown,
+         autosave over a flaky network — stay in the E2E suite. -->
+    <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="NSubstitute" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Client\ContentManagementSystem.Client.csproj" />
+  </ItemGroup>
+
+</Project>

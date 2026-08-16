@@ -135,6 +135,23 @@ public sealed class FakePageClient : IPageClient
         StructureClientResult<PageDetail>.Success((await GetAsync(id, cancellationToken))!);
 
     /// <inheritdoc />
+    public Task<StructureClientResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<PageMoveResult>.Success(
+            new PageMoveResult(
+                id,
+                request.ParentId,
+                request.Position ?? 0,
+                [
+                    new PageUrlChangeSummary(id, "Pricing", "/pricing", "/about/pricing", true),
+                    new PageUrlChangeSummary(9, "Enterprise", "/pricing/enterprise",
+                        "/about/pricing/enterprise", true),
+                ],
+                request.Preview)));
+
+    /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

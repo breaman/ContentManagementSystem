@@ -21,12 +21,14 @@ namespace ContentManagementSystem.Core.Content;
 /// <param name="tree">Owns the materialized path; nothing else may write it.</param>
 /// <param name="urls">Owns the route table; every change to a slug or an explicit URL goes through it.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="clock">Reads the current time, so a lock's expiry is testable.</param>
 /// <param name="logger">Log for page creation and for saves that lost a race.</param>
 public sealed class PageService(
     ApplicationDbContext context,
     IPageTreeService tree,
     IUrlService urls,
     ICmsAuthorization authorization,
+    TimeProvider clock,
     ILogger<PageService> logger) : IPageService
 {
     /// <summary>Escape character used with <c>LIKE</c>, so a search term's wildcards are literal.</summary>
@@ -227,11 +229,19 @@ public sealed class PageService(
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
-            var term = $"%{Escape(query.Search.Trim())}%";
+            var trimmed = query.Search.Trim();
+            var term = $"%{Escape(trimmed)}%";
+
+            // A term that is entirely digits also matches on identity. The tree's filter box is the
+            // one place an editor arrives holding a page id — from a log line, a ticket, or a URL —
+            // and a filter that answered "no results" for the id it was handed would be read as the
+            // page being gone (spec section 14.2).
+            var byId = int.TryParse(trimmed, out var id) ? id : (int?)null;
 
             pages = pages.Where(candidate =>
                 EF.Functions.Like(candidate.DraftVersion!.Title, term, LikeEscape) ||
-                EF.Functions.Like(candidate.Slug, term, LikeEscape));
+                EF.Functions.Like(candidate.Slug, term, LikeEscape) ||
+                (byId != null && candidate.Id == byId));
         }
 
         // One row beyond the limit, so that "is there a next page" is answered by the same query
@@ -245,10 +255,15 @@ public sealed class PageService(
         if (hasMore) found.RemoveAt(found.Count - 1);
 
         var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
+        var locks = await LiveLocksAsync([.. found.Select(page => page.Id)], cancellationToken);
 
         var items = found
             .Where(page => page.DraftVersion is not null)
-            .Select(page => ToSummary(page, page.DraftVersion!, withChildren.Contains(page.Id)))
+            .Select(page => ToSummary(
+                page,
+                page.DraftVersion!,
+                withChildren.Contains(page.Id),
+                LockedBy(locks, page.Id)))
             .ToList();
 
         var next = hasMore && found.Count > 0 ? Cursor.Encode(found[^1].Id) : null;
@@ -315,6 +330,7 @@ public sealed class PageService(
             .ToListAsync(cancellationToken);
 
         var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
+        var locks = await LiveLocksAsync([.. found.Select(page => page.Id)], cancellationToken);
 
         // Keyed on the parent's id, with the synthetic site root as zero — no page has that identity,
         // and a nullable key would need its own comparer to say the same thing.
@@ -328,7 +344,11 @@ public sealed class PageService(
 
             var children = byParent.TryGetValue(page.Id, out var assembled) ? assembled : [];
             var node = new PageTreeNode(
-                ToSummary(page, page.DraftVersion, withChildren.Contains(page.Id)),
+                ToSummary(
+                    page,
+                    page.DraftVersion,
+                    withChildren.Contains(page.Id),
+                    LockedBy(locks, page.Id)),
                 children);
 
             var key = page.ParentId ?? RootKey;
@@ -484,7 +504,243 @@ public sealed class PageService(
         var hasChildren = await context.Pages
             .AnyAsync(candidate => candidate.ParentId == page.Id, cancellationToken);
 
-        return CmsResult<PageDetail>.Success(ToDetail(page, draft, hasChildren), checks);
+        var locks = await LiveLocksAsync([page.Id], cancellationToken);
+
+        return CmsResult<PageDetail>.Success(
+            ToDetail(page, draft, hasChildren, LockedBy(locks, page.Id)),
+            checks);
+    }
+
+    /// <inheritdoc />
+    public async Task<CmsResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        if (!authorization.HasPermission(CmsPermissions.ContentEdit))
+        {
+            return CmsResult<PageMoveResult>.Forbidden(
+                "Moving pages is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        var subject = await context.Pages
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+
+        if (subject is null)
+        {
+            return CmsResult<PageMoveResult>.NotFound($"No page has id {id}.", PageCodes.NotFound);
+        }
+
+        if (request.ParentId is { } parentId &&
+            !await context.Pages.AnyAsync(candidate => candidate.Id == parentId, cancellationToken))
+        {
+            return CmsResult<PageMoveResult>.Invalid(
+                PageCodes.ParentNotFound,
+                $"No page has id {parentId}, or it is in the recycle bin.",
+                nameof(MovePageRequest.ParentId));
+        }
+
+        // Checked before the transaction, because the refusal is about the page's own slug rather
+        // than about anything the move computes: two children of one parent cannot share a URL
+        // segment, and a move is the one operation that can create that collision without anybody
+        // having typed a slug (spec section 10.3).
+        if (request.ParentId != subject.ParentId &&
+            await SiblingSlugExistsAsync(request.ParentId, subject.Slug, id, cancellationToken))
+        {
+            return CmsResult<PageMoveResult>.Conflict(
+                PageCodes.SlugDuplicate,
+                request.ParentId is null
+                    ? $"A page at the root of the site already uses the segment '{subject.Slug}'."
+                    : $"Another child of page {request.ParentId} already uses the segment " +
+                      $"'{subject.Slug}'. Rename this page before moving it there.",
+                nameof(MovePageRequest.ParentId));
+        }
+
+        return await ApplyMoveAsync(id, request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs the move inside a transaction, committing it or — for a preview — rolling it back.
+    /// </summary>
+    /// <param name="id">Identity of the page to move.</param>
+    /// <param name="request">The new parent and position, and whether this is a preview.</param>
+    /// <param name="cancellationToken">Token observed throughout.</param>
+    /// <returns>What the move did, or the reason it was refused.</returns>
+    private async Task<CmsResult<PageMoveResult>> ApplyMoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken)
+    {
+        var strategy = context.Database.CreateExecutionStrategy();
+
+        return await strategy.ExecuteAsync(async () =>
+        {
+            // Re-read inside the lambda, for the reason InsertAsync gives: a transient failure
+            // re-runs all of this, and entities tracked by the failed attempt would be written on
+            // top of the retry's own.
+            context.ChangeTracker.Clear();
+
+            await using var transaction =
+                await context.Database.BeginTransactionAsync(cancellationToken);
+
+            var page = await context.Pages.FirstAsync(
+                candidate => candidate.Id == id,
+                cancellationToken);
+
+            var outcome = await tree.MoveAsync(page, request.ParentId, cancellationToken);
+
+            if (outcome is not PageMoveOutcome.Moved)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                context.ChangeTracker.Clear();
+
+                return Refuse(outcome, request.ParentId);
+            }
+
+            await ReorderSiblingsAsync(page, request.Position, cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+
+            // Rebuilds the routes of the page and every descendant, emitting a redirect at each URL
+            // vacated. This is the whole reason a move needs a confirmation: one drag can rewrite
+            // the addresses of a subtree that other sites link to.
+            var sync = await urls.SyncAsync(page.Id, cancellationToken);
+
+            if (sync.HasErrors)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                context.ChangeTracker.Clear();
+
+                return CmsResult<PageMoveResult>.Invalid(sync.Diagnostics);
+            }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            // Described before the rollback: the titles are read through the same transaction, so a
+            // preview names the pages as they stand rather than as they were before it started.
+            var changes = await DescribeAsync(sync.Changes, cancellationToken);
+
+            var result = new PageMoveResult(
+                page.Id,
+                page.ParentId,
+                page.SortOrder,
+                changes,
+                request.Preview);
+
+            if (request.Preview)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+
+                // Without this the tracker still holds every row the preview changed, and the next
+                // SaveChanges in this request scope would write a move nobody confirmed.
+                context.ChangeTracker.Clear();
+            }
+            else
+            {
+                await transaction.CommitAsync(cancellationToken);
+
+                logger.LogInformation(
+                    "Page {PageId} moved under {ParentId} at position {Position}; " +
+                    "{ChangeCount} URL(s) changed and {RedirectCount} redirect(s) created.",
+                    page.Id,
+                    page.ParentId,
+                    page.SortOrder,
+                    result.UrlChanges.Count,
+                    result.RedirectCount);
+            }
+
+            return CmsResult<PageMoveResult>.Success(result);
+        });
+    }
+
+    /// <summary>Turns a tree service refusal into something an editor can act on.</summary>
+    private static CmsResult<PageMoveResult> Refuse(PageMoveOutcome outcome, int? parentId) =>
+        outcome switch
+        {
+            PageMoveOutcome.ParentNotFound => CmsResult<PageMoveResult>.Invalid(
+                PageCodes.ParentNotFound,
+                $"No page has id {parentId}, or it is in the recycle bin.",
+                nameof(MovePageRequest.ParentId)),
+
+            PageMoveOutcome.WouldCreateCycle => CmsResult<PageMoveResult>.Invalid(
+                PageCodes.MoveWouldCreateCycle,
+                "A page cannot be moved inside itself or one of its own descendants.",
+                nameof(MovePageRequest.ParentId)),
+
+            PageMoveOutcome.TooDeep => CmsResult<PageMoveResult>.Invalid(
+                PageCodes.TooDeep,
+                $"That move would put some page more than {IPageTreeService.MaxDepth} levels below " +
+                "the root.",
+                nameof(MovePageRequest.ParentId)),
+
+            _ => CmsResult<PageMoveResult>.Invalid(
+                PageCodes.ParentNotFound,
+                "That move could not be applied.",
+                nameof(MovePageRequest.ParentId)),
+        };
+
+    /// <summary>
+    /// Renumbers a level so the moved page sits at the requested position.
+    /// </summary>
+    /// <param name="moving">The page, already reparented and tracked.</param>
+    /// <param name="position">Where it should land, or null to append it.</param>
+    /// <param name="cancellationToken">Token observed while loading the siblings.</param>
+    /// <remarks>
+    /// The whole level is renumbered from zero rather than the moved page being given a fractional
+    /// or a duplicate order. Sibling order is small, bounded by one level, and rewritten inside the
+    /// same transaction — and a level whose numbers are exactly its positions is one where "move
+    /// this up one" is arithmetic rather than a search for a gap.
+    /// </remarks>
+    private async Task ReorderSiblingsAsync(
+        Page moving,
+        int? position,
+        CancellationToken cancellationToken)
+    {
+        var siblings = await context.Pages
+            .Where(candidate => candidate.ParentId == moving.ParentId && candidate.Id != moving.Id)
+            .OrderBy(candidate => candidate.SortOrder)
+            .ThenBy(candidate => candidate.Id)
+            .ToListAsync(cancellationToken);
+
+        // Clamped rather than refused. A position past the end is what a drag to the bottom of a
+        // level produces, and "put it last" is unambiguously what was meant.
+        var index = Math.Clamp(position ?? siblings.Count, 0, siblings.Count);
+
+        siblings.Insert(index, moving);
+
+        for (var order = 0; order < siblings.Count; order++)
+        {
+            siblings[order].SortOrder = order;
+        }
+    }
+
+    /// <summary>Names the pages a route rebuild moved, so a confirmation can list them.</summary>
+    private async Task<IReadOnlyList<PageUrlChangeSummary>> DescribeAsync(
+        IReadOnlyList<PageUrlChange> changes,
+        CancellationToken cancellationToken)
+    {
+        if (changes.Count == 0) return [];
+
+        var ids = changes.Select(change => change.PageId).ToList();
+
+        var titles = await context.Pages
+            .AsNoTracking()
+            .Where(candidate => ids.Contains(candidate.Id) && candidate.DraftVersion != null)
+            .Select(candidate => new { candidate.Id, candidate.DraftVersion!.Title })
+            .ToDictionaryAsync(row => row.Id, row => row.Title, cancellationToken);
+
+        return
+        [
+            .. changes.Select(change => new PageUrlChangeSummary(
+                change.PageId,
+                titles.TryGetValue(change.PageId, out var title) ? title : $"Page {change.PageId}",
+                change.OldUrl,
+                change.NewUrl,
+                change.RedirectCreated)),
+        ];
     }
 
     /// <summary>
@@ -604,7 +860,9 @@ public sealed class PageService(
         var hasChildren = await context.Pages
             .AnyAsync(candidate => candidate.ParentId == page.Id, cancellationToken);
 
-        return ToDetail(page, page.DraftVersion, hasChildren);
+        var locks = await LiveLocksAsync([page.Id], cancellationToken);
+
+        return ToDetail(page, page.DraftVersion, hasChildren, LockedBy(locks, page.Id));
     }
 
     /// <summary>Places a new page after its existing siblings.</summary>
@@ -896,6 +1154,39 @@ public sealed class PageService(
         return [.. parents];
     }
 
+    /// <summary>
+    /// Finds who currently has any of these pages open in the editor (task P6-02).
+    /// </summary>
+    /// <param name="ids">Identities of the pages being projected.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>Page identity to the holder's display name, for live locks only.</returns>
+    /// <remarks>
+    /// One query for the whole set, for the reason <see cref="ParentsWithChildrenAsync"/> gives. The
+    /// expiry cutoff is applied here rather than left to the reaper, exactly as
+    /// <c>EditLockService</c> does: a tree that showed a padlock because nothing had swept the table
+    /// in the last minute would teach editors to ignore the padlock.
+    /// </remarks>
+    private async Task<Dictionary<int, string?>> LiveLocksAsync(
+        IReadOnlyCollection<int> ids,
+        CancellationToken cancellationToken)
+    {
+        if (ids.Count == 0) return [];
+
+        var cutoff = clock.GetUtcNow() - IEditLockService.Expiry;
+
+        var held = await context.EditLocks
+            .AsNoTracking()
+            .Where(candidate => ids.Contains(candidate.PageId) && candidate.HeartbeatOn > cutoff)
+            .Select(candidate => new { candidate.PageId, candidate.User.UserName })
+            .ToListAsync(cancellationToken);
+
+        return held.ToDictionary(row => row.PageId, row => row.UserName);
+    }
+
+    /// <summary>Reads one page's holder out of a lock lookup.</summary>
+    private static string? LockedBy(Dictionary<int, string?> locks, int pageId) =>
+        locks.TryGetValue(pageId, out var holder) ? holder ?? "another editor" : null;
+
     /// <summary>Escapes the wildcards of a caller-supplied search term (spec section 22.1).</summary>
     /// <remarks>
     /// Without this, a term containing <c>%</c> matches everything and one containing <c>_</c>
@@ -907,7 +1198,11 @@ public sealed class PageService(
         .Replace("_", LikeEscape + "_", StringComparison.Ordinal)
         .Replace("[", LikeEscape + "[", StringComparison.Ordinal);
 
-    private static PageSummary ToSummary(Page page, PageVersion draft, bool hasChildren) =>
+    private static PageSummary ToSummary(
+        Page page,
+        PageVersion draft,
+        bool hasChildren,
+        string? lockedBy = null) =>
         new(
             page.Id,
             page.PublicId,
@@ -924,11 +1219,17 @@ public sealed class PageService(
             page.PublishedVersion?.VersionNumber,
             page.ShowInNavigation,
             hasChildren,
-            page.ModifiedOn ?? page.CreatedOn);
+            page.ModifiedOn ?? page.CreatedOn,
+            draft.PublishOn,
+            lockedBy);
 
-    private static PageDetail ToDetail(Page page, PageVersion draft, bool hasChildren) =>
+    private static PageDetail ToDetail(
+        Page page,
+        PageVersion draft,
+        bool hasChildren,
+        string? lockedBy = null) =>
         new(
-            ToSummary(page, draft, hasChildren),
+            ToSummary(page, draft, hasChildren, lockedBy),
             draft.ContentJson,
             draft.TemplateRevision,
             page.UseExplicitUrl,

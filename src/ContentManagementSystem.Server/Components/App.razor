@@ -8,7 +8,10 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="@Assets["css/site.css"]" />
-    @* <link rel="stylesheet" href="@Assets["ContentManagementSystem.Server.styles.css"]" /> *@
+    @* Component-scoped stylesheets, bundled across the server and the WebAssembly client. The
+       backoffice shell is the first component to have one (task P6-01), so this stopped being an
+       empty file at that point. *@
+    <link rel="stylesheet" href="@Assets["ContentManagementSystem.Server.styles.css"]" />
     <ImportMap />
     <link rel="icon" type="image/png" href="favicon.png" />
     <HeadOutlet />

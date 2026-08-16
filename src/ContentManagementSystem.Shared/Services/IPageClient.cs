@@ -86,6 +86,23 @@ public interface IPageClient
         PatchPageMetadataRequest request,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Reparents or reorders a page, rebuilding the URLs beneath it (task P6-03).
+    /// </summary>
+    /// <param name="id">Identity of the page to move.</param>
+    /// <param name="request">The new parent and position, and whether this is a preview.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>What the move did, or — for a preview — what it would do.</returns>
+    /// <remarks>
+    /// Called twice by the tree: once with <c>Preview: true</c> to fill the confirmation dialog, and
+    /// again without it if the editor goes ahead. Both calls run the same code on the server, which
+    /// is what stops the dialog promising one thing and the move doing another.
+    /// </remarks>
+    Task<StructureClientResult<PageMoveResult>> MoveAsync(
+        int id,
+        MovePageRequest request,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Runs the publish checks without publishing.</summary>
     /// <param name="id">Identity of the page.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>

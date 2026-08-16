@@ -1,0 +1,17 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Tree
+
+@if (Tree.IsDragging)
+{
+    @* Only while something is being dragged. A permanent strip between every row is clutter the
+       rest of the time, and it steals pointer events from the rows either side of it.
+
+       role="none" keeps it out of the accessibility tree entirely: it is a pointer affordance with
+       a keyboard equivalent elsewhere (Alt with the arrow keys), and a tree whose every other child
+       announced itself as a drop target would be unusable with a screen reader. *@
+    <li class="cms-tree__gap @(_over ? "cms-tree__gap--over" : null)"
+        role="none"
+        @ondragenter="() => _over = true"
+        @ondragleave="() => _over = false"
+        @ondragover:preventDefault="true"
+        @ondrop="DropAsync"></li>
+}

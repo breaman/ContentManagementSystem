@@ -1,0 +1,51 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Common
+
+@if (IsOpen)
+{
+    <div class="modal-backdrop fade show"></div>
+
+    <div class="modal d-block"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="@($"{DialogId}-title")"
+         tabindex="-1"
+         @ref="Dialog"
+         @onkeydown="OnKeyDownAsync">
+        <div class="modal-dialog modal-dialog-centered @SizeClass" role="document">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="@($"{DialogId}-title")">@Title</h2>
+                    <button type="button"
+                            class="btn-close"
+                            aria-label="Close"
+                            @onclick="CancelAsync"></button>
+                </div>
+
+                <div class="modal-body">
+                    @ChildContent
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-outline-secondary"
+                            @onclick="CancelAsync">
+                        @CancelLabel
+                    </button>
+                    <button type="button"
+                            class="btn @ConfirmClass"
+                            disabled="@(IsBusy || !CanConfirm)"
+                            @ref="ConfirmButton"
+                            @onclick="ConfirmAsync">
+                        @if (IsBusy)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                        }
+                        @ConfirmLabel
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
