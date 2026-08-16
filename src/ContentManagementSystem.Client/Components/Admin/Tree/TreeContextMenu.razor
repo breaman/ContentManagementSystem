@@ -1,0 +1,32 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Tree
+
+@if (IsOpen)
+{
+    @* A transparent sheet behind the menu, so a click anywhere else closes it. Cheaper and more
+       reliable than a document-level listener, and it also stops a click going through to the row
+       underneath — which would otherwise open a page the editor was only dismissing a menu over. *@
+    <div class="cms-menu__sheet" @onclick="CloseAsync" @oncontextmenu:preventDefault="true"></div>
+
+    <div class="cms-menu"
+         role="menu"
+         aria-label="@($"Actions for {Title}")"
+         style="@Position"
+         @ref="Menu"
+         @onkeydown="OnKeyDownAsync">
+        @for (var index = 0; index < Commands.Count; index++)
+        {
+            var command = Commands[index];
+            var position = index;
+
+            <button type="button"
+                    class="cms-menu__item @(command.IsDestructive ? "cms-menu__item--danger" : null)"
+                    role="menuitem"
+                    tabindex="@(position == _active ? 0 : -1)"
+                    @ref="Items[position]"
+                    @onclick="() => ChooseAsync(command)">
+                <span class="bi @command.Icon" aria-hidden="true"></span>
+                <span>@command.Label</span>
+            </button>
+        }
+    </div>
+}

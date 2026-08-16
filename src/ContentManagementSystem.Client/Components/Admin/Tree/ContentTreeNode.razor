@@ -25,7 +25,10 @@
           @ondragenter="() => _dropTarget = !Tree.IsDragged(Page.Id)"
           @ondragleave="() => _dropTarget = false"
           @ondragover:preventDefault="true"
-          @ondrop="DropIntoAsync">
+          @ondrop="DropIntoAsync"
+          @oncontextmenu="args => Tree.OpenMenu(Page, args)"
+          @oncontextmenu:preventDefault="true"
+          @oncontextmenu:stopPropagation="true">
 
         @if (Page.HasChildren)
         {
@@ -43,6 +46,12 @@
         }
 
         <span class="cms-tree__title">@Page.Title</span>
+
+        @if (Tree.IsOnClipboard(Page.Id))
+        {
+            <span class="bi bi-clipboard text-body-secondary" aria-hidden="true"></span>
+            <span class="visually-hidden">On the clipboard</span>
+        }
 
         <PageStatusIndicator Page="Page" Now="Tree.Now" />
     </span>

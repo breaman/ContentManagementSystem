@@ -34,6 +34,19 @@ public interface IRecycleBinService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Reports what deleting a page would take with it, without deleting anything (task P6-04).
+    /// </summary>
+    /// <param name="pageId">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The subtree's size and how much of it is live, or a not-found result.</returns>
+    /// <remarks>
+    /// Exists so a confirmation can state the consequence before somebody agrees to it: one delete
+    /// takes a whole section with it, and "delete this page?" is not the question being asked when
+    /// the page has forty descendants (acceptance criterion P6 #10).
+    /// </remarks>
+    Task<CmsResult<SubtreeImpact>> DescribeAsync(int pageId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Soft-deletes a page and everything beneath it.
     /// </summary>
     /// <param name="pageId">Identity of the page.</param>
@@ -126,6 +139,47 @@ public sealed class RecycleBinService(
             .OrderByDescending(entry => entry.DeletedOn)
             .ThenBy(entry => entry.Id)
             .ToList());
+    }
+
+    /// <inheritdoc />
+    public async Task<CmsResult<SubtreeImpact>> DescribeAsync(
+        int pageId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!authorization.HasPermission(CmsPermissions.ContentDelete))
+        {
+            return CmsResult<SubtreeImpact>.Forbidden(
+                "Deleting pages is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        var page = await context.Pages
+            .AsNoTracking()
+            .Include(candidate => candidate.DraftVersion)
+            .FirstOrDefaultAsync(candidate => candidate.Id == pageId, cancellationToken);
+
+        if (page is null)
+        {
+            return CmsResult<SubtreeImpact>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
+        }
+
+        // One indexed prefix match over the materialized path, which is the same query the delete
+        // itself walks — so the number shown and the number affected come from the same definition
+        // of "beneath this page" (spec section 10.1).
+        var descendants = await context.Pages
+            .AsNoTracking()
+            .Where(candidate => candidate.Id != page.Id && candidate.Path.StartsWith(page.Path))
+            .Select(candidate => candidate.PublishedVersionId)
+            .ToListAsync(cancellationToken);
+
+        var published = descendants.Count(version => version is not null) +
+            (page.PublishedVersionId is null ? 0 : 1);
+
+        return CmsResult<SubtreeImpact>.Success(new SubtreeImpact(
+            page.Id,
+            page.DraftVersion?.Title ?? $"Page {page.Id}",
+            descendants.Count,
+            published));
     }
 
     /// <inheritdoc />

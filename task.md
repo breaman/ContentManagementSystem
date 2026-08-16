@@ -23,6 +23,12 @@ responsive `<picture>` renderer (`P5-20`), the admin library and image editor (`
 resumable chunked upload (`P5-08`) — a transport in front of the same pipeline, not a second way
 into the library. **The one honest gap Phase 5 leaves behind is audit-log retention**, which has no
 implementation and is recorded against `P9-25` rather than absorbed here.
+**Phase 6 has started**: the three-pane shell, the real content tree, and moving pages within it are
+done (`P6-01` to `P6-03`), and the tree's context menu and filter are done bar "publish branch"
+(`P6-04`), which needs the bulk operation service of `P6-29`. Moving a page is new server work as
+well as new UI — `IPageService.MoveAsync` makes the tree position, the sibling order, and the route
+rebuild one transaction, and its **preview is the move itself, rolled back**, so the confirmation an
+editor approves cannot differ from what then happens.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -76,11 +82,11 @@ and record the date in the progress table.
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 3 | 34.5 | In progress — shell and tree done (`P6-01`…`P6-03`); `P6-04` is done bar "publish branch", which waits on `P6-29` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **160** | **203.5** | | |
+| **v1 total** | **281** | **163** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -2978,15 +2984,55 @@ daily — including the edit/preview experience the requirements call out explic
 
 ### Shell and navigation — 10 ed
 
-- [ ] **P6-01** Three-pane shell in `Client/Components/Admin/Shell/`: resizable, collapsible,
+- [x] **P6-01** Three-pane shell in `Client/Components/Admin/Shell/`: resizable, collapsible,
   responsive down to tablet, layout persisted per user [§14.1]. — 3 ed
-- [ ] **P6-02** Content tree in `Client/Components/Admin/Tree/`: lazy-loaded children, virtualized
+  *2026-08-16 — `AdminShell` takes the three panes as render fragments, so the tree, canvas, and
+  properties panel know nothing about each other. Resizing runs in a collocated JS module and
+  reports one width per gesture rather than one per `pointermove`; **keyboard resizing stays in .NET**
+  (arrows, Shift for a coarse step, Home/End), because a separator that can only be dragged is a pane
+  a keyboard user cannot resize [§28]. Geometry is per editor in `localStorage` — not a server
+  preference, since the same person on a laptop and a 34-inch monitor wants two different layouts.
+  Below 62em the panes stack in reading order rather than becoming overlays. Component-scoped CSS is
+  switched on here for the first time; note that `wwwroot` is gitignored build output in this repo,
+  so every interop module is a collocated `.razor.js` static web asset.*
+- [x] **P6-02** Content tree in `Client/Components/Admin/Tree/`: lazy-loaded children, virtualized
   sibling lists, status indicators (published / draft-pending / scheduled / unpublished / in-review /
   locked) [§14.2]. — 2 ed
-- [ ] **P6-03** Tree drag reorder/reparent **plus keyboard-accessible move controls**, with an explicit
+  *2026-08-16 — `ContentTree` fetches one level per expansion and holds them in a dictionary keyed on
+  parent id, so a move or a delete re-reads one level rather than rebuilding the graph. `Virtualize`
+  past 60 siblings, against the pane's own scrollbar. Arrow-key navigation with a roving `tabindex`,
+  so Tab steps past the whole tree; the row is the focusable `treeitem` and holds no buttons, since a
+  control inside one is another Tab stop per row. Every state is an icon **and** a word (P6-39),
+  never a colour alone, with the padlock shown beside the publishing state rather than instead of it.
+  Two facts the tree needed did not exist: `PageSummary` now carries `ScheduledPublishOn` and
+  `LockedBy`, the latter from one batched query over live `EditLock` rows.*
+- [x] **P6-03** Tree drag reorder/reparent **plus keyboard-accessible move controls**, with an explicit
   confirmation showing the URL changes and redirects that will be created. — 1.5 ed
-- [ ] **P6-04** Tree context menu (new child, duplicate deep/shallow, copy, move, delete, publish
+  *2026-08-16 — Dropping onto a row reparents; dropping into the strip between two rows reorders.
+  Both are reachable from the keyboard with Alt and the arrow keys — up/down reorder, right moves
+  into the sibling above, left moves out to the grandparent — which is acceptance criterion P6 #4 for
+  the tree. **A move that changes any URL is confirmed first**, listing every affected address and
+  the redirects; a reorder, which changes none, goes straight through rather than training editors to
+  dismiss the dialog that matters. This needed new server work: `IPageService.MoveAsync` owns the
+  tree position, the sibling order, and the route rebuild as one transaction, and **a preview is the
+  move** — run and then rolled back — so the dialog cannot promise something the button then does
+  differently. `ModalDialog` arrived here too (it is also P6-21's confirmation dialog): Bootstrap's
+  markup without Bootstrap's JavaScript, with a real focus trap and focus restoration.*
+- [~] **P6-04** Tree context menu (new child, duplicate deep/shallow, copy, move, delete, publish
   branch, unpublish) and inline filter over title/slug/id. — 0.5 ed
+  *2026-08-16 — Menu opens on right-click and equally on **Shift+F10 or the Context Menu key**, with
+  arrow-key navigation and Escape; entries that cannot act are omitted rather than disabled. Copy and
+  move are one clipboard with a mode: paste-as-copy is a deep duplicate into the target, paste-as-move
+  is the same move a drag makes, **confirmation and all** — which is why paste is built on the
+  existing operations rather than a second implementation. Delete states what it takes **before** it
+  takes it (acceptance criterion P6 #10), from a new read-only `IRecycleBinService.DescribeAsync` and
+  `GET /pages/{id}/delete-impact`. The filter replaces the tree with a flat site-wide result list
+  rather than pruning it — a lazily loaded tree can only hide what it has already fetched, so a
+  pruning filter would answer "no results" for most of the site — and the backoffice search now
+  matches a page id, which is what an editor arriving from a log line or a ticket is holding.*
+  **Open: "publish branch" only.** It is a background job with per-item results, which is
+  `BulkOperationService` in `P6-29`; a menu entry that published forty pages one request at a time,
+  with no progress and no per-item reporting, would be the wrong thing wearing the right label.
 - [ ] **P6-05** Editing canvas in `Client/Components/Admin/Canvas/`: zone cards ordered by `SortOrder`,
   grouped by `Zone.Group`, per-zone validation state, sticky action bar. — 3 ed
 

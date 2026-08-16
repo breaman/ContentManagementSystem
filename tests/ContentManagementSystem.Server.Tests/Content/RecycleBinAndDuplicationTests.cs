@@ -24,6 +24,39 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
     [Fact]
+    public async Task TheDeleteImpactStatesTheSubtreeSizeAndHowMuchOfItIsLive()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
+        var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
+        var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
+        await _bench.AddPageAsync(template, "Spec", cancellationToken, child.Summary.Id);
+        await _bench.AddPageAsync(template, "About", cancellationToken);
+
+        var publishing = _bench.Resolve<IPublishingService>();
+
+        await publishing.PublishAsync(section.Summary.Id, acknowledgeWarnings: true, cancellationToken);
+        await publishing.PublishAsync(child.Summary.Id, acknowledgeWarnings: true, cancellationToken);
+
+        var impact = await _bench.Resolve<IRecycleBinService>().DescribeAsync(
+            section.Summary.Id,
+            cancellationToken);
+
+        impact.IsSuccess.Should().BeTrue(Because(impact));
+        impact.Value!.Title.Should().Be("Products", "a confirmation names the page, not its identity");
+        impact.Value.DescendantCount.Should().Be(2, "the bystander at the root is not beneath it");
+        impact.Value.PublishedCount.Should().Be(
+            2,
+            "the count includes the page itself, because it is what leaves the public site too");
+
+        _bench.Context.ChangeTracker.Clear();
+
+        // The whole point of asking first (acceptance criterion P6 #10). A query that deleted
+        // anything on the way to counting would be worse than no confirmation at all.
+        (await _bench.Context.Pages.CountAsync(cancellationToken)).Should().Be(4);
+    }
+
+    [Fact]
     public async Task DeletingAPageTakesItsSubtreeAndHidesItWhileKeepingItsHistory()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

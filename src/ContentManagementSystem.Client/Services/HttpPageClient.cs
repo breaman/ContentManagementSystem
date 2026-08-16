@@ -130,6 +130,40 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
             cancellationToken);
 
     /// <inheritdoc />
+    public Task<StructureClientResult<PageDetail>> DuplicateAsync(
+        int id,
+        bool deep = false,
+        int? parentId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = parentId is null
+            ? $"?deep={(deep ? "true" : "false")}"
+            : $"?deep={(deep ? "true" : "false")}&parentId={parentId}";
+
+        return SendAsync<object, PageDetail>(
+            HttpMethod.Post,
+            $"{Base}/pages/{id}/duplicate{query}",
+            body: null,
+            cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<SubtreeImpact?> DescribeDeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        GetAsync<SubtreeImpact>($"{Base}/pages/{id}/delete-impact", cancellationToken);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<SubtreeResult>> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<object, SubtreeResult>(
+            HttpMethod.Delete,
+            $"{Base}/pages/{id}",
+            body: null,
+            cancellationToken);
+
+    /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

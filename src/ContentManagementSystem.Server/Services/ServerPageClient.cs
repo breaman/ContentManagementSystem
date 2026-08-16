@@ -22,6 +22,8 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="diffs">Version comparison.</param>
 /// <param name="templates">Templates, and the revision snapshots the editor form is built from.</param>
 /// <param name="previews">Shareable preview links.</param>
+/// <param name="duplication">Shallow and deep copies, which the tree's paste is built on.</param>
+/// <param name="recycleBin">Soft delete, which the tree's delete is built on.</param>
 /// <remarks>
 /// Used during pre-rendering, so a page screen arrives with its content already in the HTML rather
 /// than showing a spinner until the WebAssembly runtime finishes downloading. It calls the services
@@ -39,7 +41,9 @@ public sealed class ServerPageClient(
     IVersionService versions,
     IContentDiffService diffs,
     ITemplateService templates,
-    IPreviewTokenService previews) : IPageClient
+    IPreviewTokenService previews,
+    IDuplicationService duplication,
+    IRecycleBinService recycleBin) : IPageClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<PageTreeNode>> GetTreeAsync(
@@ -100,6 +104,26 @@ public sealed class ServerPageClient(
         MovePageRequest request,
         CancellationToken cancellationToken = default) =>
         Project(await pages.MoveAsync(id, request, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<PageDetail>> DuplicateAsync(
+        int id,
+        bool deep = false,
+        int? parentId = null,
+        CancellationToken cancellationToken = default) =>
+        Project(await duplication.DuplicateAsync(id, deep, parentId, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<SubtreeImpact?> DescribeDeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        (await recycleBin.DescribeAsync(id, cancellationToken)).Value;
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<SubtreeResult>> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Project(await recycleBin.DeleteAsync(id, cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PublishValidation>> ValidateAsync(

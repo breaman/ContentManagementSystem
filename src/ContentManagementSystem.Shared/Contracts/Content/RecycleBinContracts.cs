@@ -49,6 +49,27 @@ public sealed record SubtreeResult(
     IReadOnlyList<ApiDiagnostic> Warnings);
 
 /// <summary>
+/// What deleting a page would take with it (task P6-04, acceptance criterion P6 #10).
+/// </summary>
+/// <param name="PageId">The page that would be deleted.</param>
+/// <param name="Title">Its title, so a confirmation names the page rather than its identity.</param>
+/// <param name="DescendantCount">How many live pages sit beneath it and would go too.</param>
+/// <param name="PublishedCount">
+/// How many of them — including the page itself — are currently on the public site, and would
+/// therefore stop being served the moment the delete happens.
+/// </param>
+/// <remarks>
+/// A read rather than a rolled-back write, unlike the move preview. A delete's consequences are two
+/// counts obtainable from one indexed prefix query, with none of the ordering, path rewriting, or
+/// redirect emission that makes a move only knowable by doing it.
+/// </remarks>
+public sealed record SubtreeImpact(
+    int PageId,
+    string Title,
+    int DescendantCount,
+    int PublishedCount);
+
+/// <summary>
 /// Why a permanent delete was refused: something still points at the page.
 /// </summary>
 /// <param name="PageId">The page that cannot be removed.</param>

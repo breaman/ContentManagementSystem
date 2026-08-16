@@ -4,6 +4,25 @@
 
 <div class="cms-tree" @onkeydown="OnKeyDownAsync">
 
+    <div class="cms-tree__filter">
+        <label class="visually-hidden" for="@FilterId">Filter pages by title, slug, or id</label>
+        <input id="@FilterId"
+               type="search"
+               class="form-control form-control-sm"
+               placeholder="Filter by title, slug, or id"
+               value="@_filter"
+               @oninput="OnFilterChanged" />
+        @if (IsFiltering)
+        {
+            <button type="button"
+                    class="btn btn-sm btn-link cms-tree__filter-clear"
+                    @onclick="ClearFilter">
+                <span class="bi bi-x-lg" aria-hidden="true"></span>
+                <span class="visually-hidden">Clear the filter</span>
+            </button>
+        }
+    </div>
+
     @if (_error is not null)
     {
         <p class="alert alert-warning py-2 px-3 small" role="alert">
@@ -14,7 +33,7 @@
     @if (_moveErrors is { Count: > 0 })
     {
         <div class="alert alert-danger py-2 px-3 small" role="alert">
-            <p class="mb-1 fw-semibold">The page was not moved.</p>
+            <p class="mb-1 fw-semibold">That did not happen.</p>
             <ul class="mb-0 ps-3">
                 @foreach (var diagnostic in _moveErrors)
                 {
@@ -24,7 +43,46 @@
         </div>
     }
 
-    @if (Roots is null)
+    @if (IsFiltering)
+    {
+        @* A flat result list, not a pruned tree. The filter searches the whole site, and most of
+           what it finds sits under nodes this tree has never fetched (task P6-04). *@
+        <div class="cms-tree__results" role="region" aria-label="Filter results" aria-busy="@Aria(_searching)">
+            @if (_results is null)
+            {
+                <p class="text-body-secondary small" role="status">Searching…</p>
+            }
+            else if (_results.Count == 0)
+            {
+                <p class="text-body-secondary small">Nothing matches “@_filter”.</p>
+            }
+            else
+            {
+                <ul class="cms-tree__result-list">
+                    @foreach (var match in _results)
+                    {
+                        <li>
+                            <button type="button"
+                                    class="cms-tree__result @(IsSelected(match.Id) ? "cms-tree__result--selected" : null)"
+                                    @onclick="() => ActivateAsync(match)">
+                                <span class="cms-tree__title">@match.Title</span>
+                                <code class="cms-tree__result-slug">/@match.Slug</code>
+                                <PageStatusIndicator Page="match" Now="Now" />
+                            </button>
+                        </li>
+                    }
+                </ul>
+
+                @if (_results.Count >= FilterLimit)
+                {
+                    <p class="text-body-secondary small mb-0">
+                        Showing the first @FilterLimit matches. Narrow the term to see the rest.
+                    </p>
+                }
+            }
+        </div>
+    }
+    else if (Roots is null)
     {
         <p class="text-body-secondary small" role="status">Loading the tree…</p>
     }
@@ -54,6 +112,14 @@
             </ul>
         </CascadingValue>
     }
+
+    <TreeContextMenu IsOpen="_menuFor is not null"
+                     Title="@(_menuFor?.Title ?? string.Empty)"
+                     X="_menuX"
+                     Y="_menuY"
+                     Commands="@(_menuFor is null ? [] : CommandsFor(_menuFor))"
+                     OnChosen="RunCommandAsync"
+                     OnClosed="CloseMenu" />
 
     <ModalDialog IsOpen="_pending is not null"
                  Title="This move changes URLs"
@@ -118,6 +184,53 @@
                     </tbody>
                 </table>
             </div>
+        }
+    </ModalDialog>
+
+    <ModalDialog IsOpen="_deleting is not null"
+                 Title="Move to the recycle bin?"
+                 ConfirmLabel="Delete"
+                 ConfirmClass="btn-danger"
+                 IsBusy="_working"
+                 OnConfirm="ConfirmDeleteAsync"
+                 OnCancel="CancelDelete">
+        @if (_deleting is { } impact)
+        {
+            <p>
+                @if (impact.DescendantCount == 0)
+                {
+                    <text><strong>@impact.Title</strong> goes to the recycle bin.</text>
+                }
+                else
+                {
+                    <text>
+                        <strong>@impact.Title</strong> and the
+                        <strong>@impact.DescendantCount page(s)</strong> beneath it all go to the
+                        recycle bin together.
+                    </text>
+                }
+            </p>
+
+            @if (impact.PublishedCount > 0)
+            {
+                <p class="mb-0">
+                    <span class="bi bi-exclamation-triangle-fill text-warning" aria-hidden="true"></span>
+                    @impact.PublishedCount of them are live, and leave the public site immediately.
+                    Nothing is redirected — the addresses become 404s and appear in the not-found
+                    report.
+                </p>
+            }
+            else
+            {
+                <p class="mb-0 text-body-secondary">
+                    None of them are published, so no visitor sees any change.
+                </p>
+            }
+
+            <p class="mb-0 mt-2 text-body-secondary">
+                Nothing is destroyed: the pages keep their full history and can be restored as
+                drafts.
+            </p>
         }
     </ModalDialog>
 

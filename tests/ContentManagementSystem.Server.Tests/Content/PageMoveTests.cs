@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Publishing;
@@ -231,6 +233,40 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         // The endpoint policy is the door and this is the lock: a move reached from a CLI verb with
         // no HTTP request at all is subject to the same rule (spec section 20.4).
         refused.Outcome.Should().Be(CmsOutcome.Forbidden);
+    }
+
+    [Fact]
+    public async Task TheBackofficeFilterMatchesATitleASlugAndAPageId()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var template = await _bench.AddTemplateAsync("landing", cancellationToken);
+
+        var enterprise = await _bench.AddPageAsync(template, "Enterprise plans", cancellationToken);
+        await _bench.AddPageAsync(template, "About us", cancellationToken);
+
+        (await FindAsync("enterprise", cancellationToken))
+            .Should().ContainSingle().Which.Should().Be(enterprise.Summary.Id, "the title matches");
+
+        (await FindAsync("enterprise-plans", cancellationToken))
+            .Should().ContainSingle().Which.Should().Be(enterprise.Summary.Id, "the slug matches");
+
+        // The case the tree's filter box exists for: an editor arrives holding an id from a log
+        // line, a ticket, or a URL, and a filter that answered "no results" would read as the page
+        // being gone (task P6-04).
+        (await FindAsync(enterprise.Summary.Id.ToString(CultureInfo.InvariantCulture), cancellationToken))
+            .Should().ContainSingle().Which.Should().Be(enterprise.Summary.Id);
+
+        (await FindAsync("nothing-like-this", cancellationToken)).Should().BeEmpty();
+    }
+
+    /// <summary>Runs the backoffice filter and returns the identities it matched.</summary>
+    private async Task<IReadOnlyList<int>> FindAsync(string term, CancellationToken cancellationToken)
+    {
+        var found = await Pages.ListAsync(new PageQuery(Search: term), cancellationToken);
+
+        found.IsSuccess.Should().BeTrue(Because(found));
+
+        return [.. found.Value!.Items.Select(page => page.Id)];
     }
 
     /// <summary>The page service under test, resolved from the real container.</summary>

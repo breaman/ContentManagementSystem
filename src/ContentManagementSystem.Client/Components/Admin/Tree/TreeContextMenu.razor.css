@@ -1,0 +1,56 @@
+/* The tree's context menu (task P6-04).
+
+   Fixed rather than absolute, and outside the tree pane's stacking context, because the pane scrolls
+   its own content — a menu positioned inside it would be clipped the moment it opened near the
+   bottom edge, which is exactly where the last row in a long tree is. */
+
+.cms-menu {
+    position: fixed;
+    z-index: 1060;
+    min-inline-size: 13rem;
+    padding: 0.25rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.375rem;
+    background-color: var(--bs-body-bg);
+    box-shadow: 0 0.5rem 1rem rgb(0 0 0 / 0.15);
+}
+
+/* The sheet that catches a click anywhere else. Transparent, full-viewport, and below the menu. */
+.cms-menu__sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 1059;
+}
+
+.cms-menu__item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    inline-size: 100%;
+    padding: 0.375rem 0.625rem;
+    border: 0;
+    border-radius: 0.25rem;
+    background: transparent;
+    text-align: start;
+    font-size: 0.875rem;
+    color: var(--bs-body-color);
+}
+
+.cms-menu__item:hover,
+.cms-menu__item:focus-visible {
+    background-color: var(--bs-secondary-bg);
+}
+
+.cms-menu__item:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: -2px;
+}
+
+.cms-menu__item--danger {
+    color: var(--bs-danger-text-emphasis);
+}
+
+.cms-menu__item--danger:hover,
+.cms-menu__item--danger:focus-visible {
+    background-color: var(--bs-danger-bg-subtle);
+}

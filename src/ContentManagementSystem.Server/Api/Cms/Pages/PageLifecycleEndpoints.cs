@@ -38,6 +38,11 @@ public static class PageLifecycleEndpoints
             .RequireAuthorization(CmsPermissions.ContentEdit)
             .RequireCmsAntiforgery();
 
+        pages.MapGet("/{id:int}/delete-impact", DescribeDeleteAsync)
+            .WithName("DescribePageDelete")
+            .WithSummary("Reports how many pages a delete would take with it, without deleting them.")
+            .RequireAuthorization(CmsPermissions.ContentDelete);
+
         pages.MapDelete("/{id:int}", DeleteAsync)
             .WithName("DeletePage")
             .WithSummary("Soft-deletes a page and its subtree into the recycle bin.")
@@ -92,6 +97,12 @@ public static class PageLifecycleEndpoints
         .ToHttpResult(created => Results.Created(
             $"{CmsApiEndpoints.BasePath}{PageEndpoints.Prefix}/{created.Summary.Id}",
             created));
+
+    private static async Task<IResult> DescribeDeleteAsync(
+        int id,
+        IRecycleBinService recycleBin,
+        CancellationToken cancellationToken) =>
+        (await recycleBin.DescribeAsync(id, cancellationToken)).ToHttpResult(Results.Ok);
 
     /// <remarks>
     /// Answers with the affected subtree rather than a 204. One delete takes every descendant with

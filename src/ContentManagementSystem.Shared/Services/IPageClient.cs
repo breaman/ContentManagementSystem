@@ -103,6 +103,40 @@ public interface IPageClient
         MovePageRequest request,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Copies a page, and optionally everything beneath it (task P6-04, spec section 14.12).
+    /// </summary>
+    /// <param name="id">Identity of the page to copy.</param>
+    /// <param name="deep">Whether to copy the subtree as well as the page.</param>
+    /// <param name="parentId">
+    /// Where the copy lands, or null to put it beside the original. Naming a parent is what turns
+    /// duplication into the paste half of the tree's copy-and-paste.
+    /// </param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    Task<StructureClientResult<PageDetail>> DuplicateAsync(
+        int id,
+        bool deep = false,
+        int? parentId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reports what deleting a page would take with it, without deleting anything (task P6-04).
+    /// </summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The subtree's size and how much of it is live.</returns>
+    Task<SubtreeImpact?> DescribeDeleteAsync(int id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Soft-deletes a page and its subtree into the recycle bin (task P6-04, spec section 14.10).
+    /// </summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>Every page that went with it, and how many of them were live.</returns>
+    Task<StructureClientResult<SubtreeResult>> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Runs the publish checks without publishing.</summary>
     /// <param name="id">Identity of the page.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>

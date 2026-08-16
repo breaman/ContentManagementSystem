@@ -67,6 +67,23 @@ public abstract class StubPageClient : IPageClient
         CancellationToken cancellationToken = default) => throw Unexpected();
 
     /// <inheritdoc />
+    public virtual Task<StructureClientResult<PageDetail>> DuplicateAsync(
+        int id,
+        bool deep = false,
+        int? parentId = null,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<SubtreeImpact?> DescribeDeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<StructureClientResult<SubtreeResult>> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
     public virtual Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) => throw Unexpected();

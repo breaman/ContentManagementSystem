@@ -152,6 +152,27 @@ public sealed class FakePageClient : IPageClient
                 request.Preview)));
 
     /// <inheritdoc />
+    public async Task<StructureClientResult<PageDetail>> DuplicateAsync(
+        int id,
+        bool deep = false,
+        int? parentId = null,
+        CancellationToken cancellationToken = default) =>
+        StructureClientResult<PageDetail>.Success((await GetAsync(id, cancellationToken))!);
+
+    /// <inheritdoc />
+    public Task<SubtreeImpact?> DescribeDeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<SubtreeImpact?>(new SubtreeImpact(id, "Pricing", 1, 2));
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<SubtreeResult>> DeleteAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<SubtreeResult>.Success(
+            new SubtreeResult(id, [id, 9], UnpublishedCount: 1, [])));
+
+    /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

@@ -4,6 +4,7 @@ using ContentManagementSystem.Shared.Services;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 
 namespace ContentManagementSystem.Client.Components.Admin.Tree;
 
@@ -56,6 +57,10 @@ public partial class ContentTree : ComponentBase
     [Inject]
     private IToastService Toasts { get; set; } = default!;
 
+    /// <summary>Used only to place a keyboard-opened context menu under its row.</summary>
+    [Inject]
+    private IJSRuntime Js { get; set; } = default!;
+
     /// <summary>The page currently open in the canvas, so the tree can show where the editor is.</summary>
     [Parameter]
     public int? SelectedId { get; set; }
@@ -63,6 +68,17 @@ public partial class ContentTree : ComponentBase
     /// <summary>Raised when a row is activated — by click, or by Enter on the focused row.</summary>
     [Parameter]
     public EventCallback<PageSummary> OnActivated { get; set; }
+
+    /// <summary>
+    /// Raised when the menu's "New child page" is chosen, with the page it should sit under.
+    /// </summary>
+    /// <remarks>
+    /// The tree does not create the page itself. Creating one needs a template chosen and a title
+    /// typed, which is a form and belongs on the screen hosting the tree — the tree's job is to say
+    /// where it goes.
+    /// </remarks>
+    [Parameter]
+    public EventCallback<PageSummary> OnCreateRequested { get; set; }
 
     /// <summary>Accessible name of the tree.</summary>
     [Parameter]
@@ -95,6 +111,12 @@ public partial class ContentTree : ComponentBase
 
     /// <summary>The current time, as the status classifier needs it.</summary>
     internal DateTimeOffset Now => Clock.GetUtcNow();
+
+    /// <summary>Ties the filter box to its own label, uniquely per instance.</summary>
+    private string FilterId { get; } = $"tree-filter-{Guid.NewGuid():n}";
+
+    /// <summary>Renders a boolean as an ARIA attribute value, which is lowercase.</summary>
+    private static string Aria(bool value) => value ? "true" : "false";
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
@@ -259,6 +281,16 @@ public partial class ContentTree : ComponentBase
         // navigation keys, since the two share all four arrows (task P6-03).
         if (args.AltKey && await TryKeyboardMoveAsync(args, current.Page))
         {
+            return;
+        }
+
+        // Both of the platform gestures for "open the context menu without a mouse". Windows and
+        // Linux keyboards have a dedicated key; Mac keyboards do not, which is why Shift+F10 has to
+        // work as well (task P6-04, spec section 28).
+        if (args.Key == "ContextMenu" || (args.Key == "F10" && args.ShiftKey))
+        {
+            await OpenMenuForFocusedAsync(current.Page);
+
             return;
         }
 
