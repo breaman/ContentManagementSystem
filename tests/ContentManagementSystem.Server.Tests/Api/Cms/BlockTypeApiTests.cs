@@ -464,8 +464,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
         var saved = await early.Content.ReadFromJsonAsync<PropertySaveResult>(cancellationToken);
 
-        saved!.Warnings.Should().ContainSingle();
-        saved.Warnings[0].Code.Should().Be(FieldConfigurationCodes.NotEnforced);
+        // Nothing reported: the media picker settings were the deferred ones until P5-19 began
+        // enforcing them on the publish path. The refusal above is the half this test is really
+        // about — a property's configuration is checked exactly as a zone's is.
+        saved!.Warnings.Should().BeEmpty();
     }
 
     private static JsonElement Configuration(string json) => JsonDocument.Parse(json).RootElement.Clone();

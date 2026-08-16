@@ -23,6 +23,16 @@ public class ReferenceContentTests : IDisposable
 {
     private readonly FieldRendererHarness _harness = new();
 
+    public ReferenceContentTests() =>
+        // Every media item the reference content places, so the pages render pictures rather than
+        // the section 15.3 placeholder — which is what makes the renderer's real output, and the
+        // absence of any warning about it, assertable here (task P5-20).
+        _harness.Media
+            .Add(401, width: 2400, height: 1350)
+            .Add(812, width: 1600, height: 900)
+            .Add(900, width: 1200, height: 800)
+            .Add(902, width: 800, height: 800);
+
     public void Dispose()
     {
         _harness.Dispose();
@@ -98,7 +108,7 @@ public class ReferenceContentTests : IDisposable
         markup.Should().Contain("<time class=\"cms-date\" datetime=\"2026-09-01\"");
         markup.Should().Contain("<span class=\"cms-boolean\" data-value=\"true\">Yes</span>");
         markup.Should().Contain("<dd>wide</dd>");
-        markup.Should().Contain("<span class=\"cms-media cms-media-placeholder\" data-media-id=\"812\">A poster</span>");
+        markup.Should().Contain("<picture class=\"cms-media\">").And.Contain("alt=\"A poster\"");
         markup.Should().Contain("<ul class=\"cms-media-list\">");
         markup.Should().Contain("<li class=\"cms-tag\">policy</li>");
         markup.Should().Contain("<a href=\"/pricing\"").And.Contain("Pricing");
@@ -138,7 +148,7 @@ public class ReferenceContentTests : IDisposable
 
         // A block's structured properties, drawn by each field type's own renderer rather than read
         // out of the JSON by the block's markup — the path CmsBlockProperty exists for.
-        markup.Should().Contain("data-media-id=\"401\"");
+        markup.Should().Contain("alt=\"A stage\"").And.Contain("<source type=\"image/webp\"");
         markup.Should().Contain("<span class=\"cms-color\" data-color=\"#ff8800\">#ff8800</span>");
         markup.Should().Contain("href=\"https://example.test/tickets\"");
 

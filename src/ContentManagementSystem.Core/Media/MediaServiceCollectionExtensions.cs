@@ -23,6 +23,10 @@ public static class MediaServiceCollectionExtensions
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configureUpload">Optional deployment limits — sizes, megapixels, SVG policy.</param>
+    /// <param name="configureValidation">
+    /// Optional publish-time policy — currently whether a placed image with no description blocks a
+    /// publish or merely warns (task P5-21).
+    /// </param>
     /// <returns>The service collection, for chaining.</returns>
     /// <remarks>
     /// A store must be registered separately, with <see cref="AddCmsFileSystemMediaStore"/> or
@@ -40,13 +44,18 @@ public static class MediaServiceCollectionExtensions
     /// </example>
     public static IServiceCollection AddCmsMedia(
         this IServiceCollection services,
-        Action<MediaUploadOptions>? configureUpload = null)
+        Action<MediaUploadOptions>? configureUpload = null,
+        Action<MediaValidationOptions>? configureValidation = null)
     {
         ArgumentNullException.ThrowIfNull(services);
 
         var options = new MediaUploadOptions();
 
         configureUpload?.Invoke(options);
+
+        var validation = new MediaValidationOptions();
+
+        configureValidation?.Invoke(validation);
 
         // The built instance rather than IOptions, matching AddCmsSanitization: these are refusal
         // thresholds read on every upload, and a limit that could change after startup is a limit
@@ -61,11 +70,22 @@ public static class MediaServiceCollectionExtensions
 
         services.TryAddScoped<IMediaUploadService, MediaUploadService>();
 
+        // The resumable transport in front of it (task P5-08). It stages parts and assembles them;
+        // the pipeline above is still the only thing that decides whether the result becomes an item.
+        services.TryAddScoped<IChunkedUploadService, ChunkedUploadService>();
+
         // The read and metadata half. Registered here rather than in a call of its own because the
         // two are one feature from a host's point of view: a deployment that accepts uploads and
         // cannot browse or describe them has a write-only library.
         services.TryAddScoped<IMediaLibraryService, MediaLibraryService>();
         services.TryAddScoped<IMediaFolderService, MediaFolderService>();
+
+        // The publish-time half of the picker settings and of the alt-text policy (tasks P5-19 and
+        // P5-21). It is registered with the library rather than with delivery because it reads the
+        // same rows the library writes, and because a host that accepts uploads and publishes pages
+        // needs both or neither.
+        services.TryAddSingleton(validation);
+        services.TryAddScoped<IMediaContentValidator, MediaContentValidator>();
 
         // Shared with the page, routing, and preview services; TryAdd means whichever call runs
         // first wins and every timestamp in the system comes from one clock.
@@ -103,6 +123,11 @@ public static class MediaServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
 
         services.TryAddSingleton<IMediaUrlSigner, MediaUrlSigner>();
+
+        // The render-time half of the same feature: a page stores a media id and nothing else, so
+        // something has to turn that id into dimensions, alternative text, and signed URLs while the
+        // markup is being written (task P5-20). Scoped, because it reads the database.
+        services.TryAddScoped<IMediaResolver, MediaResolver>();
 
         // Singleton, and it has to be: a per-request instance would give every request its own lock,
         // which is the same as having none (task P5-13).

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using ContentManagementSystem.Client.Components.Admin.Media;
 using ContentManagementSystem.Client.Components.Admin.Pages;
 using ContentManagementSystem.Client.Components.Admin.Reusable;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 using Microsoft.Playwright;
 
 namespace ContentManagementSystem.E2E.Tests;
@@ -73,6 +75,18 @@ public class PageScreenAccessibilityTests
             // The where-used panel, which is the part of this screen with the most for axe to judge:
             // a table of affected pages, three badge states, and a nested list of items.
             "Enterprise"
+        },
+
+        // The media screens are the ones where an accessibility gate has the most to say, because
+        // they are the ones full of images: every tile in the grid carries an alt attribute whose
+        // value comes from editorial data, and the fixture deliberately includes an item nobody has
+        // described (tasks P5-19 and P5-22).
+        { "media library", typeof(MediaLibrary), [], "team-photo.jpg" },
+        {
+            "media item",
+            typeof(MediaItemEditor),
+            new() { ["Id"] = FakeMediaClient.PlacedId },
+            "Team photograph"
         },
     };
 
@@ -160,6 +174,13 @@ public class PageScreenAccessibilityTests
         services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         services.AddScoped<IPageClient, FakePageClient>();
         services.AddScoped<IReusableClient, FakeReusableClient>();
+        services.AddScoped<IMediaClient, FakeMediaClient>();
+
+        // Two hosting services a real pre-render supplies and a bare collection does not: the
+        // uploader's <InputFile> resolves IJSRuntime on construction, and the media item screen
+        // navigates away after a permanent delete. Neither runs during a static render.
+        services.AddScoped<NavigationManager, StaticNavigationManager>();
+        services.AddScoped<IJSRuntime, UnavailableJSRuntime>();
         services.AddAuthorizationCore();
         services.AddCascadingAuthenticationState();
         services.AddScoped<AuthenticationStateProvider, AdministratorStateProvider>();

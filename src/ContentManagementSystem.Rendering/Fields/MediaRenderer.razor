@@ -1,8 +1,44 @@
 @inherits CmsFieldRendererBase
-@* The spec section 15.3 placeholder: a missing media item renders its alt text, never a broken
-   <img>. Until P5 supplies the library, every item is "missing", which is why this is all there is
-   to see — the cache tag the code-behind adds is the half that has to be right now. *@
-@if (MediaId is { } mediaId)
+@using ContentManagementSystem.Data.Models.Cms
+@* Spec section 13.6. width and height are always emitted and are the dimensions the pipeline
+   actually resolves — that is what reserves the right box before the bytes arrive, and it is why a
+   rotated or cropped item cannot be described by the numbers on its row. The signatures are built
+   server-side while this renders, so no editor ever sees one (spec section 13.5). *@
+@if (Picture is { } picture)
 {
+    <picture class="cms-media">
+        @foreach (var source in picture.Sources)
+        {
+            <source type="@source.MimeType" srcset="@source.SrcSet" sizes="@picture.Sizes" />
+        }
+        <img src="@picture.Src" srcset="@picture.SrcSet" sizes="@picture.Sizes"
+             width="@picture.Width" height="@picture.Height" alt="@Alt"
+             loading="@Loading" fetchpriority="@FetchPriority" decoding="@Decoding" />
+    </picture>
+
+    @if (Caption is { Length: > 0 } caption)
+    {
+        <figcaption class="cms-media-caption">@caption</figcaption>
+    }
+}
+else if (OriginalUrl is { Length: > 0 } original && Item is { } item)
+{
+    @* No rendition exists for this one: an SVG or GIF the processor cannot re-encode, or a file
+       that is not an image at all. The first still displays; the second is a link, because an
+       <img> pointing at a PDF is a broken image and a link is what the editor meant. *@
+    @if (item.Kind is MediaKind.Image)
+    {
+        <img class="cms-media" src="@original" alt="@Alt" loading="@Loading"
+             fetchpriority="@FetchPriority" decoding="@Decoding" />
+    }
+    else
+    {
+        <a class="cms-media cms-media-file" href="@original">@DocumentLabel</a>
+    }
+}
+else if (MediaId is { } mediaId)
+{
+    @* The spec section 15.3 placeholder: an item nothing can resolve renders its alternative text,
+       never a broken <img>. *@
     <span class="cms-media cms-media-placeholder" data-media-id="@mediaId">@Alt</span>
 }

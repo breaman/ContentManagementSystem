@@ -79,8 +79,34 @@ public sealed class MediaUploadOptions
     /// </remarks>
     public long MaxPixels { get; set; } = DefaultMaxPixels;
 
+    /// <summary>Default part size a resumable upload is cut into, in bytes.</summary>
+    /// <remarks>
+    /// 4 MB. Small enough that losing a part to a dropped connection costs a second or two on a slow
+    /// link, large enough that a 50 MB video is a dozen requests rather than hundreds — and each part
+    /// is buffered in memory on the way in, so this is also the per-request memory cost.
+    /// </remarks>
+    public const int DefaultChunkBytes = 4 * 1024 * 1024;
+
     /// <summary>What to do with an uploaded SVG.</summary>
     public SvgUploadPolicy SvgPolicy { get; set; } = SvgUploadPolicy.Reject;
+
+    /// <summary>Part size a resumable upload is cut into, in bytes (task P5-08).</summary>
+    /// <remarks>
+    /// The server chooses it and tells the client, rather than accepting whatever size arrives. A
+    /// client-chosen part size is a client-chosen per-request memory allocation on the server, which
+    /// is the same denial of service the rendition signature exists to prevent, one endpoint over.
+    /// </remarks>
+    public int ChunkBytes { get; set; } = DefaultChunkBytes;
+
+    /// <summary>
+    /// How long an untouched resumable upload survives before its fragments are discarded.
+    /// </summary>
+    /// <remarks>
+    /// Long enough to outlast a laptop lid closing over lunch, short enough that an abandoned
+    /// session is not still occupying storage next week. Sessions that expire leave nothing behind
+    /// but bytes under the <c>incoming</c> prefix, which is why that prefix holds nothing else.
+    /// </remarks>
+    public TimeSpan UploadSessionLifetime { get; set; } = TimeSpan.FromHours(6);
 
     /// <summary>
     /// Whether an image must arrive with alternative text or a decorative flag.

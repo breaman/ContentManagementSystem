@@ -285,8 +285,15 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         zones.Should().BeEmpty();
     }
 
+    /// <remarks>
+    /// The media picker settings were the deferred ones from P1-12 until P5-19 began enforcing them
+    /// on the publish path, so a zone configured with them is now stored with nothing reported at
+    /// all. The deferral machinery itself is still exercised, against a stub field type in
+    /// <c>FieldConfigurationValidatorTests</c> — re-pointing this test at whichever real field type
+    /// happened to be behind would put it back in the same position one phase later.
+    /// </remarks>
     [Fact]
-    public async Task ASettingWhosePhaseHasNotShippedIsStoredAndWarnedAbout()
+    public async Task TheMediaPickerSettingsAreStoredWithNothingReported()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
@@ -298,20 +305,15 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
                 "photo",
                 "Photo",
                 FieldTypeKeys.Media,
-                Configuration("""{"minWidth":800}""")),
+                Configuration("""{"minWidth":800,"aspectRatio":"16:9","allowedTypes":["Image"]}""")),
             cancellationToken);
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var saved = await response.Content.ReadFromJsonAsync<ZoneSaveResult>(cancellationToken);
 
-        // Accepted and stored, because refusing it makes a developer build half a content model and
-        // come back. Reported, because a setting that quietly does nothing is worse than one that
-        // says when it will start (P1-12).
         saved!.Zone.Configuration!.Value.GetProperty("minWidth").GetInt32().Should().Be(800);
-        saved.Warnings.Should().ContainSingle();
-        saved.Warnings[0].Code.Should().Be(FieldConfigurationCodes.NotEnforced);
-        saved.Warnings[0].Property.Should().Be("minWidth");
+        saved.Warnings.Should().BeEmpty("the publish check enforces all three of these now");
     }
 
     [Fact]

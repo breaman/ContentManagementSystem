@@ -42,6 +42,17 @@ public static class MediaStorageKeys
     public const string QuarantinePrefix = "quarantine";
 
     /// <summary>
+    /// Prefix under which the parts of an in-progress chunked upload are staged (task P5-08).
+    /// </summary>
+    /// <remarks>
+    /// Nothing under here is a media item. It is the only prefix whose contents are <em>not</em>
+    /// content-addressed — the bytes are incomplete, so their hash is not yet knowable — which is
+    /// exactly why it is a prefix of its own: "everything still arriving" is then one prefix to sweep
+    /// when a session is abandoned or expires, and nothing that serves bytes ever reads from it.
+    /// </remarks>
+    public const string IncomingPrefix = "incoming";
+
+    /// <summary>
     /// Longest a key may be, matching the column that stores it.
     /// </summary>
     public const int MaxLength = FieldLengths.StorageKey;
@@ -110,6 +121,67 @@ public static class MediaStorageKeys
         var hex = Convert.ToHexStringLower(sha256);
 
         return $"{QuarantinePrefix}/{hex[..2]}/{hex}";
+    }
+
+    /// <summary>
+    /// Builds the key one part of an in-progress chunked upload is staged under.
+    /// </summary>
+    /// <param name="uploadId">The session, as a 32-character lower-case hexadecimal identity.</param>
+    /// <param name="chunkIndex">Zero-based position of the part within the file.</param>
+    /// <returns>A key such as <c>incoming/3f9a…/000007.part</c>.</returns>
+    /// <remarks>
+    /// The index is zero-padded so the parts sort in the order they must be concatenated in — which
+    /// matters on the day somebody has to reassemble a stalled upload by hand, and costs nothing on
+    /// every other day. The <c>.part</c> extension is there so that nothing, human or otherwise,
+    /// mistakes a fragment for a file.
+    /// </remarks>
+    public static string ForUploadChunk(string uploadId, int chunkIndex)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(chunkIndex);
+
+        return $"{IncomingPrefix}/{NormalizeUploadId(uploadId)}/{chunkIndex:D6}.part";
+    }
+
+    /// <summary>
+    /// Builds the key an in-progress chunked upload's manifest is stored under.
+    /// </summary>
+    /// <param name="uploadId">The session, as a 32-character lower-case hexadecimal identity.</param>
+    /// <returns>A key such as <c>incoming/3f9a…/session.json</c>.</returns>
+    /// <remarks>
+    /// <strong>Session state lives in the store rather than in a table, and that is a deliberate
+    /// trade.</strong> A resumable upload has to survive the client reconnecting to a different
+    /// instance, which rules out memory; a table would do it too, but an in-progress upload is
+    /// transient data with the same lifetime as the fragments it describes, so keeping the two
+    /// together means abandoning a session is one prefix delete rather than a row and a sweep that
+    /// could disagree with each other.
+    /// </remarks>
+    public static string ForUploadManifest(string uploadId) =>
+        $"{IncomingPrefix}/{NormalizeUploadId(uploadId)}/session.json";
+
+    /// <summary>
+    /// Reports whether a string is an upload identity this application issued.
+    /// </summary>
+    /// <param name="uploadId">The candidate identity.</param>
+    /// <returns><see langword="true"/> when it is 32 lower-case hexadecimal characters.</returns>
+    /// <remarks>
+    /// Checked before the identity reaches a key, because an upload id is the one part of a media
+    /// key that arrives from a client. It is a GUID this server generated, so the shape is exact and
+    /// anything else is refused rather than sanitized.
+    /// </remarks>
+    public static bool IsValidUploadId([NotNullWhen(true)] string? uploadId) =>
+        uploadId is { Length: 32 } && uploadId.All(character =>
+            character is (>= '0' and <= '9') or (>= 'a' and <= 'f'));
+
+    private static string NormalizeUploadId(string uploadId)
+    {
+        if (!IsValidUploadId(uploadId))
+        {
+            throw new ArgumentException(
+                "Upload identities are server-generated 32-character hexadecimal strings.",
+                nameof(uploadId));
+        }
+
+        return uploadId;
     }
 
     /// <summary>

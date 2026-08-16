@@ -227,16 +227,29 @@ public class FieldConfigurationValidatorTests
     public void ASettingWhoseEnforcingPhaseHasNotShippedIsStoredWithAWarning()
     {
         var result = _validator.Validate(
-            FieldTypeKeys.Media,
-            """{ "allowedTypes": ["image"], "minWidth": 1200 }""");
+            DeferredSettingFieldType.TypeKey,
+            """{ "notYet": 1200, "honoured": 4 }""");
 
         // The configuration is correct, merely early. Refusing it would make a developer come back
         // and finish the content model in a later phase.
         result.HasErrors.Should().BeFalse();
-        result.Codes().Should().Equal(
-            FieldConfigurationCodes.NotEnforced,
-            FieldConfigurationCodes.NotEnforced);
-        result.Diagnostics[0].Message.Should().Contain("P5");
+        result.Codes().Should().Equal(FieldConfigurationCodes.NotEnforced);
+        result.Diagnostics[0].Message.Should().Contain(DeferredSettingFieldType.Phase);
+    }
+
+    /// <remarks>
+    /// The media picker settings were the deferred ones until P5, and are now enforced on the
+    /// publish path (task P5-19). Asserted here so that the day one of them is quietly moved back
+    /// behind <c>notEnforcedUntil</c>, something says so.
+    /// </remarks>
+    [Fact]
+    public void TheMediaPickerSettingsAreStoredWithNothingReportedAtAll()
+    {
+        var result = _validator.Validate(
+            FieldTypeKeys.Media,
+            """{ "allowedTypes": ["Image"], "minWidth": 1200, "aspectRatio": "16:9" }""");
+
+        result.Diagnostics.Should().BeEmpty();
     }
 
     [Fact]
@@ -261,6 +274,7 @@ public class FieldConfigurationValidatorTests
         var provider = new ServiceCollection()
             .AddSingleton<IContentSanitizer, RecordingSanitizer>()
             .AddCmsFieldTypes()
+            .AddCmsFieldType<DeferredSettingFieldType>()
             .BuildServiceProvider();
 
         return provider.GetRequiredService<IFieldConfigurationValidator>();

@@ -1,0 +1,19 @@
+@* The count is the folder's own, not its subtree's — it says how many items this view would show,
+   which is the question a folder in a browser is asked. *@
+<li>
+    <button type="button" class="btn btn-link p-0 @(IsSelected ? "fw-bold" : null)"
+            @onclick="() => OnSelect.InvokeAsync(Folder.Id)">
+        @Folder.Name
+    </button>
+    <span class="small text-body-secondary">(@Folder.ItemCount)</span>
+
+    @if (Folder.Children.Count > 0)
+    {
+        <ul class="list-unstyled ms-3">
+            @foreach (var child in Folder.Children)
+            {
+                <MediaFolderBranch Folder="child" SelectedId="SelectedId" OnSelect="OnSelect" />
+            }
+        </ul>
+    }
+</li>

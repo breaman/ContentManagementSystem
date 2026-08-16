@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Interfaces;
@@ -85,6 +86,7 @@ public interface IPublishingService
 /// <param name="references">Rewrites the published version's reference rows from its payload.</param>
 /// <param name="indexer">Walks a payload to check the entities it points at still exist.</param>
 /// <param name="schemas">Supplies the property configuration the allowed-templates check reads.</param>
+/// <param name="media">Checks the pictures this content places — existence, alt text, and the picker settings.</param>
 /// <param name="urls">Materializes the public route a publish creates and withdraws it on unpublish.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
@@ -97,6 +99,7 @@ public sealed class PublishingService(
     IContentReferenceProjector references,
     IReferenceIndexer indexer,
     IContentSchemaCatalog schemas,
+    IMediaContentValidator media,
     IUrlService urls,
     ICmsAuthorization authorization,
     IUserService users,
@@ -421,6 +424,12 @@ public sealed class PublishingService(
 
         diagnostics.AddRange(await CheckReferencedPagesAsync(payload, cancellationToken));
         diagnostics.AddRange(await CheckReferencedReusableAsync(payload, cancellationToken));
+
+        // Alt text is the one of these that blocks a publish over something no other check would
+        // ever notice: an undescribed picture renders perfectly and is invisible until an audit
+        // (spec section 13.7).
+        diagnostics.AddRange(await media.ValidateAsync(payload, TemplateSchema(payload), cancellationToken));
+
         diagnostics.AddRange(await CheckUrlAvailableAsync(page, cancellationToken));
 
         if (!page.Template.IsEnabled)
@@ -622,11 +631,7 @@ public sealed class PublishingService(
         IReadOnlyList<Shared.Contracts.Fields.ContentReference> references,
         Dictionary<int, (string Key, string BlockTypeKey)> shapesByItemId)
     {
-        var templateSchema = payload.TemplateKey is { } templateKey &&
-            payload.TemplateRevision is { } revision &&
-            schemas.TryGetTemplate(templateKey, revision, out var resolved)
-            ? resolved
-            : null;
+        var templateSchema = TemplateSchema(payload);
 
         var diagnostics = new List<ValidationDiagnostic>();
 
@@ -717,6 +722,24 @@ public sealed class PublishingService(
 
         return diagnostics;
     }
+
+    /// <summary>
+    /// The captured template schema a payload names, when this deployment still holds it.
+    /// </summary>
+    /// <param name="payload">The content being published.</param>
+    /// <returns>The schema, or null when the revision cannot be resolved.</returns>
+    /// <remarks>
+    /// Null is not an error here. The schema walk has already reported an unresolvable revision as
+    /// an error of its own, and the checks that take this argument use it only to read configured
+    /// restrictions — so null means "no restriction can be read", which is the safe direction: a
+    /// publish must not be refused over a rule nobody could load.
+    /// </remarks>
+    private ContentSchema? TemplateSchema(ContentPayload payload) =>
+        payload.TemplateKey is { } templateKey &&
+        payload.TemplateRevision is { } revision &&
+        schemas.TryGetTemplate(templateKey, revision, out var schema)
+            ? schema
+            : null;
 
     private async Task<Page?> LoadAsync(int pageId, bool tracked, CancellationToken cancellationToken)
     {

@@ -16,18 +16,16 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// its own. Copying any of that into the page is what makes replacing an image in the library leave
 /// stale copies behind on every page that used it.
 /// <para>
-/// Configuration keys: the P5 additions <c>allowedTypes</c>, <c>minWidth</c>, and
-/// <c>aspectRatio</c>.
+/// Configuration keys: <c>allowedTypes</c>, <c>minWidth</c>, <c>aspectRatio</c>, and <c>sizes</c>.
 /// </para>
 /// <para>
-/// <strong>Completed in P5.</strong> What is here is everything the payload can answer on its own:
-/// the shape, the geometry, and — the part that matters — the reference. Reference extraction is
-/// deliberately not deferred with the rest, because a media field that reported nothing until P5
-/// would leave every page saved before then with no <c>ContentReference</c> row, and nothing would
-/// go back and add them: where-used would under-report and cache invalidation would miss the pages
-/// (spec section 7.3). Still to come with the media library: that the item exists and is not
-/// deleted, the <c>allowedTypes</c> / <c>minWidth</c> / <c>aspectRatio</c> restrictions, the picker,
-/// and the renderer that turns a crop into a rendition.
+/// <strong>Completed in P5.</strong> What this class checks is everything the payload can answer on
+/// its own: the shape, the geometry, and the reference. The three restrictions are checked on the
+/// publish path instead, beside <c>allowedTemplates</c> and the reusable-content <c>allowedTypes</c>
+/// — a field type is a stateless singleton with no database, so "does item 812 exist, and how wide
+/// is it" is not a question it can ask (spec section 7). The picture itself is
+/// <c>MediaRenderer</c>'s, which resolves the item and signs a rendition URL per candidate width
+/// (spec section 13.6).
 /// </para>
 /// </remarks>
 public sealed class MediaFieldType : FieldTypeBase

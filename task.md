@@ -4,22 +4,25 @@
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
 sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
 (`P3-29`), and Q8 (`P3-30`) still open. **Phase 4 is complete** — all 19 tasks, all 7 acceptance
-criteria, and its exit gate. **Phase 5 is under way: 26 of 33 tasks are done**, covering the storage,
-processing, and delivery spine and now the whole management API. Media is uploaded through the
-ten-step pipeline (`P5-05` to `P5-07`) into a store that is a local directory or a blob container
-behind one interface (`P5-03`, `P5-04`), with the schema and migration #6 beneath it (`P5-01`,
-`P5-02`). Uploads are judged by their bytes rather than their names, capped before they are decoded,
-stripped of every metadata block, and deduplicated by content hash. SkiaSharp is the sole processor
-and asserts its own encoders at startup (`P5-09`); renditions are signed, allowlisted, lazily
-generated behind a per-key semaphore, and served with a year of immutable caching, `nosniff`, and a
-pinned content type (`P5-13` to `P5-18`, `P5-25`). **The API an editor drives now exists** (`P5-23`):
-browse and search, metadata, non-destructive edits and revert (`P5-10`), replace-keeping-id, the
-folder tree, soft delete with a bin, and a permanent delete guarded by where-used (`P5-24`).
-**A rendition URL that was not signed by this site is refused, a library edit changes every URL the
-site emits without a purge, and a URL signed against a superseded edit is refused with `410` rather
-than served the newer picture under the old cache key.** What remains is the authoring surface — the
-picker, the `<picture>` renderer, the admin screens, chunked upload — and the two criteria that
-depend on the `media` field type existing.
+criteria, and its exit gate. **Phase 5 is complete** — 32 of 33 tasks, all 13 acceptance criteria,
+and its exit gate; the one task left open is `P5-33`, which asks for a confirmation Legal has not
+given. Media is uploaded through the ten-step pipeline (`P5-05` to `P5-07`) into a store that is a
+local directory or a blob container behind one interface (`P5-03`, `P5-04`), with the schema and
+migration #6 beneath it (`P5-01`, `P5-02`). Uploads are judged by their bytes rather than their
+names, capped before they are decoded, stripped of every metadata block, and deduplicated by content
+hash. SkiaSharp is the sole processor and asserts its own encoders at startup (`P5-09`); renditions
+are signed, allowlisted, lazily generated behind a per-key semaphore, and served with a year of
+immutable caching, `nosniff`, and a pinned content type (`P5-13` to `P5-18`, `P5-25`). The API an
+editor drives exists (`P5-23`): browse and search, metadata, non-destructive edits and revert
+(`P5-10`), replace-keeping-id, the folder tree, soft delete with a bin, and a permanent delete
+guarded by where-used (`P5-24`). **A rendition URL that was not signed by this site is refused, a
+library edit changes every URL the site emits without a purge, and a URL signed against a superseded
+edit is refused with `410` rather than served the newer picture under the old cache key.** The
+authoring surface closed it out: the `media` picker and its publish-time settings (`P5-19`), the
+responsive `<picture>` renderer (`P5-20`), the admin library and image editor (`P5-22`), and
+resumable chunked upload (`P5-08`) — a transport in front of the same pipeline, not a second way
+into the library. **The one honest gap Phase 5 leaves behind is audit-log retention**, which has no
+implementation and is recorded against `P9-25` rather than absorbed here.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -72,12 +75,12 @@ and record the date in the progress table.
 | [2 — Pages, versioning, publishing](#phase-2--pages-versioning-and-publishing) | 29 | 29 | 27.0 | Complete — all 29 tasks and all 11 acceptance criteria | 2026-08-14 |
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
-| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 26 | 23.5 | Storage, processing, signed delivery, and the management API done; editors and UI remain | — |
+| [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 0 | 34.5 | Not started | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **154** | **203.5** | | |
+| **v1 total** | **281** | **160** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -105,7 +108,14 @@ These come from [§29.2](./spec.md#292-open-questions). Each one gates the phase
 - [ ] **Q8** — Existing site to migrate, and must its URL structure be preserved?
   *Owner: Product · Needed by: Phase 3* · **Answer:** _pending_
 - [ ] **Q9** — Retention/compliance obligations on content versions and audit logs?
-  *Owner: Legal · Needed by: Phase 5* · **Answer:** _pending_
+  *Owner: Legal · Needed by: Phase 5* · **Answer:** _pending — but no longer blocking, and `P5-33`
+  says exactly what an answer would change._ The **version** half is already configuration rather
+  than code: `RetentionPolicy` implements the five clauses of [§11.7] and reads its window from
+  `SiteSettings.VersionRetentionDays`, so a legal answer sets a number. The **audit-log** half has
+  no policy at all — `AuditLog` grows without bound and nothing prunes it, which is a defensible
+  default for a compliance question nobody has answered and is not one to carry to launch. Whichever
+  way Q9 lands, an audit retention sweep is work that does not exist yet; it is recorded against
+  `P9` rather than absorbed into Phase 5.
 - [ ] **Q10** — Does self-service registration stay enabled, and with what default role?
   *Owner: Security · Needed by: Phase 1 (enforced P9)* · **Answer:** _pending_
 
@@ -2702,8 +2712,19 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   *Rendition generation is lazy rather than queued (ADR 0007): warming six sizes of every upload
   would encode far more than any page asks for. Quarantined bytes are kept under a key with no
   extension and no row pointing at it.*
-- [ ] **P5-08** Chunked/resumable upload for large files with progress reporting
+- [x] **P5-08** Chunked/resumable upload for large files with progress reporting
   (`Server/Api/Cms/Media/` + `Client/`). — 1.5 ed
+  *2026-08-16 — `ChunkedUploadService` plus five endpoints under `/media/uploads`. **It is a
+  transport, not a second way into the library**: parts are staged under an `incoming` prefix and
+  the assembled bytes go through the identical `IMediaUploadService` call the single-request route
+  uses, so every refusal applies to both — `AFileWhoseBytesDisagreeWithItsNameIsRefusedWhenTheSessionIsFinished`
+  is the test that holds that line. Session state is a JSON manifest in the store beside its own
+  fragments rather than a table: an in-progress upload is transient data with exactly the lifetime
+  of the parts it describes, so abandoning one is a delete instead of a row and a sweep that could
+  disagree — and it needs no migration, leaving #7 to `P7-08` as planned. Parts arrive in order and
+  the session reports the index it wants next, which is what makes an interrupted upload resumable
+  rather than merely restartable; progress is reported from the **server's** count of bytes it
+  holds, because a bar driven by what the client wrote moves forward through failures.*
 
 ### 5.2 Image processing — 7.5 ed
 
@@ -2748,21 +2769,59 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   documents. — 0.25 ed
 - [x] **P5-18** Signing-key rotation with a grace period during which the previous key still validates
   [§20.8]. — 0.25 ed
-- [ ] **P5-19** `media` and `mediaList` field types completed: editor picker, inline crop/rotate/focal
+- [x] **P5-19** `media` and `mediaList` field types completed: editor picker, inline crop/rotate/focal
   UI, reference extraction. — 1.5 ed
-- [ ] **P5-20** Responsive `<picture>` renderer in `Rendering/Fields/`: WebP `<source>`, accurate
+  *2026-08-16 — the three picker settings lost their `notEnforcedUntil` and are enforced on the
+  **publish path**, beside `allowedTemplates` and the reusable `allowedTypes`, for the structural
+  reason those two are there: a field type is a stateless singleton with no database, and "how wide
+  is item 812" is not a question it can ask. `MediaContentValidator` judges them against the picture
+  the page will **show** — library edits and this placement's crop applied first — which is what
+  makes a 4:3 photograph legal in a 16:9 slot once an editor has cropped it there. **Q's syntax is
+  settled**: `aspectRatio` is `W:H` or a decimal, matched within one percent, because a normalized
+  crop applied to whole pixels lands a pixel or two off every time. The picker is `MediaSlotEditor`
+  in the page editor — the first structured field type with a real control before Phase 6, and it
+  earns it: a media reference cannot be typed. Everything it writes is usage-scope.*
+- [x] **P5-20** Responsive `<picture>` renderer in `Rendering/Fields/`: WebP `<source>`, accurate
   `srcset`/`sizes`, explicit `width`/`height` for CLS, `loading="lazy"` + `decoding="async"` on
   non-LCP images, `loading="eager"` + `fetchpriority="high"` on the first image in the first zone
   [§13.6]. — 1.5 ed
-- [~] **P5-21** Alt-text policy [§13.7]: `AltText` required at upload **or** `IsDecorative = true`;
+  *2026-08-16 — `IMediaResolver` (the media counterpart of `ILinkResolver`, batched for the same
+  N+1 reason) plus `ResponsiveImages`, which is the arithmetic, plus the renderer, which is the
+  markup. **Every number emitted is the resolved one, not the requested one**: the pipeline never
+  upscales, so a 900 px original asked for at 1280 comes back at 900, and markup claiming 1280 would
+  reserve a box the picture never fills — the exact layout shift the attributes exist to prevent.
+  The same rule makes each `w` descriptor the width the browser will actually receive. "First image
+  in the first zone" is settled by `RenderContext.ClaimLcpImage`, claimed **before the first await**
+  so the claim happens in document order rather than in query-completion order. `sizes` is a new
+  configuration setting defaulting to `100vw` — overstating it would fetch a file too small for a
+  full-width hero with no symptom but a soft picture. An SVG or GIF has no rendition and is shown at
+  its signed original; a document is a link, because an `<img>` at a PDF is a broken image where a
+  label belongs.*
+- [x] **P5-21** Alt-text policy [§13.7]: `AltText` required at upload **or** `IsDecorative = true`;
   usage-level override; **publish-time validation error** when neither is present. — 0.5 ed
-  *Upload-time half done and configurable (`RequireAltTextOnUpload`), and `PATCH /media/{id}` now
+  *Upload-time half done and configurable (`RequireAltTextOnUpload`), and `PATCH /media/{id}`
   enforces the same rule — without it an editor could satisfy the upload check and then clear the
-  field, and publish-time validation would be the first thing to notice, on somebody else's page.
-  The publish-time error itself still needs the `media` field type to resolve the item, which is
-  `P5-19`.*
-- [ ] **P5-22** Media admin in `Client/Components/Admin/Media/`: browser (grid/list, folders, filters),
+  field. 2026-08-16 — the publish-time half landed with `P5-19`'s validator, on both the page and
+  the reusable-content publish paths: an item placed on forty pages must not be the way an
+  undescribed picture reaches all of them. Three sources satisfy the rule and the **placement's
+  override is one of them**, because an image whose library description is wrong for one page's
+  context is precisely what an override is for; a rule that ignored it would force a choice between
+  an accurate library and a publishable page. `MediaValidationOptions.MissingAltTextSeverity`
+  carries the spec's migration escape hatch and defaults to `Error` — a rule that made ten thousand
+  imported pages unpublishable at once would be turned off wholesale rather than worked through.*
+- [x] **P5-22** Media admin in `Client/Components/Admin/Media/`: browser (grid/list, folders, filters),
   detail/metadata panel, image editor, replace-keeping-id, where-used, soft delete + bin. — 0.5 ed
+  *2026-08-16 — `MediaBrowser`, `MediaFolderBranch`, `MediaLibrary`, `MediaItemEditor`, over a new
+  `IMediaClient` with the usual two implementations. **The browser is one component behind two
+  screens** — the library page and the picker a `media` field opens — because they are the same
+  screen, and two copies would drift first in the picker, which is the one an editor uses most.
+  Thumbnails are **fetched, not built**: a client cannot sign a rendition URL, so a new
+  `GET /media/links?ids=` signs a batch per page of results. That is a separate contract from
+  `MediaDetail` on purpose — signing is a delivery concern and the library service has no key, and
+  folding URLs into the metadata record would have coupled the two halves the DI split keeps apart.
+  The image editor is numeric: the operation set and its storage are complete, and a drag-and-drop
+  crop surface is authoring experience, which is Phase 6. The where-used list sits beside the delete
+  buttons because it is the answer to the question they raise.*
 - [x] **P5-23** Media API endpoints per [§22.1]: `POST /media`, `GET /media`, `GET /media/{id}`,
   `PATCH /media/{id}`, `PUT /media/{id}/edits`, `POST /media/{id}/revert`, `POST /media/{id}/replace`,
   `DELETE /media/{id}`, `GET /media/{id}/references`, `/media/folders…`. — included above
@@ -2809,10 +2868,31 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   under two different file names. The second upload answers `200` rather than `201` with
   `deduplicated: true`, because nothing was created and the editor needs to be told which file they
   already had.*
-- [ ] **P5-32** Benchmark NFR-8 — cold 4000 px source → 1280 px WebP under 800 ms p95; telemetry
+- [x] **P5-32** Benchmark NFR-8 — cold 4000 px source → 1280 px WebP under 800 ms p95; telemetry
   `cms.media.rendition.generated` / `.duration` [§24.1].
-- [ ] **P5-33** Confirm Q9 (retention/compliance on versions and audit logs) is answered and reflected in
+  *`RenditionBenchmarkTests` measures twenty **cold** renditions through the endpoint, not through
+  the processor: reading the original out of the store, taking the per-key lock, writing the result
+  back, and recording the row are what turn a fast encoder into a slow first request, and they are
+  exactly what a benchmark of `IImageProcessor` would miss. Each sample varies the crop in the
+  fourth decimal — the precision the spec canonicalizes to — so no two requests name the same
+  rendition and none can be served from storage. One warm request is discarded first, because the
+  native decoder loading and the first database connection are per-process costs NFR-8 is not about.
+  The source is noise rather than a flat fill, which compresses to nothing and would report a number
+  no real upload could reproduce. Both instruments are asserted alongside the stopwatch: a benchmark
+  that passed while the dashboard stayed flat would leave the requirement unobservable the day it
+  starts being missed.*
+- [~] **P5-33** Confirm Q9 (retention/compliance on versions and audit logs) is answered and reflected in
   the retention policy.
+  *2026-08-16 — **Q9 is still unanswered and no longer blocks**, on the same reasoning that
+  unblocked Q7: what an answer would change is written down, and it is not code. The version half
+  already obeys [§11.7] through `RetentionPolicy` and reads its window from
+  `SiteSettings.VersionRetentionDays`, so a legal answer sets a number and nothing is rebuilt. The
+  audit half is the honest gap: `AuditLog` has **no** retention at all and nothing prunes it, which
+  is the right default for an unanswered compliance question and the wrong state to launch in. That
+  is recorded against Phase 9 rather than absorbed here, because an audit retention sweep is work
+  that does not exist yet and pretending otherwise is how a compliance gap reaches production inside
+  a ticked box. Left `[~]` deliberately: the confirmation this task asks for cannot be made until
+  Legal answers.*
 
 ### Acceptance criteria — Phase 5
 
@@ -2830,28 +2910,46 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   *Both branches are proven: `SvgSanitizerTests` covers the strict profile, and
   `AnSvgUploadFollowsTheDeploymentsPolicyWhichDefaultsToRefusingIt` covers the shipped default. Q7
   now selects a setting rather than gating code.*
-- [~] **P5 #6** Rotating an image in the library updates every usage; the original bytes are unchanged
+- [x] **P5 #6** Rotating an image in the library updates every usage; the original bytes are unchanged
   and revert-to-original restores it.
-  *Two of the three halves proven. The original is byte-for-byte identical across an edit, and revert
-  restores it and moves the counter again. "Updates every usage" is proven structurally — the counter
-  is in every signature, so every URL changes — but not yet through a page showing the image, which
-  needs the `media` field type (`P5-19`).*
-- [ ] **P5 #7** A usage-level crop affects only that page; other usages are unchanged.
+  *The original is byte-for-byte identical across an edit, and revert restores it and moves the
+  counter again. The third half closed with `P5-19`:
+  `RotatingAnImageInTheLibraryChangesWhatEveryPageShowingItResolvesTo` puts one picture on two
+  published pages, rotates it once in the library, and asserts that both pages resolve to the
+  swapped dimensions **with neither payload changed and neither page republished** — which is the
+  claim, and which is only true because a placement stores an id and nothing else about the file.*
+- [x] **P5 #7** A usage-level crop affects only that page; other usages are unchanged.
+  *Proven at both ends. `AUsageLevelCropAffectsOnlyThatPageAndLeavesTheOtherUsageUntouched` puts one
+  item on two pages, crops one of them, and asserts the library row is untouched — no edit document,
+  generation counter still zero — while the two placements resolve to different pictures. At the
+  renderer, `AUsageCropChangesOnlyTheUrlsOfThePlacementThatCarriesIt` asserts the two placements
+  share **no** URL at all, because the crop is inside the signature.*
 - [x] **P5 #8** An unsigned or tampered rendition URL returns 400/403; a valid one returns the image.
   *`MediaUrlSignerTests` at the unit level; `ARenditionUrlWithATamperedWidthIsRefusedWithoutEncodingAnything`
   end to end, which also asserts the refusal cost zero encodes — a signature that refused *after*
   generating would have moved the denial of service rather than prevented it.*
 - [x] **P5 #9** A rendition is generated once — twenty concurrent cold requests produce one encode. *`P5-30`.*
-- [ ] **P5 #10** `<picture>` output includes a WebP source, an accurate `srcset`, explicit
+- [x] **P5 #10** `<picture>` output includes a WebP source, an accurate `srcset`, explicit
   `width`/`height`, and `loading="lazy"` on non-LCP images. Requesting AVIF is rejected at the
   spec-parsing layer.
-- [ ] **P5 #11** Publishing a page whose image has neither alt text nor a decorative flag fails
+  *`MediaPictureRendererTests`, against the markup rather than the arithmetic, because half of what
+  §13.6 asks for is attributes: a perfect `srcset` on an `<img>` with no `width` still shifts the
+  layout. The descriptors are asserted as the widths the browser will actually receive —
+  `320, 640, 960, 1280, 1920, 2000` from a 2000 px source, where the last is a 2560 request clamped
+  back down. `NoSourceEverOffersAvifBecauseNothingCouldProduceIt` covers the format half at the
+  renderer; `RenditionRequestParser` already refused it at the endpoint.*
+- [x] **P5 #11** Publishing a page whose image has neither alt text nor a decorative flag fails
   validation.
-- [~] **P5 #12** Permanent deletion of referenced media is refused with a correct where-used list.
-  *The guard and the endpoint ship in `P5-24`, and `GET /media/{id}/references` answers the list.
-  The refusal cannot be exercised end to end yet: creating a media reference means placing an image
-  in a payload, and the `media` field type is `P5-19`. What is asserted today is the other refusal —
-  permanent deletion of an item that is not in the bin.*
+  *`PublishingAPageWhoseImageHasNeitherAltTextNorADecorativeFlagFailsValidation`, with the three
+  ways out proven beside it: the item's own text, the decorative flag, and the placement's override.
+  The migration downgrade is proven too — a deployment may make it a warning and publish, which is
+  what stops the rule being turned off wholesale during an import.*
+- [x] **P5 #12** Permanent deletion of referenced media is refused with a correct where-used list.
+  *The guard and the endpoint shipped in `P5-24`; `P5-19` made the refusal reachable.
+  `PermanentDeletionOfAPlacedImageIsRefusedAndTheWhereUsedListNamesThePage` places a picture on a
+  page, publishes it, bins the item — which succeeds, because a soft delete is deliberately not
+  reference-guarded — and then finds the purge refused with `media.still-referenced` and the
+  where-used list naming the page that caused it.*
 - [x] **P5 #13** A library-level edit bumps `EditsVersion`, changing rendition URLs and thereby busting
   client and CDN caches.
   *`ALibraryEditBumpsEditsVersionAndRevertingBumpsItAgain` from the API side and
@@ -2859,7 +2957,10 @@ performance. **23.5 ed** · Entry: Phase 3 exit. Parallel with Phase 4.
   and the old one is `410`, so a superseded link cannot quietly deliver the new picture under the old
   cache key.*
 
-**Exit gate:** safe upload, non-destructive edits, signed responsive renditions. — [ ] met on ____
+**Exit gate:** safe upload, non-destructive edits, signed responsive renditions. — [x] met on
+2026-08-16. All thirteen acceptance criteria pass. The one item left open is `P5-33`, which asks for
+a confirmation Legal has not given; it is recorded rather than closed, and the gap it names — audit
+log retention — is Phase 9 work that does not exist yet.
 
 **Risks:** R11 (rendition CPU cost), R12 (SVG XSS). R10 closed by the SkiaSharp decision.
 
@@ -3257,6 +3358,13 @@ Entry: all prior phases exit.
   documentation only. — 0 ed
 - [ ] **P9-24** Browser matrix verification for NFR-13 (last 2 versions of Chrome, Edge, Firefox,
   Safari). — included above
+- [ ] **P9-25** Audit-log retention: a nightly sweep and a configurable window, matching what
+  `RetentionPolicy` already does for versions [§11.7]. — 0.5 ed
+  *Raised by `P5-33`. `AuditLog` currently grows without bound and nothing prunes it, which is a
+  defensible default for an unanswered compliance question (**Q9**) and the wrong state to launch
+  in — the interceptor writes a row for every tracked change, so the table grows with editorial
+  activity forever and eventually slows every `SaveChanges`. Deliberately not sized until Q9 lands:
+  the window is the part Legal decides, and the sweep is the part that is the same either way.*
 
 ### Acceptance criteria — Phase 9
 
@@ -3425,8 +3533,8 @@ the checklist for verifying the delivered system against the original ask.
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
 | R-10 | "a published page could still be visible to unauthenticated users while content editors are making changes that only they can see internally" | [§11.1], [§12] | P2-11, P3-12, P3-16 | **P2 #4, P3 #3** — the central promise | [x] `P2 #4` 2026-08-14; `P3 #3` 2026-08-15 |
 | R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [x] 2026-08-16 — `P5 #1`–`#5` all met; `P5-08` (chunked upload) is a comfort feature over a working upload, not a gate |
-| R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [ ] |
-| R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [ ] |
+| R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [x] 2026-08-16 — both met, and non-destructively: the stored original is byte-for-byte identical across an edit, a library rotate reaches every page showing the image without republishing one, and a usage crop reaches only its own placement |
+| R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [x] 2026-08-16 — a placement stores an id and its own edits, nothing about the file, which is what makes `R-12`'s library rotate propagate |
 | R-14 | "do plenty of research and add elements that are clearly missing" | [§4.2] — 30 gaps | see below | per gap | [ ] |
 
 ### Gap coverage (R-14)
@@ -3446,10 +3554,10 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #9 | Version diff & rollback | P2-13, P2-14 | [ ] |
 | #10 | Soft delete & recycle bin | P2-08, P6-28 | [ ] |
 | #11 | HTML sanitization / XSS defense | P1-18…P1-20, P9-06 | [ ] |
-| #12 | Upload validation & safe serving | P5-05…P5-07, P5-17 | [ ] |
-| #13 | Alt text enforced | P5-21 | [ ] |
-| #14 | Focal point / smart cropping | P5-12 | [ ] |
-| #15 | Renditions, `srcset`, WebP | P5-13…P5-16, P5-20 | [ ] |
+| #12 | Upload validation & safe serving | P5-05…P5-07, P5-17 | [x] 2026-08-16 — decided at the sniffer and the sanitizer, so single-request upload, replace, and chunked assembly share one set of refusals |
+| #13 | Alt text enforced | P5-21 | [x] 2026-08-16 — at upload, at `PATCH`, and at publish on both the page and reusable paths; a placement override is one of the three ways out |
+| #14 | Focal point / smart cropping | P5-12 | [x] 2026-08-16 |
+| #15 | Renditions, `srcset`, WebP | P5-13…P5-16, P5-20 | [x] 2026-08-16 — every descriptor is the width the browser will actually receive, because the pipeline never upscales |
 | #16 | Where-used / link integrity | P4-07, P4-08 | [x] 2026-08-16 — transitive, split by pinned, and the delete guard is built on it |
 | #17 | Output caching + invalidation | P8-06…P8-13 | [ ] |
 | #18 | Concurrency control | P2-03, P2-15, P6-19 | [ ] |
@@ -3505,8 +3613,8 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | **Measured 2026-08-16, still open for P8** — the where-used walk is ~2.8 ms for 40 pages and its query count is bounded by nesting depth (5), not by page count ([baseline](./docs/phase-4-fanout-baseline.md), `ReferenceFanOutTests`). The residual is the eviction itself, which has no implementation until P8 |
 | R9 | Testcontainers unreliable in CI | Med | 0 | Flake rate above 5% | Open |
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |
-| R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | Open |
-| R12 | SVG sanitization bypassed | **Critical** | 5 | Any bypass found → disable SVG | Open |
+| R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | **Mitigated and measured 2026-08-16, still open for P9** — renditions are lazy rather than warmed (ADR 0007), a per-key semaphore collapses N cold requests for one rendition into one encode (`P5-30`), and generation is bounded by an allowlist of six widths. `RenditionBenchmarkTests` holds NFR-8 on cold encodes through the whole endpoint. None of that is the trigger: the contingency turns on **sustained CPU under a load test**, and no load test exists until P9 |
+| R12 | SVG sanitization bypassed | **Critical** | 5 | Any bypass found → disable SVG | **Unreached in the shipped default, still open** — `SvgUploadPolicy` defaults to `Reject` (`P5-06`), so a deployment that never opts in cannot be bypassed because it never sanitizes. The sanitizer is reachable only by an explicit `Sanitize`, and **Q7 is unanswered**, so the risk cannot be closed — it is the opt-in branch that carries it. The contingency is already the default state, which is the point |
 | R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | Open |
 | R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | Open |
 | R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | Open |

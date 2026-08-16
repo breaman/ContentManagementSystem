@@ -39,26 +39,46 @@ internal static class MediaValue
     /// <remarks>
     /// Shared for the same reason the item rules above are: <c>media</c> and <c>mediaList</c> pick
     /// from one library under one set of restrictions, and two copies would diverge the first time
-    /// either gained a setting. All three are declared now and enforced in P5, when the library
-    /// they read exists — see <see cref="FieldConfigurationSetting.NotEnforcedUntil"/> for why they
-    /// are declared early rather than refused until then.
+    /// either gained a setting.
+    /// <para>
+    /// <strong>The first three are enforced at publish time, not here.</strong> A field type is a
+    /// stateless singleton with no database, and "how wide is item 812" cannot be answered from the
+    /// stored value — so they are checked on the publish path beside <c>allowedTemplates</c> and the
+    /// reusable-content <c>allowedTypes</c>, which are deferred for exactly the same reason
+    /// (spec section 7). What is checked against them is the picture the page will <em>show</em>:
+    /// library edits and this placement's own crop are applied first, so an editor satisfies an
+    /// aspect ratio by cropping rather than by re-uploading.
+    /// </para>
     /// </remarks>
     public static FieldConfigurationSchema PickerSettings { get; } = new(
         [
             FieldConfigurationSetting.TextList(
                 "allowedTypes",
-                "Media types an editor may pick, such as image or document. An empty list allows any of them.",
-                notEnforcedUntil: "P5"),
+                "Media kinds an editor may pick — Image, Document, Video, Audio. An empty list allows any of them.",
+                allowedValues: MediaKinds),
             FieldConfigurationSetting.Integer(
                 "minWidth",
-                "Narrowest original, in pixels, that may be picked.",
-                minimum: 1,
-                notEnforcedUntil: "P5"),
+                "Narrowest picture, in pixels, this placement accepts, measured after cropping.",
+                minimum: 1),
             FieldConfigurationSetting.Text(
                 "aspectRatio",
-                "Aspect ratio a picked item must have. The syntax is settled in P5 with the crop editor.",
-                notEnforcedUntil: "P5"),
+                "Aspect ratio the placed picture must have, written as W:H such as 16:9, or as a decimal."),
+            FieldConfigurationSetting.Text(
+                "sizes",
+                "The 'sizes' attribute the responsive markup carries, such as " +
+                "'(max-width: 768px) 100vw, 800px'. Defaults to 100vw."),
         ]);
+
+    /// <summary>
+    /// The values <c>allowedTypes</c> may hold — the names of <c>MediaKind</c>.
+    /// </summary>
+    /// <remarks>
+    /// A closed set, so a zone configured with a misspelled kind is refused on save rather than
+    /// quietly matching nothing and letting anything through. Spelled here rather than derived from
+    /// the enum because this is a wire contract: renaming a member of <c>MediaKind</c> must be a
+    /// visible decision about stored configuration, not a silent one.
+    /// </remarks>
+    private static readonly string[] MediaKinds = ["Image", "Document", "Video", "Audio"];
 
     /// <summary>
     /// Checks one picked item.

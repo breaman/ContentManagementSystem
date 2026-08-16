@@ -54,6 +54,32 @@ public sealed record MediaDetail(
     string RowVersion);
 
 /// <summary>
+/// The signed URLs a client may fetch one item's bytes from (task P5-22, spec section 13.5).
+/// </summary>
+/// <param name="MediaItemId">The item these URLs address.</param>
+/// <param name="ThumbnailUrl">A grid-sized rendition, or null for an item with no rendition pipeline.</param>
+/// <param name="PreviewUrl">A panel-sized rendition, or null for the same reason.</param>
+/// <param name="OriginalUrl">The stored original, which every item has.</param>
+/// <remarks>
+/// <strong>A separate contract from <see cref="MediaDetail"/>, and separately fetched.</strong>
+/// Signing is a delivery concern and the signing key lives with the delivery services, which a host
+/// that only accepts uploads does not register at all; folding these into the metadata record would
+/// make the library service depend on a key it has no use for. The split also keeps
+/// <see cref="MediaDetail"/> honest about what it is — everything the row says, and nothing about
+/// where the bytes can be reached.
+/// <para>
+/// The URLs carry the item's current <c>EditsVersion</c>, so a set fetched before a library edit
+/// stops resolving after it. That is the same refusal every rendition URL on the public site gets,
+/// and the remedy is the same: ask again.
+/// </para>
+/// </remarks>
+public sealed record MediaLinks(
+    int MediaItemId,
+    string? ThumbnailUrl,
+    string? PreviewUrl,
+    string OriginalUrl);
+
+/// <summary>
 /// What an upload did.
 /// </summary>
 /// <param name="Item">The item the upload resolved to.</param>

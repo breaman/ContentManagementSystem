@@ -12,8 +12,9 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// Stored as <c>{ "type": "mediaList", "items": [ { "mediaId": 812, … }, … ] }</c> — the same item
 /// shape <c>media</c> stores, repeated. Order is the author's and is preserved as written.
 /// <para>
-/// Configuration keys: <c>min</c>, <c>max</c>, and the P5 additions <c>allowedTypes</c>,
-/// <c>minWidth</c>, <c>aspectRatio</c>.
+/// Configuration keys: <c>min</c>, <c>max</c>, <c>allowedTypes</c>, <c>minWidth</c>,
+/// <c>aspectRatio</c>, and <c>sizes</c>. The picker settings restrict every item in the gallery, not
+/// the gallery as a whole — a ratio applies to each picture in it.
 /// </para>
 /// <para>
 /// The same item appearing twice is allowed. A gallery that repeats an image is unusual but not
@@ -21,7 +22,8 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </para>
 /// <para>
 /// <strong>Completed in P5</strong>, alongside <see cref="MediaFieldType"/> and for the same
-/// reasons.
+/// reasons. Each item is rendered by the single-media renderer rather than by a copy of its markup,
+/// so a gallery and a single picker cannot drift apart about what a crop means.
 /// </para>
 /// </remarks>
 public sealed class MediaListFieldType : ListFieldTypeBase

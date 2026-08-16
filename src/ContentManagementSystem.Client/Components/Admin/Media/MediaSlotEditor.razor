@@ -1,0 +1,145 @@
+@using ContentManagementSystem.Shared.Contracts.Media
+
+<div class="border rounded p-2">
+    @if (Item is null)
+    {
+        <p class="mb-2 text-body-secondary">Nothing picked.</p>
+    }
+    else
+    {
+        <div class="d-flex gap-3 mb-2">
+            @if (Links?.ThumbnailUrl is { Length: > 0 } thumbnail)
+            {
+                <img src="@thumbnail" alt="" style="max-width: 8rem" class="img-fluid" decoding="async" />
+            }
+
+            <div>
+                <p class="mb-1">@Item.OriginalFileName</p>
+                @if (Item.Width is { } width && Item.Height is { } height)
+                {
+                    <p class="small text-body-secondary mb-1">@width × @height</p>
+                }
+
+                @* The library's own description, shown because it is what this placement inherits
+                   when the override below is empty. An editor who cannot see it has no way to tell
+                   whether overriding is worth doing. *@
+                <p class="small text-body-secondary mb-0">
+                    @if (Item.IsDecorative)
+                    {
+                        <text>Marked decorative in the library.</text>
+                    }
+                    else if (string.IsNullOrWhiteSpace(Item.AltText))
+                    {
+                        <span class="text-danger">
+                            No alt text in the library — describe it here or in the library, or
+                            publishing this page will fail.
+                        </span>
+                    }
+                    else
+                    {
+                        <text>Library alt text: @Item.AltText</text>
+                    }
+                </p>
+            </div>
+        </div>
+    }
+
+    <div class="d-flex gap-2 mb-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@Disabled"
+                @onclick="() => IsPicking = !IsPicking">
+            @(IsPicking ? "Close the picker" : Item is null ? "Pick a file" : "Pick a different file")
+        </button>
+
+        @if (Item is not null)
+        {
+            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@Disabled"
+                    @onclick="ClearAsync">
+                Clear
+            </button>
+        }
+    </div>
+
+    @if (Item is not null)
+    {
+        <div class="mb-2">
+            <label class="form-label" for="@($"alt-{PropertyKey}")">Alternative text for this page</label>
+            <input id="@($"alt-{PropertyKey}")" class="form-control form-control-sm" disabled="@Disabled"
+                   value="@AltOverride"
+                   @onchange="async e => { AltOverride = e.Value?.ToString(); await WriteAsync(); }" />
+            <div class="form-text">Leave empty to use the library's own description.</div>
+        </div>
+
+        @* Usage-scope geometry: this crop is stored in this page's payload and affects this
+           placement only. The library's own crop, which affects every page, is on the media
+           screen (spec section 13.4). *@
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="@($"crop-{PropertyKey}")"
+                   disabled="@Disabled" checked="@HasCrop"
+                   @onchange="async e => { HasCrop = (bool?)e.Value ?? false; await WriteAsync(); }" />
+            <label class="form-check-label" for="@($"crop-{PropertyKey}")">
+                Crop this picture for this page only
+            </label>
+        </div>
+
+        <div class="row g-2 mt-0">
+            <div class="col-3">
+                <label class="form-label small" for="@($"crop-x-{PropertyKey}")">Left</label>
+                <input id="@($"crop-x-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasCrop)" value="@CropX"
+                       @onchange="async e => { CropX = Number(e.Value, 0); await WriteAsync(); }" />
+            </div>
+            <div class="col-3">
+                <label class="form-label small" for="@($"crop-y-{PropertyKey}")">Top</label>
+                <input id="@($"crop-y-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasCrop)" value="@CropY"
+                       @onchange="async e => { CropY = Number(e.Value, 0); await WriteAsync(); }" />
+            </div>
+            <div class="col-3">
+                <label class="form-label small" for="@($"crop-w-{PropertyKey}")">Width</label>
+                <input id="@($"crop-w-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasCrop)" value="@CropWidth"
+                       @onchange="async e => { CropWidth = Number(e.Value, 1); await WriteAsync(); }" />
+            </div>
+            <div class="col-3">
+                <label class="form-label small" for="@($"crop-h-{PropertyKey}")">Height</label>
+                <input id="@($"crop-h-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasCrop)" value="@CropHeight"
+                       @onchange="async e => { CropHeight = Number(e.Value, 1); await WriteAsync(); }" />
+            </div>
+        </div>
+
+        <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="@($"focal-{PropertyKey}")"
+                   disabled="@Disabled" checked="@HasFocalPoint"
+                   @onchange="async e => { HasFocalPoint = (bool?)e.Value ?? false; await WriteAsync(); }" />
+            <label class="form-check-label" for="@($"focal-{PropertyKey}")">
+                Keep a particular point visible when the template crops to another shape
+            </label>
+        </div>
+
+        <div class="row g-2 mt-0">
+            <div class="col-3">
+                <label class="form-label small" for="@($"focal-x-{PropertyKey}")">Across</label>
+                <input id="@($"focal-x-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasFocalPoint)" value="@FocalX"
+                       @onchange="async e => { FocalX = Number(e.Value, 0.5); await WriteAsync(); }" />
+            </div>
+            <div class="col-3">
+                <label class="form-label small" for="@($"focal-y-{PropertyKey}")">Down</label>
+                <input id="@($"focal-y-{PropertyKey}")" class="form-control form-control-sm" type="number"
+                       step="0.01" min="0" max="1" disabled="@(Disabled || !HasFocalPoint)" value="@FocalY"
+                       @onchange="async e => { FocalY = Number(e.Value, 0.5); await WriteAsync(); }" />
+            </div>
+        </div>
+    }
+
+    @if (IsPicking)
+    {
+        <div class="mt-3 border-top pt-3">
+            @* The library's own browser, not a copy of it: same filters, same folders, same recycle
+               bin, and no chance of the two drifting apart. *@
+            <MediaBrowser OnPicked="PickedAsync" AllowRecycleBin="false" />
+        </div>
+    }
+</div>
+

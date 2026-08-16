@@ -4,14 +4,17 @@ using ContentManagementSystem.Core.Content.Markdown;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Tests.Content;
+using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
+using ContentManagementSystem.Shared.Contracts.Media;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Contracts.Structure;
 
@@ -19,6 +22,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace ContentManagementSystem.Core.Tests.Rendering;
 
@@ -32,7 +36,9 @@ namespace ContentManagementSystem.Core.Tests.Rendering;
 /// the sanitizer and the markdown pipeline both are, and substituting them would mean the tests
 /// asserting that markup is safe were asserting it about a double.
 /// <para>
-/// What is faked is only what needs a database: link resolution and the schema catalog.
+/// What is faked is only what needs a database: link, reusable, and media resolution, and the
+/// schema catalog. The media URL signer is the real one over a fixed key, so a rendered
+/// <c>srcset</c> holds signatures the delivery endpoint would actually accept.
 /// </para>
 /// </remarks>
 internal sealed class FieldRendererHarness : IDisposable
@@ -65,6 +71,15 @@ internal sealed class FieldRendererHarness : IDisposable
         _bunit.Services.AddSingleton<IFieldRendererCatalog>(new FieldRendererCatalog(Registry));
         _bunit.Services.AddSingleton<ILinkResolver>(Links);
         _bunit.Services.AddSingleton<IReusableContentResolver>(Reusable);
+        _bunit.Services.AddSingleton<IMediaResolver>(Media);
+
+        // The real signer over a fixed key. Substituting it would make the picture tests assert
+        // against URLs a double invented, and the one property worth proving about a srcset is that
+        // every candidate in it is one this deployment would actually accept (task P5-20).
+        _bunit.Services.AddSingleton<IMediaUrlSigner>(new MediaUrlSigner(
+            new MediaSigningOptions { Key = Convert.ToBase64String(new byte[32]) },
+            TimeProvider.System,
+            NullLogger<MediaUrlSigner>.Instance));
         _bunit.Services.AddSingleton<IContentSchemaCatalog>(provider => Schemas);
         _bunit.Services.AddSingleton<IFieldTypeRegistry>(Registry);
 
@@ -91,6 +106,9 @@ internal sealed class FieldRendererHarness : IDisposable
 
     /// <summary>The reusable items this render can resolve, and what they resolve to.</summary>
     public TestReusableContentResolver Reusable { get; } = new();
+
+    /// <summary>The media items this render can resolve, and what they resolve to.</summary>
+    public TestMediaResolver Media { get; } = new();
 
     /// <summary>The block type revisions this render can resolve configuration from.</summary>
     public IContentSchemaCatalog Schemas { get; set; } = ContentSchemaCatalog.Empty;
@@ -197,6 +215,75 @@ internal sealed class TestLinkResolver : ILinkResolver
         }
 
         return Task.FromResult<IReadOnlyDictionary<int, ResolvedLink>>(resolved);
+    }
+}
+
+/// <summary>
+/// A media resolver a test states the contents of outright (task P5-20).
+/// </summary>
+/// <remarks>
+/// Faked for the reason the link resolver is: it needs a database and nothing about the markup under
+/// test depends on how the row was read. Everything downstream of it is real — the geometry, the
+/// candidate widths, and the signature are the deployment's own, so a test that asserts on a
+/// <c>srcset</c> is asserting about URLs the delivery endpoint would accept.
+/// </remarks>
+internal sealed class TestMediaResolver : IMediaResolver
+{
+    private readonly Dictionary<int, ResolvedMedia> _items = [];
+
+    /// <summary>Adds an item this resolver can find.</summary>
+    /// <param name="id">The item id.</param>
+    /// <param name="width">Pixel width of the stored original.</param>
+    /// <param name="height">Pixel height of the stored original.</param>
+    /// <param name="altText">The item's own alternative text.</param>
+    /// <param name="isDecorative">Whether it renders <c>alt=""</c>.</param>
+    /// <param name="contentType">The sniffed media type, which decides the fallback format.</param>
+    /// <param name="kind">What the file is.</param>
+    /// <param name="edits">The library-scope edits.</param>
+    /// <param name="editsVersion">The edits generation.</param>
+    /// <param name="caption">Caption rendered beneath the picture.</param>
+    public TestMediaResolver Add(
+        int id,
+        int? width = 2000,
+        int? height = 1500,
+        string? altText = "A quiet street",
+        bool isDecorative = false,
+        string contentType = "image/jpeg",
+        MediaKind kind = MediaKind.Image,
+        MediaEdits? edits = null,
+        int editsVersion = 0,
+        string? caption = null)
+    {
+        _items[id] = new ResolvedMedia(
+            id,
+            kind,
+            contentType,
+            $"photo-{id}.jpg",
+            width,
+            height,
+            altText,
+            isDecorative,
+            null,
+            caption,
+            null,
+            edits ?? MediaEdits.None,
+            editsVersion);
+
+        return this;
+    }
+
+    public Task<IReadOnlyDictionary<int, ResolvedMedia>> ResolveAsync(
+        IEnumerable<int> mediaIds,
+        CancellationToken cancellationToken = default)
+    {
+        var resolved = new Dictionary<int, ResolvedMedia>();
+
+        foreach (var id in mediaIds.Distinct())
+        {
+            if (_items.TryGetValue(id, out var item)) resolved[id] = item;
+        }
+
+        return Task.FromResult<IReadOnlyDictionary<int, ResolvedMedia>>(resolved);
     }
 }
 

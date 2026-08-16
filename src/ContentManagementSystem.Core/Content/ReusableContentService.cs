@@ -1,6 +1,7 @@
 using System.Text.Json;
 
 using ContentManagementSystem.Core.Content.Schema;
+using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
@@ -24,6 +25,7 @@ namespace ContentManagementSystem.Core.Content;
 /// <param name="references">Rewrites a version's reference rows from its payload.</param>
 /// <param name="indexer">Walks a payload to report the entities it points at.</param>
 /// <param name="impact">Answers where an item is used and what a change to it would touch.</param>
+/// <param name="media">Checks the pictures this item places — existence, alt text, and the picker settings.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="users">Identity of the caller, recorded on the published version and the audit row.</param>
 /// <param name="clock">Source of the current time.</param>
@@ -35,6 +37,7 @@ public sealed class ReusableContentService(
     IContentReferenceProjector references,
     IReferenceIndexer indexer,
     IReferenceQueryService impact,
+    IMediaContentValidator media,
     ICmsAuthorization authorization,
     IUserService users,
     TimeProvider clock,
@@ -834,6 +837,11 @@ public sealed class ReusableContentService(
         }
 
         diagnostics.AddRange(await CheckReferencedEntitiesAsync(payload, cancellationToken));
+
+        // The same media rules a page publish applies, against the same schema this item's own
+        // values were checked against. An item placed on forty pages must not be the way an
+        // undescribed picture reaches all of them (task P5-21, spec section 13.7).
+        diagnostics.AddRange(await media.ValidateAsync(payload, schema, cancellationToken));
 
         if (await CreatesCycleAsync(item.Id, payload, cancellationToken) is { } cycle)
         {

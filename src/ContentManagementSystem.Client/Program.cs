@@ -27,4 +27,7 @@ builder.Services.AddScoped<IPageClient, HttpPageClient>();
 // The reusable content library, and its server twin ServerReusableClient.
 builder.Services.AddScoped<IReusableClient, HttpReusableClient>();
 
+// The media library, the picker, and the resumable uploader; ServerMediaClient is its twin.
+builder.Services.AddScoped<IMediaClient, HttpMediaClient>();
+
 await builder.Build().RunAsync();

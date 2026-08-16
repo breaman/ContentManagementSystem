@@ -138,7 +138,7 @@ public sealed class FakeReusableClient : IReusableClient
                 true,
                 [],
                 [new ApiDiagnostic(ReusableCodes.BlastRadius, "3 published pages will change immediately.")],
-                Impact())));
+                Impact)));
 
     /// <inheritdoc />
     public Task<StructureClientResult<ReusablePublishResult>> PublishAsync(
@@ -146,7 +146,7 @@ public sealed class FakeReusableClient : IReusableClient
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(StructureClientResult<ReusablePublishResult>.Success(
-            new ReusablePublishResult(Id, 44, 4, DateTimeOffset.UtcNow, 2, 1, Impact(), [])));
+            new ReusablePublishResult(Id, 44, 4, DateTimeOffset.UtcNow, 2, 1, Impact, [])));
 
     /// <inheritdoc />
     public Task<StructureClientResult<ReusableUnpublishResult>> UnpublishAsync(
@@ -154,7 +154,7 @@ public sealed class FakeReusableClient : IReusableClient
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(StructureClientResult<ReusableUnpublishResult>.Success(
-            new ReusableUnpublishResult(Id, 2, Impact())));
+            new ReusableUnpublishResult(Id, 2, Impact)));
 
     /// <inheritdoc />
     public Task<StructureClientResult<ReusableDeleteResult>> DeleteAsync(
@@ -166,10 +166,17 @@ public sealed class FakeReusableClient : IReusableClient
 
     /// <inheritdoc />
     public Task<ReferenceImpact> WhereUsedAsync(int id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Impact());
+        Task.FromResult(Impact);
 
-    /// <summary>An impact carrying one of each row state the where-used panel can draw.</summary>
-    private static ReferenceImpact Impact() =>
+    /// <summary>
+    /// An impact carrying one of each row state the where-used panel can draw.
+    /// </summary>
+    /// <remarks>
+    /// Shared with <see cref="FakeMediaClient"/>, which renders the same panel beside the media
+    /// item's delete buttons. One fixture, because a second copy would be the one that stopped
+    /// carrying a pinned row and left that branch unchecked on whichever screen owned it.
+    /// </remarks>
+    public static ReferenceImpact Impact { get; } =
         new(
             [
                 new AffectedPage(1, "Pricing", "/pricing", IsPublished: true, IsPinned: false, "footer"),

@@ -1,6 +1,7 @@
 using System.Net;
 
 using ContentManagementSystem.Core;
+using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Media.Upload;
 using ContentManagementSystem.Shared.Common;
@@ -51,8 +52,14 @@ public static class MediaEndpoints
         var media = group.MapGroup(Prefix).WithTags("Media");
 
         // Read once, at map time, from the same options object the pipeline reads on every upload.
-        var bodyLimit = new MediaBodySizeLimit(
-            ((IEndpointRouteBuilder)group).ServiceProvider.GetRequiredService<MediaUploadOptions>());
+        var uploadOptions = ((IEndpointRouteBuilder)group).ServiceProvider
+            .GetRequiredService<MediaUploadOptions>();
+
+        var bodyLimit = new MediaBodySizeLimit(uploadOptions);
+
+        // A part is bounded far more tightly than a whole file: the transport ceiling for the
+        // chunked route is one part, not one upload, which is most of the point of having it.
+        var chunkLimit = new MediaChunkSizeLimit(uploadOptions);
 
         media.MapPost("/", UploadAsync)
             .WithName("UploadMedia")
@@ -62,9 +69,47 @@ public static class MediaEndpoints
             .WithMetadata(bodyLimit)
             .Accepts<IFormFile>("multipart/form-data");
 
+        // Before the /{id:int} routes for the reason the folder routes are: readability. The int
+        // constraint already stops "uploads" matching them.
+        media.MapPost("/uploads", StartUploadAsync)
+            .WithName("StartChunkedUpload")
+            .WithSummary("Opens a resumable upload for a large file, in parts the server sizes.")
+            .RequireAuthorization(CmsPermissions.MediaUpload)
+            .RequireCmsAntiforgery();
+
+        media.MapGet("/uploads/{uploadId}", GetUploadAsync)
+            .WithName("GetChunkedUpload")
+            .WithSummary("Reports how much of a resumable upload has arrived, so a client can resume.")
+            .RequireAuthorization(CmsPermissions.MediaUpload);
+
+        media.MapPut("/uploads/{uploadId}/parts/{index:int}", AppendUploadAsync)
+            .WithName("AppendChunkedUpload")
+            .WithSummary("Sends the next part. Parts arrive in order and the response says which is next.")
+            .RequireAuthorization(CmsPermissions.MediaUpload)
+            .RequireCmsAntiforgery()
+            .WithMetadata(chunkLimit)
+            .Accepts<Stream>("application/octet-stream");
+
+        media.MapPost("/uploads/{uploadId}/complete", CompleteUploadAsync)
+            .WithName("CompleteChunkedUpload")
+            .WithSummary("Assembles the parts and puts them through the ordinary upload pipeline.")
+            .RequireAuthorization(CmsPermissions.MediaUpload)
+            .RequireCmsAntiforgery();
+
+        media.MapDelete("/uploads/{uploadId}", AbandonUploadAsync)
+            .WithName("AbandonChunkedUpload")
+            .WithSummary("Abandons a resumable upload and discards everything staged for it.")
+            .RequireAuthorization(CmsPermissions.MediaUpload)
+            .RequireCmsAntiforgery();
+
         media.MapGet("/", ListAsync)
             .WithName("ListMedia")
             .WithSummary("Browses the library, filtered by folder, kind, search text, or usage.")
+            .RequireAuthorization(CmsPermissions.ContentRead);
+
+        media.MapGet("/links", LinksAsync)
+            .WithName("GetMediaLinks")
+            .WithSummary("Signs thumbnail, preview, and original URLs for a batch of items.")
             .RequireAuthorization(CmsPermissions.ContentRead);
 
         // Before the /{id:int} routes only for readability — the int constraint already stops
@@ -208,6 +253,62 @@ public static class MediaEndpoints
         return result.ToHttpResult(Results.Ok);
     }
 
+    /// <remarks>
+    /// The session is created from a declaration rather than from bytes, so the extension allowlist
+    /// and the size ceiling are applied before the client starts transferring — the alternative is
+    /// an editor watching a progress bar reach the end of a file that was never going to be accepted
+    /// (task P5-08).
+    /// </remarks>
+    private static async Task<IResult> StartUploadAsync(
+        StartChunkedUploadRequest request,
+        IChunkedUploadService uploads,
+        CancellationToken cancellationToken) =>
+        (await uploads.StartAsync(request, cancellationToken))
+        .ToHttpResult(session => Results.Created(
+            $"{CmsApiEndpoints.BasePath}{Prefix}/uploads/{session.UploadId}",
+            session));
+
+    private static async Task<IResult> GetUploadAsync(
+        string uploadId,
+        IChunkedUploadService uploads,
+        CancellationToken cancellationToken) =>
+        (await uploads.GetAsync(uploadId, cancellationToken)).ToHttpResult(Results.Ok);
+
+    /// <remarks>
+    /// Reads the raw request body rather than a form: a part is a slice of a file and has no name,
+    /// no type, and no other fields travelling with it, so multipart framing would be envelope
+    /// around nothing. The service bounds what it reads by the part size it chose, and the endpoint
+    /// carries the matching transport ceiling so Kestrel refuses an oversized body first.
+    /// </remarks>
+    private static async Task<IResult> AppendUploadAsync(
+        string uploadId,
+        int index,
+        HttpRequest request,
+        IChunkedUploadService uploads,
+        CancellationToken cancellationToken) =>
+        (await uploads.AppendAsync(uploadId, index, request.Body, cancellationToken))
+        .ToHttpResult(Results.Ok);
+
+    /// <remarks>
+    /// Answers exactly what the single-request upload answers, deduplication included, because it is
+    /// the same pipeline reached by a different transport. A client can therefore share its
+    /// success handling between the two routes.
+    /// </remarks>
+    private static async Task<IResult> CompleteUploadAsync(
+        string uploadId,
+        IChunkedUploadService uploads,
+        CancellationToken cancellationToken) =>
+        (await uploads.CompleteAsync(uploadId, cancellationToken)).ToHttpResult(upload => upload.Deduplicated
+            ? Results.Ok(upload)
+            : Results.Created($"{CmsApiEndpoints.BasePath}{Prefix}/{upload.Item.Id}", upload));
+
+    private static async Task<IResult> AbandonUploadAsync(
+        string uploadId,
+        IChunkedUploadService uploads,
+        CancellationToken cancellationToken) =>
+        (await uploads.AbandonAsync(uploadId, cancellationToken))
+        .ToHttpResult(discarded => Results.Ok(new { uploadId = discarded }));
+
     private static async Task<IResult> ListAsync(
         IMediaLibraryService library,
         CancellationToken cancellationToken,
@@ -345,6 +446,45 @@ public static class MediaEndpoints
         CancellationToken cancellationToken) =>
         (await library.WhereUsedAsync(id, cancellationToken)).ToHttpResult(Results.Ok);
 
+    /// <summary>
+    /// Signs the URLs a batch of items can be shown at.
+    /// </summary>
+    /// <remarks>
+    /// Batched, and separate from the list endpoint, for two different reasons. Batched because a
+    /// grid of fifty thumbnails must not be fifty requests. Separate because the signing key is a
+    /// delivery concern and the library service does not have one — see <see cref="MediaLinks"/>.
+    /// <para>
+    /// The ids are read back through the library service rather than signed blindly, so an item that
+    /// does not exist, or is in the recycle bin the caller is not looking at, simply produces no
+    /// entry. Signing whatever id arrived would turn this into an oracle for which ids exist.
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> LinksAsync(
+        IMediaLibraryService library,
+        IMediaUrlSigner signer,
+        CancellationToken cancellationToken,
+        string? ids = null)
+    {
+        var wanted = (ids ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(candidate => int.TryParse(candidate, out var id) ? id : 0)
+            .Where(id => id > 0)
+            .Distinct()
+            .Take(MediaQuery.MaxTake)
+            .ToList();
+
+        var links = new List<MediaLinks>(wanted.Count);
+
+        foreach (var id in wanted)
+        {
+            var item = await library.GetAsync(id, cancellationToken);
+
+            if (item.Value is { } detail) links.Add(MediaLinkFactory.For(detail, signer));
+        }
+
+        return Results.Ok(links);
+    }
+
     private static async Task<IResult> ListFoldersAsync(
         IMediaFolderService folders,
         CancellationToken cancellationToken) =>
@@ -398,6 +538,26 @@ public static class MediaEndpoints
 
     /// <summary>Room for the multipart envelope on top of the file itself.</summary>
     private const long MultipartOverheadBytes = 64 * 1024;
+
+    /// <summary>
+    /// The largest body one part of a resumable upload may have (task P5-08).
+    /// </summary>
+    /// <param name="options">The deployment's upload limits.</param>
+    /// <remarks>
+    /// The whole reason the chunked route is safer than the single-request one: the transport
+    /// ceiling here is a <em>part</em>, so a fifty-megabyte video never puts fifty megabytes into
+    /// one request or one buffer. The service applies the same bound again to the bytes it reads, so
+    /// a caller that is not an HTTP request faces it too.
+    /// <para>
+    /// A small allowance on top of the configured part size, because a part that exactly fills it is
+    /// legitimate and a ceiling equal to the payload leaves no room for framing.
+    /// </para>
+    /// </remarks>
+    private sealed class MediaChunkSizeLimit(MediaUploadOptions options) : IRequestSizeLimitMetadata
+    {
+        /// <inheritdoc />
+        public long? MaxRequestBodySize { get; } = options.ChunkBytes + (64L * 1024);
+    }
 
     /// <summary>
     /// The multipart body an upload or a replacement arrives in, once it has been read and bounded.

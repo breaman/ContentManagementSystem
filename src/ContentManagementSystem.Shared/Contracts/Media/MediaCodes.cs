@@ -132,4 +132,25 @@ public static class MediaCodes
 
     /// <summary>The save lost a concurrency race and was refused rather than overwriting the winner.</summary>
     public const string Conflict = "media.conflict";
+
+    /// <summary>The resumable upload session named does not exist, or has expired and been swept.</summary>
+    /// <remarks>
+    /// Distinct from <see cref="NotFound"/> so a client can tell "that file is gone" from "your
+    /// upload timed out"; the remedy for the second is to start a new session and re-send, which is
+    /// something an uploader can do without a person being involved (task P5-08).
+    /// </remarks>
+    public const string UploadSessionNotFound = "media.upload-session-not-found";
+
+    /// <summary>
+    /// The part offered is not the one the session expects next.
+    /// </summary>
+    /// <remarks>
+    /// The response carries the expected index, so the correct client behaviour is to seek there and
+    /// continue rather than to fail — which is what makes an interrupted upload resumable rather
+    /// than merely restartable.
+    /// </remarks>
+    public const string UploadChunkOutOfOrder = "media.upload-chunk-out-of-order";
+
+    /// <summary>The parts received do not add up to the size the session was opened for.</summary>
+    public const string UploadIncomplete = "media.upload-incomplete";
 }

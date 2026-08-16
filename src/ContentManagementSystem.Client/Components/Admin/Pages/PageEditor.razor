@@ -1,7 +1,9 @@
 @page "/admin/pages/{Id:int}"
 @rendermode InteractiveWebAssembly
 @attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Client.Components.Admin.Media
 @using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Fields
 @using ContentManagementSystem.Shared.Contracts.Security
 
 <PageTitle>@(Page?.Summary.Title ?? "Page")</PageTitle>
@@ -84,6 +86,15 @@ else
                                       @onchange="e => Values[slot.Key] = e.Value?.ToString() ?? string.Empty">
                             </textarea>
                         }
+                        else if (slot.FieldTypeKey == FieldTypeKeys.Media)
+                        {
+                            @* The one structured field type with a real control before Phase 6, and
+                               it earns it: a media reference cannot be typed, and the crop it
+                               carries is what makes acceptance criterion P5 #7 reachable at all. *@
+                            <MediaSlotEditor PropertyKey="@slot.Key" Disabled="@(IsBusy || !CanEdit)"
+                                             Value="@Values.GetValueOrDefault(slot.Key, string.Empty)"
+                                             ValueChanged="value => Values[slot.Key] = value" />
+                        }
                         else
                         {
                             <textarea id="@($"zone-{slot.Key}")" class="form-control font-monospace" rows="4"
@@ -92,7 +103,7 @@ else
 
                         <div class="form-text">
                             <code>@slot.Key</code> · @slot.FieldTypeKey
-                            @if (!Editable(slot.FieldTypeKey))
+                            @if (!Editable(slot.FieldTypeKey) && slot.FieldTypeKey != FieldTypeKeys.Media)
                             {
                                 <text>
                                     — shown as stored. A control for this field type arrives with the

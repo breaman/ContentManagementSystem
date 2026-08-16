@@ -1,0 +1,14 @@
+@page "/admin/media"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Media</PageTitle>
+
+<h1>Media</h1>
+<p class="text-body-secondary">
+    Every uploaded file, and the folders that organize them. Editing a picture here changes it on
+    every page showing it — the original bytes are never touched, so reverting is always available.
+</p>
+
+<MediaBrowser />

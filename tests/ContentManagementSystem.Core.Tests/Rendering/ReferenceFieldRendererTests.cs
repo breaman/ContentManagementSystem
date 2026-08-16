@@ -205,10 +205,10 @@ public class ReferenceFieldRendererTests : IDisposable
     }
 
     [Fact]
-    public void MediaRendersThePlaceholderWithItsAltTextAndTagsTheItem()
+    public void AnUnresolvableMediaItemRendersThePlaceholderWithItsAltTextAndTagsTheItem()
     {
-        // Spec section 15.3's answer for a media item that cannot be resolved — which, until P5
-        // builds the library, is every one of them.
+        // Spec section 15.3's answer for an item that has been deleted out from under a page: the
+        // placement's own words, never a broken <img>.
         var context = RenderTagged(
             """{"type":"media","mediaId":812,"altOverride":"A quiet street"}""",
             out var markup);

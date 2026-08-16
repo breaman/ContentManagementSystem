@@ -19,14 +19,32 @@ public static class TestImages
     /// <param name="width">Width in pixels.</param>
     /// <param name="height">Height in pixels.</param>
     /// <param name="format">Format to encode as.</param>
+    /// <param name="unique">
+    /// Whether to tint the image with a random colour so its bytes differ from every other call.
+    /// </param>
     /// <returns>The encoded file.</returns>
-    public static byte[] Encode(int width, int height, SKEncodedImageFormat format = SKEncodedImageFormat.Jpeg)
+    /// <remarks>
+    /// <paramref name="unique"/> exists because the upload pipeline deduplicates on the SHA-256 of
+    /// the content: two fixtures asking for "an 800×600 image" produce identical bytes and therefore
+    /// one library item, so a test arranging two pictures would silently be arranging one. It is off
+    /// by default, since the dedupe tests need exactly that determinism.
+    /// </remarks>
+    public static byte[] Encode(
+        int width,
+        int height,
+        SKEncodedImageFormat format = SKEncodedImageFormat.Jpeg,
+        bool unique = false)
     {
         using var bitmap = new SKBitmap(width, height);
 
         using (var canvas = new SKCanvas(bitmap))
         {
-            canvas.Clear(SKColors.CornflowerBlue);
+            canvas.Clear(unique
+                ? new SKColor(
+                    (byte)Random.Shared.Next(256),
+                    (byte)Random.Shared.Next(256),
+                    (byte)Random.Shared.Next(256))
+                : SKColors.CornflowerBlue);
 
             // A shape rather than a flat fill, so a test that rotates the image can tell which way
             // up the result is.

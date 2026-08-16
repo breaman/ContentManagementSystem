@@ -89,12 +89,16 @@ public class FieldConfigurationSchemaWriterTests
     [Fact]
     public void ASettingNotYetEnforcedSaysSoInBothPlaces()
     {
-        var allowedTypes = Write(FieldTypeKeys.Media).GetProperty("properties").GetProperty("allowedTypes");
+        var deferred = Write(DeferredSettingFieldType.TypeKey)
+            .GetProperty("properties")
+            .GetProperty(DeferredSettingFieldType.DeferredSetting);
 
         // In the description for anything that only renders JSON Schema, and as an annotation for
         // the backoffice, which badges it.
-        allowedTypes.GetProperty("description").GetString().Should().EndWith("Not enforced until P5.");
-        allowedTypes.GetProperty("x-cmsNotEnforcedUntil").GetString().Should().Be("P5");
+        deferred.GetProperty("description").GetString().Should()
+            .EndWith($"Not enforced until {DeferredSettingFieldType.Phase}.");
+        deferred.GetProperty("x-cmsNotEnforcedUntil").GetString().Should()
+            .Be(DeferredSettingFieldType.Phase);
     }
 
     [Fact]
@@ -122,6 +126,7 @@ public class FieldConfigurationSchemaWriterTests
         var provider = new ServiceCollection()
             .AddSingleton<IContentSanitizer, RecordingSanitizer>()
             .AddCmsFieldTypes()
+            .AddCmsFieldType<DeferredSettingFieldType>()
             .BuildServiceProvider();
 
         return provider.GetRequiredService<IFieldTypeRegistry>();

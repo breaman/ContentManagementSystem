@@ -24,6 +24,9 @@ namespace ContentManagementSystem.Rendering;
 /// </remarks>
 public sealed class RenderContext
 {
+    /// <summary>Whether this render's likely Largest Contentful Paint image has been claimed.</summary>
+    private int _lcpClaimed;
+
     /// <summary>
     /// Creates a render context and seeds the cache tags every page response carries.
     /// </summary>
@@ -111,4 +114,28 @@ public sealed class RenderContext
     /// unpublished link target resolves and is badged, or degrades to plain text.
     /// </remarks>
     public bool IsPreview => Mode is CmsRenderMode.Preview or CmsRenderMode.ScheduledPreview;
+
+    /// <summary>
+    /// Claims this render's likely Largest Contentful Paint image, which only the first caller wins.
+    /// </summary>
+    /// <returns><see langword="true"/> for the first image on the page, and false for every other.</returns>
+    /// <remarks>
+    /// Spec section 13.6 asks for <c>loading="eager"</c> and <c>fetchpriority="high"</c> on the first
+    /// image in the first zone, and lazy loading on the rest. That is a fact about the page rather
+    /// than about any one image, so it is settled here — the alternative, a renderer deciding for
+    /// itself, cannot work: an image renderer has no idea whether another one already ran.
+    /// <para>
+    /// <strong>Claimed before the first <c>await</c>, deliberately.</strong> Templates, zones, and
+    /// field renderers begin rendering in document order, and a claim made synchronously at the top
+    /// of <c>OnParametersSet</c> is therefore made in that order too. A claim made after an
+    /// asynchronous resolve would be made in completion order, which is whichever image's database
+    /// query returned first — and eager-loading an image halfway down the page is worse than eager-
+    /// loading none, because it competes with the one that is actually visible.
+    /// </para>
+    /// <para>
+    /// Interlocked because a render is not guaranteed to be single-threaded; the cost is one atomic
+    /// exchange per image, and the failure it prevents is two images both claiming to be the LCP.
+    /// </para>
+    /// </remarks>
+    public bool ClaimLcpImage() => Interlocked.Exchange(ref _lcpClaimed, 1) == 0;
 }

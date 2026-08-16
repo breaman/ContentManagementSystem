@@ -110,6 +110,48 @@ public static class ReferencePath
         return new ReferenceLocation(zoneKey, blockId, propertyKey, blockTypeKey, blockTypeRevision);
     }
 
+    /// <summary>
+    /// Reads back the value a path names.
+    /// </summary>
+    /// <param name="path">The absolute payload path, or null.</param>
+    /// <param name="payload">The payload the path came from.</param>
+    /// <returns>The value, or an undefined element when the path cannot be followed.</returns>
+    /// <remarks>
+    /// The other question a reference's path answers, and the one the media publish check needs: the
+    /// coordinates say <em>where</em> a reference is, this says <em>what</em> is stored there. A
+    /// media placement's alternative-text override and its crop live on that value, and neither can
+    /// be judged from the target row alone — an image with no alt text in the library is perfectly
+    /// publishable on a page that describes it itself (spec section 13.7).
+    /// <para>
+    /// Undefined for anything unfollowable, exactly as <see cref="Parse"/> returns nulls. A caller
+    /// that cannot read the value enforces no rule against it, which is the correct direction: a
+    /// publish must not be refused over a value nobody could find.
+    /// </para>
+    /// </remarks>
+    public static JsonElement Value(string? path, ContentPayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        if (string.IsNullOrEmpty(path)) return default;
+
+        var segments = Split(path);
+
+        if (segments.Count < 2 || segments[0].Name != ContentPayloadMembers.Zones) return default;
+
+        var value = payload.GetZone(segments[1].Name);
+
+        for (var i = 2; i < segments.Count && value.ValueKind is not JsonValueKind.Undefined; i++)
+        {
+            var segment = segments[i];
+
+            value = segment.Index is { } index
+                ? Element(value, segment.Name, index)
+                : Member(value, segment.Name);
+        }
+
+        return value;
+    }
+
     /// <summary>One step of a path: a member name, optionally indexed.</summary>
     private readonly record struct PathSegment(string Name, int? Index);
 
