@@ -1,0 +1,70 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Reference
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Pickers
+
+<div class="cms-field cms-field--page-reference" aria-labelledby="@Field.LabelledBy"
+     aria-describedby="@Field.DescribedBy">
+
+    @if (Chosen.Count == 0)
+    {
+        <p class="cms-field__chosen text-body-secondary" id="@Field.ControlId">No page chosen.</p>
+    }
+    else
+    {
+        <ul class="cms-field__references" id="@Field.ControlId">
+            @for (var index = 0; index < Chosen.Count; index++)
+            {
+                var pageId = Chosen[index];
+                var position = index;
+
+                <li class="cms-field__reference">
+                    <span class="cms-field__reference-title">@Title(pageId)</span>
+
+                    @if (IsMultiple)
+                    {
+                        @* Order is the author's, so it needs controls — and explicit ones, never
+                           drag alone (P6-07 applies the same rule to blocks). *@
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                disabled="@(Field.Disabled || position == 0)"
+                                aria-label="@($"Move {Title(pageId)} up")"
+                                @onclick="() => MoveAsync(position, -1)">
+                            <span class="bi bi-arrow-up" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                disabled="@(Field.Disabled || position == Chosen.Count - 1)"
+                                aria-label="@($"Move {Title(pageId)} down")"
+                                @onclick="() => MoveAsync(position, 1)">
+                            <span class="bi bi-arrow-down" aria-hidden="true"></span>
+                        </button>
+                    }
+
+                    <button type="button" class="btn btn-sm btn-outline-danger"
+                            disabled="@Field.Disabled"
+                            aria-label="@($"Remove {Title(pageId)}")"
+                            @onclick="() => RemoveAsync(pageId)">
+                        <span class="bi bi-x-lg" aria-hidden="true"></span>
+                    </button>
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="cms-field__actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                disabled="@(Field.Disabled || IsFull)" @onclick="() => IsPicking = true">
+            @(IsMultiple ? "Add a page" : Chosen.Count == 0 ? "Choose a page" : "Choose a different page")
+        </button>
+    </div>
+
+    @if (CountRule is { Length: > 0 } rule)
+    {
+        <p class="form-text">@rule</p>
+    }
+
+</div>
+
+<PagePicker IsOpen="IsPicking"
+            AllowedTemplates="AllowedTemplates"
+            Excluded="Chosen"
+            OnPicked="OnPickedAsync"
+            OnCancel="() => IsPicking = false" />

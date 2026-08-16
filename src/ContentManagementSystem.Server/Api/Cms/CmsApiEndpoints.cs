@@ -67,6 +67,7 @@ public static class CmsApiEndpoints
         group.MapRedirectEndpoints();
 
         group.MapPreviewTokenEndpoints();
+        group.MapMarkupPreviewEndpoints();
 
         return group;
     }

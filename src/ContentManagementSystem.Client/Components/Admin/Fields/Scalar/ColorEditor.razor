@@ -1,0 +1,81 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--color">
+
+    @if (Palette.Count > 0)
+    {
+        @* A configured palette is a constraint on the content, so the control offers the palette
+           and nothing else. A free colour picker beside it would let an author pick something the
+           publish check then refuses, which is a worse experience than not offering it. *@
+        <fieldset class="cms-field__palette" disabled="@Field.Disabled"
+                  aria-labelledby="@Field.LabelledBy" aria-describedby="@Field.DescribedBy">
+            @foreach (var swatch in Palette)
+            {
+                <div class="cms-field__swatch">
+                    <input type="radio"
+                           class="cms-field__swatch-input"
+                           name="@Field.ControlId"
+                           id="@SwatchId(swatch)"
+                           checked="@Matches(swatch)"
+                           @onchange="() => WriteColorAsync(swatch)" />
+                    @* The name is the label, not the square. A swatch identified only by its colour
+                       is a control nobody with a colour vision deficiency can tell from the one
+                       beside it (spec section 28). *@
+                    <label class="cms-field__swatch-label" for="@SwatchId(swatch)">
+                        <span class="cms-field__swatch-chip" style="background-color: @swatch"
+                              aria-hidden="true"></span>
+                        <code>@swatch</code>
+                    </label>
+                </div>
+            }
+        </fieldset>
+
+        @if (Chosen is { Length: > 0 } held && !Matches(held))
+        {
+            <p class="form-text text-warning-emphasis" role="status">
+                This page holds <code>@held</code>, which is not in the palette any more. Choosing a
+                swatch replaces it.
+            </p>
+        }
+    }
+    else
+    {
+        <div class="cms-field__color-row">
+            <input type="color"
+                   id="@Field.ControlId"
+                   class="form-control form-control-color"
+                   aria-labelledby="@Field.LabelledBy"
+                   aria-describedby="@DescribedBy"
+                   aria-invalid="@Field.AriaInvalid"
+                   disabled="@Field.Disabled"
+                   value="@(Chosen is { Length: 7 } ? Chosen : "#000000")"
+                   @onchange="OnPickedAsync" />
+
+            @* The hex box is not a duplicate control, it is the accessible one: a native colour
+               picker is a mouse-driven overlay, and typing #1f6feb is how somebody working from a
+               brand document or from the keyboard enters a colour. *@
+            <input type="text"
+                   id="@HexId"
+                   class="form-control cms-field__hex @InvalidClass"
+                   aria-label="Colour as a hex value"
+                   aria-describedby="@DescribedBy"
+                   disabled="@Field.Disabled"
+                   maxlength="7"
+                   placeholder="#RRGGBB"
+                   value="@Chosen"
+                   @onchange="OnTypedAsync" />
+
+            @if (Chosen is { Length: > 0 })
+            {
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        disabled="@Field.Disabled" @onclick="() => WriteColorAsync(null)">
+                    Clear
+                </button>
+            }
+        </div>
+
+        <p class="form-text" id="@FormatId">Six hex digits behind a hash, such as <code>#1f6feb</code>.</p>
+    }
+
+</div>

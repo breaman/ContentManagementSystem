@@ -1,0 +1,62 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Pickers
+
+<li role="treeitem"
+    aria-level="@Level"
+    aria-selected="@((Selected?.Id == Node.Page.Id).ToString().ToLowerInvariant())"
+    aria-expanded="@(Node.Page.HasChildren ? IsExpanded.ToString().ToLowerInvariant() : null)">
+
+    <div class="cms-picker__branch">
+
+        @if (Node.Page.HasChildren)
+        {
+            <button type="button" class="cms-picker__expander"
+                    aria-label="@(IsExpanded ? $"Collapse {Node.Page.Title}" : $"Expand {Node.Page.Title}")"
+                    @onclick="ToggleAsync">
+                <span class="bi @(IsExpanded ? "bi-chevron-down" : "bi-chevron-right")" aria-hidden="true"></span>
+            </button>
+        }
+        else
+        {
+            @* A spacer so leaves line up with their expandable siblings rather than shuffling
+               left. Hidden from assistive technology, which has aria-level for the same job. *@
+            <span class="cms-picker__expander cms-picker__expander--leaf" aria-hidden="true"></span>
+        }
+
+        <button type="button"
+                class="cms-picker__option @(Selected?.Id == Node.Page.Id ? "cms-picker__option--chosen" : "")"
+                disabled="@(!IsAllowed(Node.Page))"
+                @onclick="() => OnSelected.InvokeAsync(Node.Page)">
+            <span class="cms-picker__option-title">@Node.Page.Title</span>
+            <span class="cms-picker__option-meta">
+                <code>@Node.Page.Slug</code>
+                @if (!IsAllowed(Node.Page))
+                {
+                    <text> · not allowed here</text>
+                }
+            </span>
+        </button>
+
+    </div>
+
+    @if (IsExpanded)
+    {
+        <ul role="group">
+            @if (Children is null)
+            {
+                <li role="treeitem" aria-level="@(Level + 1)" class="cms-picker__loading">Loading…</li>
+            }
+            else
+            {
+                @foreach (var child in Children)
+                {
+                    <PagePickerBranch Node="child"
+                                      Level="@(Level + 1)"
+                                      Selected="Selected"
+                                      IsAllowed="IsAllowed"
+                                      OnSelected="OnSelected" />
+                }
+            }
+        </ul>
+    }
+
+</li>

@@ -1,3 +1,4 @@
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Shared.Contracts.Structure;
 
 using Microsoft.AspNetCore.Components;
@@ -33,7 +34,7 @@ public partial class EditingCanvas : ComponentBase
 
     /// <summary>Draws the control inside a zone card.</summary>
     [Parameter]
-    public RenderFragment<ZoneEditorContext>? Editor { get; set; }
+    public RenderFragment<FieldEditorContext>? Editor { get; set; }
 
     /// <summary>Whether the whole canvas is read-only.</summary>
     [Parameter]

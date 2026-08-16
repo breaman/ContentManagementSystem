@@ -1,0 +1,81 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Reference
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Pickers
+
+<div class="cms-field cms-field--reusable" aria-labelledby="@Field.LabelledBy"
+     aria-describedby="@Field.DescribedBy">
+
+    @if (ReusableContentId is null)
+    {
+        <p class="cms-field__chosen text-body-secondary" id="@Field.ControlId">Nothing placed here.</p>
+    }
+    else
+    {
+        <div class="cms-field__chosen" id="@Field.ControlId">
+            <p class="cms-field__chosen-title">
+                <span class="bi bi-recycle" aria-hidden="true"></span>
+                @(Item?.Name ?? $"Item {ReusableContentId}")
+                @if (Item is not null)
+                {
+                    <code>@Item.Key</code>
+                }
+            </p>
+
+            <p class="cms-field__chosen-binding">
+                @if (PinnedVersionId is null)
+                {
+                    <text>
+                        Follows the item — publishing it updates this page and every other page
+                        carrying it, with no republish here.
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        Pinned to one version. Publishing the item will not change what this page
+                        shows.
+                    </text>
+                }
+            </p>
+
+            @if (Item is { PublishedVersionNumber: null })
+            {
+                <p class="cms-field__chosen-warning text-warning-emphasis" role="status">
+                    <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>
+                    This item has never been published, so nothing shows here yet.
+                </p>
+            }
+        </div>
+    }
+
+    <div class="cms-field__actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                disabled="@Field.Disabled" @onclick="() => IsPicking = true">
+            @(ReusableContentId is null ? "Place something" : "Place something else")
+        </button>
+
+        @if (PinnedVersionId is not null)
+        {
+            @* Unpinning is offered here and pinning is not: pinning needs a version to pin to,
+               which the picker resolves, while letting go of a pin needs nothing at all. *@
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    disabled="@Field.Disabled" @onclick="UnpinAsync">
+                Follow the item again
+            </button>
+        }
+
+        @if (ReusableContentId is not null)
+        {
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    disabled="@Field.Disabled" @onclick="ClearAsync">
+                Clear
+            </button>
+        }
+    </div>
+
+</div>
+
+<ReusablePicker IsOpen="IsPicking"
+                AllowedTypes="AllowedTypes"
+                OnPicked="OnPickedAsync"
+                OnCancel="() => IsPicking = false" />

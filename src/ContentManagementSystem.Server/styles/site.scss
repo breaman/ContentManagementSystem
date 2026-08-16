@@ -60,6 +60,434 @@
   field-sizing: content
 }
 
+// ---------------------------------------------------------------------------
+// Content typography (task P6-40)
+//
+// The layer authored prose is rendered in — by the public site, and by the editor's preview pane,
+// which is the point of it being here rather than in a component's scoped stylesheet. Blazor's
+// scoped CSS attributes only the elements it renders statically, and a preview is a MarkupString
+// full of elements nothing knew about at build time, so a scoped rule would style the wrapper and
+// nothing inside it. Acceptance criterion P6 #2 wants those two renderings to match; one shared
+// class is what makes that true rather than approximately true.
+// ---------------------------------------------------------------------------
+
+.cms-content {
+  // A measure rather than the full pane width. Prose set across a wide monitor is prose nobody
+  // finishes a paragraph of, and an editor previewing a zone should see the line length a reader
+  // will get.
+  max-width: 68ch;
+  line-height: 1.6;
+
+  > :first-child { margin-block-start: 0; }
+  > :last-child { margin-block-end: 0; }
+
+  h2, h3, h4, h5, h6 {
+    margin-block: 1.5em 0.5em;
+    line-height: 1.25;
+    text-wrap: balance;
+  }
+
+  p, ul, ol, blockquote, pre, table, figure { margin-block: 0 1em; }
+
+  ul, ol { padding-inline-start: 1.5em; }
+
+  li + li { margin-block-start: 0.25em; }
+
+  blockquote {
+    padding-inline-start: 1em;
+    border-inline-start: 0.25rem solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+  }
+
+  // Wide content scrolls inside itself rather than pushing the pane sideways. A preview pane that
+  // scrolls horizontally is a preview an author has to fight to read.
+  pre, table { overflow-x: auto; }
+
+  pre {
+    padding: 0.75rem 1rem;
+    background: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius);
+  }
+
+  table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    border-collapse: collapse;
+
+    th, td {
+      padding: 0.375rem 0.75rem;
+      border: 1px solid var(--bs-border-color);
+    }
+  }
+
+  img { max-width: 100%; height: auto; }
+
+  a { text-decoration: underline; }
+}
+
+// ---------------------------------------------------------------------------
+// Backoffice field editors (tasks P6-06 to P6-15, P6-40)
+//
+// Shared by every field editor, which is why it is a layer rather than a per-component scoped
+// stylesheet: a zone card, a block's property row, and a reusable item's property all draw the same
+// controls, and three copies of these rules would drift.
+// ---------------------------------------------------------------------------
+
+.cms-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  &__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  &__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__format {
+    margin-inline-start: auto;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+  }
+
+  &__actions,
+  &__insertions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  // Split mode. Two panes side by side above the shell's tablet breakpoint, and stacked below it,
+  // where two columns would each be too narrow to read (spec section 14.4).
+  &__panes { display: grid; gap: 0.75rem; }
+
+  &--split &__panes {
+    @media (min-width: 62em) {
+      grid-template-columns: 1fr 1fr;
+      align-items: start;
+    }
+  }
+
+  &__pane { min-width: 0; }
+
+  &__preview {
+    padding: 0.75rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+  }
+
+  &__preview-label,
+  &__allowlist summary {
+    margin-block-end: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+  }
+
+  &__allowlist {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+
+    code { margin-inline-end: 0.375rem; }
+  }
+
+  &__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.125rem 0.5rem;
+    background: var(--bs-tertiary-bg);
+    border-radius: 2rem;
+  }
+
+  &__tag-entry { display: flex; gap: 0.5rem; }
+
+  &__palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border: 0;
+    padding: 0;
+  }
+
+  &__swatch-chip {
+    display: inline-block;
+    inline-size: 1rem;
+    block-size: 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.125rem;
+    vertical-align: text-bottom;
+  }
+
+  &__swatch-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  &__color-row { display: flex; gap: 0.5rem; align-items: center; }
+
+  &__hex { max-inline-size: 10rem; }
+
+  &__references,
+  &__gallery {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__reference {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__reference-title { flex: 1 1 auto; min-width: 0; }
+
+  &__gallery-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-block-end: 0.5rem;
+  }
+
+  &__gallery-heading {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 0.875rem;
+  }
+
+  &__chosen { margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: baseline; }
+
+  &__chosen-meta,
+  &__chosen-kind,
+  &__chosen-binding,
+  &__chosen-text,
+  &__chosen-target-window {
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+  }
+}
+
+// The editors themselves. CodeMirror and Quill both size to their content by default, which on a
+// long document means a zone card taller than the screen with the action bar somewhere below it.
+.cms-source-editor .cm-editor,
+.cms-wysiwyg-editor .ql-container {
+  max-block-size: 32rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+}
+
+.cms-source-editor .cm-scroller { overflow: auto; }
+
+.cms-preview__body {
+  max-block-size: 32rem;
+  overflow-y: auto;
+}
+
+// The counter. Over the enforced maximum is a refusal and over the advisory one is advice, so they
+// are told apart by word and by weight as well as by colour (spec section 28).
+.cms-field-count {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--bs-secondary-color);
+
+  &__numbers { display: flex; gap: 0.5rem; }
+
+  &--warning &__message { color: var(--bs-warning-text-emphasis); }
+
+  &--over &__message {
+    color: var(--bs-danger-text-emphasis);
+    font-weight: 600;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// The block list (tasks P6-06 and P6-07)
+// ---------------------------------------------------------------------------
+
+.cms-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  &__actions { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.75rem; }
+
+  &__undo { display: flex; align-items: center; gap: 0.75rem; margin: 0; }
+}
+
+.cms-block {
+  border: 1px solid var(--bs-border-color);
+  border-radius: var(--bs-border-radius);
+  background: var(--bs-body-bg);
+
+  &--error { border-color: var(--bs-danger-border-subtle); }
+  &--warning { border-color: var(--bs-warning-border-subtle); }
+  &--drop { outline: 2px dashed var(--bs-primary); outline-offset: 2px; }
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--bs-tertiary-bg);
+    border-radius: var(--bs-border-radius) var(--bs-border-radius) 0 0;
+  }
+
+  &--collapsed &__header { border-radius: var(--bs-border-radius); }
+
+  // Grab only where a pointer can actually use it; the buttons beside it are the real controls.
+  &__grip { cursor: grab; color: var(--bs-secondary-color); }
+
+  &__disclosure {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: start;
+  }
+
+  &__type { font-weight: 600; white-space: nowrap; }
+
+  &__summary {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--bs-secondary-color);
+  }
+
+  &__position { font-size: 0.8125rem; color: var(--bs-secondary-color); white-space: nowrap; }
+
+  &__controls { display: flex; gap: 0.25rem; }
+
+  &__body {
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  &__property-name { margin: 0 0 0.25rem; font-size: 0.9375rem; }
+
+  &__required { color: var(--bs-danger); }
+
+  &__property-help,
+  &__diagnostics,
+  &__property-diagnostics {
+    margin: 0.25rem 0 0;
+    font-size: 0.8125rem;
+  }
+
+  &__diagnostics,
+  &__property-diagnostics { list-style: none; padding: 0; }
+
+  &__diagnostic--error { color: var(--bs-danger-text-emphasis); }
+  &__diagnostic--warning { color: var(--bs-warning-text-emphasis); }
+}
+
+// ---------------------------------------------------------------------------
+// The pickers (task P6-15)
+// ---------------------------------------------------------------------------
+
+.cms-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+
+  &__results,
+  &__tree,
+  &--blocks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  &__results,
+  &__tree { max-block-size: 24rem; overflow-y: auto; }
+
+  &__option {
+    inline-size: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    gap: 0.125rem;
+    padding: 0.375rem 0.5rem;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: var(--bs-border-radius);
+    text-align: start;
+
+    &:hover:not(:disabled) { background: var(--bs-tertiary-bg); }
+
+    // The chosen option is marked by more than a background tint, because a tint is the first thing
+    // to disappear at high contrast or under a colour vision deficiency (spec section 28).
+    &--chosen {
+      border-color: var(--bs-primary);
+      background: var(--bs-primary-bg-subtle);
+      font-weight: 600;
+    }
+
+    &:disabled { opacity: 0.55; }
+  }
+
+  &__option-meta,
+  &__option-help { font-size: 0.8125rem; font-weight: 400; color: var(--bs-secondary-color); }
+
+  &__branch { display: flex; align-items: center; gap: 0.25rem; }
+
+  &__expander {
+    flex: 0 0 auto;
+    inline-size: 1.5rem;
+    background: none;
+    border: 0;
+    color: var(--bs-secondary-color);
+  }
+
+  &__kinds { border: 0; padding: 0; }
+
+  &__destination { display: flex; flex-direction: column; gap: 0.5rem; }
+}
+
 #blazor-error-ui {
   color-scheme: light dark;
   background: lightyellow;

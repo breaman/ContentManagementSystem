@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Components.Admin.Media;
 using ContentManagementSystem.Client.Components.Admin.Pages;
 using ContentManagementSystem.Client.Components.Admin.Reusable;
@@ -175,6 +176,14 @@ public class PageScreenAccessibilityTests
         services.AddScoped<IPageClient, FakePageClient>();
         services.AddScoped<IReusableClient, FakeReusableClient>();
         services.AddScoped<IMediaClient, FakeMediaClient>();
+
+        // The field editor catalog and the preview pipeline the editors reach through
+        // (tasks P6-06 to P6-15). The catalog is the real one: which control an author meets for a
+        // field type is exactly what this gate should be auditing, and stubbing it would have the
+        // audit inspect a screen nobody uses.
+        services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
+        services.AddScoped<IMarkupPreviewClient, FakeMarkupPreviewClient>();
+        services.AddSingleton(TimeProvider.System);
 
         // Two hosting services a real pre-render supplies and a bare collection does not: the
         // uploader's <InputFile> resolves IJSRuntime on construction, and the media item screen

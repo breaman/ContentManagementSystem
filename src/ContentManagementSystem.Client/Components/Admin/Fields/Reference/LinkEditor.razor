@@ -1,0 +1,50 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Reference
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Pickers
+
+<div class="cms-field cms-field--link" aria-labelledby="@Field.LabelledBy"
+     aria-describedby="@Field.DescribedBy">
+
+    @if (Link is { } link)
+    {
+        <p class="cms-field__chosen" id="@Field.ControlId">
+            <span class="bi @Icon" aria-hidden="true"></span>
+            <span class="cms-field__chosen-kind">@LinkKinds.Label(link.Kind ?? "")</span>
+            <span class="cms-field__chosen-target">@link.Describe(PageTitle, MediaName)</span>
+            @if (link.Text is { Length: > 0 } text)
+            {
+                <span class="cms-field__chosen-text">reads as “@text”</span>
+            }
+            @if (link.Target == "_blank")
+            {
+                <span class="cms-field__chosen-target-window">opens in a new tab</span>
+            }
+        </p>
+    }
+    else
+    {
+        <p class="cms-field__chosen text-body-secondary" id="@Field.ControlId">No link set.</p>
+    }
+
+    <div class="cms-field__actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                disabled="@Field.Disabled" @onclick="() => IsPicking = true">
+            @(Link is null ? "Set a link" : "Change the link")
+        </button>
+
+        @if (Link is not null)
+        {
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    disabled="@Field.Disabled" @onclick="ClearAsync">
+                Clear
+            </button>
+        }
+    </div>
+
+</div>
+
+<LinkPicker IsOpen="IsPicking"
+            AllowedKinds="AllowedKinds"
+            Existing="@Value"
+            OnPicked="OnPickedAsync"
+            OnCancel="() => IsPicking = false" />

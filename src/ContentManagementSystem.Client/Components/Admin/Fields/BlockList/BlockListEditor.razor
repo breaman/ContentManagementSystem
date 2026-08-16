@@ -1,0 +1,84 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.BlockList
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-blocks" id="@Field.ControlId"
+     aria-labelledby="@Field.LabelledBy" aria-describedby="@DescribedBy">
+
+    @if (Blocks.Count == 0)
+    {
+        <p class="cms-blocks__empty text-body-secondary">
+            Nothing here yet. Add the first block below.
+        </p>
+    }
+    else
+    {
+        @* An ordered list, because the order is the content. A screen reader entering it is told
+           how many blocks there are, which is the first thing anybody wants to know. *@
+        <ol class="cms-blocks__list">
+            @for (var index = 0; index < Blocks.Count; index++)
+            {
+                var position = index;
+                var block = Blocks[position];
+
+                <BlockCard Block="block"
+                           Position="position"
+                           Count="Blocks.Count"
+                           Field="Field"
+                           BlockType="TypeOf(block)"
+                           Schema="SchemaOf(block)"
+                           IsSchemaLoading="IsSchemaLoading(block)"
+                           IsCollapsed="IsCollapsed(block)"
+                           CanAdd="!IsFull"
+                           OnToggleCollapse="() => ToggleAsync(block)"
+                           OnMove="step => MoveAsync(position, step)"
+                           OnDuplicate="() => DuplicateAsync(position)"
+                           OnDelete="() => DeleteAsync(position)"
+                           OnPropertyChanged="change => OnPropertyChangedAsync(position, change)"
+                           OnDragStart="from => Dragging = from"
+                           OnDropOn="to => DropAsync(to)" />
+            }
+        </ol>
+    }
+
+    @if (Removed is { } removed)
+    {
+        @* Undo sits where the block was and stays until the next change, rather than in a toast
+           that times out. Deleting a block an author spent ten minutes filling in is the one action
+           in this control that is worth being able to take back after reading the screen. *@
+        <div class="cms-blocks__undo alert alert-secondary" role="status">
+            <span>Removed “@removed.Summary”.</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="UndoAsync">
+                <span class="bi bi-arrow-counterclockwise" aria-hidden="true"></span>
+                Put it back
+            </button>
+        </div>
+    }
+
+    <div class="cms-blocks__actions">
+        <button type="button" class="btn btn-sm btn-outline-primary"
+                disabled="@(Field.Disabled || IsFull || Addable.Count == 0)"
+                @onclick="() => IsPicking = true">
+            <span class="bi bi-plus-lg" aria-hidden="true"></span>
+            Add a block
+        </button>
+
+        @if (CountRule is { Length: > 0 } rule)
+        {
+            <span class="cms-blocks__rule form-text" id="@RuleId">@rule</span>
+        }
+    </div>
+
+    @if (Addable.Count == 0 && !IsLoading)
+    {
+        <p class="form-text text-warning-emphasis" role="status">
+            This property allows no block types that this deployment has registered, so nothing can
+            be added to it.
+        </p>
+    }
+
+</div>
+
+<BlockPicker IsOpen="IsPicking"
+             BlockTypes="Addable"
+             OnPicked="OnBlockTypePickedAsync"
+             OnCancel="() => IsPicking = false" />

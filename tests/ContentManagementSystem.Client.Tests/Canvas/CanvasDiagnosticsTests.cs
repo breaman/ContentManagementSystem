@@ -1,4 +1,5 @@
 using ContentManagementSystem.Client.Components.Admin.Canvas;
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Shared.Contracts.Api;
 
 namespace ContentManagementSystem.Client.Tests.Canvas;

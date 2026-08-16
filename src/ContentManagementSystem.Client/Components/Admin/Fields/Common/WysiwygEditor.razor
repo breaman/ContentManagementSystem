@@ -1,0 +1,11 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Common
+@inherits JsEditorComponentBase
+
+@* Quill takes this element over, and appends its toolbar as a SIBLING of it — which is why the
+   teardown in the bundle removes the toolbar explicitly rather than emptying the container.
+
+   No ARIA here, for the reason SourceEditor gives: the name belongs on Quill's own editable
+   element, which it creates inside this one. *@
+<div class="cms-wysiwyg-editor"
+     id="@EditorId"
+     @ref="Host"></div>

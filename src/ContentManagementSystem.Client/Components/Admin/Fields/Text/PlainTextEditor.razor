@@ -1,0 +1,55 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Text
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+
+@* No form-floating wrapper, following the rule the plain zone editor set: the slot's label is the
+   card's heading, and a floating label would print the zone's name a second time inside its own
+   control. *@
+<div class="cms-field cms-field--text">
+
+    <input type="text"
+           id="@Field.ControlId"
+           class="form-control @InvalidClass"
+           aria-labelledby="@Field.LabelledBy"
+           aria-describedby="@DescribedBy"
+           aria-invalid="@Field.AriaInvalid"
+           disabled="@Field.Disabled"
+           maxlength="@HardStop"
+           value="@Text"
+           @oninput="OnInputAsync"
+           @onchange="OnInputAsync" />
+
+    <div class="cms-field__footer">
+
+        <FieldCounter Id="@CountId" Text="@Text" MaxLength="MaxLength" SoftLimit="SoftLimit" />
+
+        @if (CanPreview)
+        {
+            <button type="button" class="btn btn-sm btn-link cms-field__preview-toggle"
+                    aria-expanded="@IsPreviewing.ToString().ToLowerInvariant()"
+                    aria-controls="@PreviewId"
+                    @onclick="() => IsPreviewing = !IsPreviewing">
+                @(IsPreviewing ? "Hide preview" : "Preview")
+            </button>
+        }
+
+    </div>
+
+    @if (Pattern is { Length: > 0 })
+    {
+        <p class="form-text cms-field__pattern" id="@PatternId">@PatternHint</p>
+    }
+
+    @if (IsPreviewing)
+    {
+        @* The template's own typography, not the backoffice's. A preview set in the admin font is a
+           preview of nothing an anonymous reader will ever see. *@
+        <div class="cms-field__preview" id="@PreviewId">
+            <p class="cms-field__preview-label">As the page will show it</p>
+            <div class="cms-content">
+                <p>@Text</p>
+            </div>
+        </div>
+    }
+
+</div>

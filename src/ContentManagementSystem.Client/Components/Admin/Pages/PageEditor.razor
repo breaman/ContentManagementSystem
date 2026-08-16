@@ -2,6 +2,7 @@
 @rendermode InteractiveWebAssembly
 @attribute [Authorize(Roles = CmsRoles.ContentReaders)]
 @using ContentManagementSystem.Client.Components.Admin.Canvas
+@using ContentManagementSystem.Client.Components.Admin.Fields
 @using ContentManagementSystem.Shared.Contracts.Content
 @using ContentManagementSystem.Shared.Contracts.Security
 
@@ -57,10 +58,13 @@ else
                        PageErrorHeading="@ErrorHeading"
                        Status="@StatusLine">
 
+            @* One line, and no switch on the field type: which control fills a zone is the editor
+               catalog's answer (ADR-0014), and the same host draws a block's properties inside a
+               block list, so the two surfaces cannot disagree. *@
             <Editor Context="zone">
-                <PlainZoneEditor Field="zone"
-                                 Value="@Values.GetValueOrDefault(zone.Zone.Key, string.Empty)"
-                                 ValueChanged="value => OnZoneChanged(zone.Zone.Key, value)" />
+                <FieldEditorHost Field="zone"
+                                 Value="@Values.GetValueOrDefault(zone.Slot.Key, string.Empty)"
+                                 ValueChanged="value => OnZoneChanged(zone.Slot.Key, value)" />
             </Editor>
 
             <EmptyState>

@@ -1,0 +1,20 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Pickers
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Client.Components.Admin.Media
+
+<ModalDialog IsOpen="IsOpen"
+             Title="@Title"
+             ConfirmLabel="Done"
+             CanConfirm="true"
+             SizeClass="modal-xl"
+             OnConfirm="OnCancel"
+             OnCancel="OnCancel">
+
+    @* The library's own browser, not a copy of it: same filters, same folders, same uploader, and
+       no chance of the two drifting apart. Choosing a file closes the dialog, so the footer's
+       button is only there for somebody who opened it and changed their mind. *@
+    <MediaBrowser OnPicked="OnPicked"
+                  RestrictToKind="@RestrictToKind"
+                  AllowRecycleBin="false" />
+
+</ModalDialog>

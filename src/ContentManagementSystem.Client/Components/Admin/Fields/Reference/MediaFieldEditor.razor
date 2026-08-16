@@ -1,0 +1,11 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Reference
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Media
+
+@* The control P5-19 already shipped, adapted to the field editor contract rather than reimplemented.
+   It owns the whole of usage-scope editing — the crop, the focal point, and the alternative text for
+   this placement — and none of that changed because the canvas now hosts it. *@
+<MediaSlotEditor PropertyKey="@Field.Slot.Key"
+                 Disabled="@Field.Disabled"
+                 Value="@Value"
+                 ValueChanged="WriteAsync" />

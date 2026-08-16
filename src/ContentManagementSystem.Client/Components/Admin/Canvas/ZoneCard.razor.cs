@@ -1,3 +1,4 @@
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Structure;
@@ -37,7 +38,7 @@ public partial class ZoneCard : ComponentBase
 
     /// <summary>Draws the control that fills the zone.</summary>
     [Parameter]
-    public RenderFragment<ZoneEditorContext>? Editor { get; set; }
+    public RenderFragment<FieldEditorContext>? Editor { get; set; }
 
     /// <summary>
     /// The card's element id, which is also what a deep link to this zone targets.
@@ -58,7 +59,7 @@ public partial class ZoneCard : ComponentBase
         string.IsNullOrWhiteSpace(Zone.Description) ? null : $"{Anchor}-help";
 
     /// <summary>What the card hands to its body.</summary>
-    private ZoneEditorContext Context => new(
+    private FieldEditorContext Context => new(
         Zone,
         $"{Anchor}-control",
         LabelId,

@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
 
@@ -55,6 +56,14 @@ public static class PageEndpoints
         pages.MapGet("/{id:int}", GetAsync)
             .WithName("GetPage")
             .WithSummary("Reads a page's metadata and its draft payload.")
+            .RequireAuthorization(CmsPermissions.ContentRead);
+
+        // For prose. A rich-text zone has to put an address in the document it is writing, so the
+        // one it puts there is the one the CMS resolved rather than one an author remembered
+        // (task P6-11). Property-valued links keep storing the id instead (ADR-0006).
+        pages.MapGet("/{id:int}/link", GetLinkAsync)
+            .WithName("GetPageLink")
+            .WithSummary("Resolves a page's current URL, for inserting a link into rich text.")
             .RequireAuthorization(CmsPermissions.ContentRead);
 
         pages.MapGet("/{id:int}/draft", GetDraftAsync)
@@ -126,6 +135,28 @@ public static class PageEndpoints
         int depth = 1) =>
         (await pages.TreeAsync(parentId, depth, cancellationToken))
         .ToHttpResult(value => Results.Ok(value));
+
+    /// <remarks>
+    /// Resolved with unpublished targets included, because the caller holds <c>Content.Read</c> and
+    /// is looking at the backoffice: an editor linking to a section that goes live next week must be
+    /// able to find its URL. The public delivery path resolves the same ids without that flag, so
+    /// nothing here can leak a draft URL to an anonymous visitor.
+    /// <para>
+    /// A page that does not exist answers <c>404</c> rather than a link with a null URL, which are
+    /// two different facts: "there is no such page" and "that page has no address you may see".
+    /// </para>
+    /// </remarks>
+    private static async Task<IResult> GetLinkAsync(
+        int id,
+        ILinkResolver links,
+        CancellationToken cancellationToken)
+    {
+        var resolved = await links.ResolveAsync([id], includeUnpublished: true, cancellationToken);
+
+        return resolved.TryGetValue(id, out var link)
+            ? Results.Ok(new PageLink(link.PageId, link.Url, link.IsPublished, link.Title))
+            : Results.NotFound();
+    }
 
     private static async Task<IResult> CreateAsync(
         CreatePageRequest request,

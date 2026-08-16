@@ -1,0 +1,52 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--json">
+
+    <textarea id="@Field.ControlId"
+              class="form-control font-monospace @InvalidClass"
+              rows="10"
+              spellcheck="false"
+              aria-labelledby="@Field.LabelledBy"
+              aria-describedby="@DescribedBy"
+              aria-invalid="@(ParseError is null ? Field.AriaInvalid : "true")"
+              disabled="@Field.Disabled"
+              value="@Draft"
+              @oninput="OnInputAsync"></textarea>
+
+    <div class="cms-field__footer">
+
+        @* Parse state is a live region because it is the only thing telling an author whether what
+           they are typing will save at all, and it changes on its own rather than on a click. *@
+        <p class="cms-field__json-state mb-0" id="@StateId" role="status" aria-live="polite">
+            @if (ParseError is { Length: > 0 } error)
+            {
+                <span class="text-danger">
+                    <span class="bi bi-exclamation-octagon-fill" aria-hidden="true"></span>
+                    Not valid JSON yet — @error
+                </span>
+            }
+            else if (Draft.Trim().Length > 0)
+            {
+                <span class="text-success-emphasis">
+                    <span class="bi bi-check-circle-fill" aria-hidden="true"></span>
+                    Valid JSON.
+                </span>
+            }
+        </p>
+
+        <button type="button" class="btn btn-sm btn-link"
+                disabled="@(Field.Disabled || ParseError is not null || Draft.Trim().Length == 0)"
+                @onclick="Reformat">
+            Tidy up
+        </button>
+
+    </div>
+
+    <p class="form-text" id="@ScopeId">
+        Anything here is stored as written and is invisible to search, to where-used, and to cache
+        invalidation. Data that points at a page or an image belongs in a page reference or a media
+        property instead.
+    </p>
+
+</div>

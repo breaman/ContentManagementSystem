@@ -1,3 +1,5 @@
+using ContentManagementSystem.Client.Components.Admin.Fields;
+using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -14,9 +16,10 @@ namespace ContentManagementSystem.Client.Components.Admin.Reusable;
 /// (task P4-11, spec section 9.4).
 /// </summary>
 /// <remarks>
-/// The same plain form the page editor uses — every property a textarea, real editors in Phase 6 —
-/// wrapped around the one thing that makes reusable content different: <strong>publishing here
-/// changes pages nobody on this screen is editing.</strong> Every irreversible action is therefore
+/// The same property form the page editor uses — each control resolved from the field editor catalog
+/// (ADR-0014, P6-06 to P6-15), so an author meets the identical control whether they are filling a
+/// zone or a reusable item — wrapped around the one thing that makes reusable content different:
+/// <strong>publishing here changes pages nobody on this screen is editing.</strong> Every irreversible action is therefore
 /// staged: the screen asks the server what would be affected, shows it, and only then sends the
 /// acknowledged request.
 /// <para>
@@ -115,8 +118,25 @@ public partial class ReusableEditor : ComponentBase
         CanEdit = await HoldsAnyAsync(CmsRoles.ContentEditors);
     }
 
-    /// <summary>Whether the property gets a plain editable control rather than a read-only one.</summary>
-    private static bool Editable(string fieldTypeKey) => PlainSlotValues.Editable(fieldTypeKey);
+    /// <summary>Builds the context one property's editor is drawn with.</summary>
+    /// <param name="slot">The property, as the captured revision recorded it.</param>
+    /// <returns>The ids the control should carry, and the read-only flag.</returns>
+    /// <remarks>
+    /// No diagnostics are threaded through yet: this screen reports a refused save above the form
+    /// rather than against the property it names, which is where the editing canvas (P6-05) has the
+    /// advantage and where this screen will follow it.
+    /// </remarks>
+    private FieldEditorContext ContextFor(CapturedSlot slot) => new(
+        slot,
+        $"prop-{slot.Key}",
+        $"prop-{slot.Key}-name",
+        slot.Description is { Length: > 0 } ? $"prop-{slot.Key}-help" : null,
+        IsBusy || !CanEdit,
+        ZoneSeverity.None,
+        PayloadPath: $"{ContentPayloadMembers.Zones}.{slot.Key}");
+
+    /// <summary>Takes a property's new stored value.</summary>
+    private void OnPropertyChanged(string key, string json) => Values[key] = json;
 
     private async Task SaveAsync() => await WriteAsync(
         "The draft was not saved",

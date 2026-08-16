@@ -60,6 +60,10 @@ public sealed class RichTextFieldType : FieldTypeBase
                 "profile",
                 "How permissive the HTML allowlist is for this property (spec section 20.2).",
                 allowedValues: ["basic", "extended"]),
+            FieldConfigurationSetting.Integer(
+                FieldSettingNames.SoftLimit,
+                "Length the editor's counter starts warning at. Advisory only — nothing refuses a value for passing it.",
+                minimum: 1),
         ]);
 
 

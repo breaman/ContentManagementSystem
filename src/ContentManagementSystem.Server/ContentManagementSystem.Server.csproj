@@ -28,4 +28,30 @@
     <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\js" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\node_modules\bootstrap\dist\js\bootstrap.bundle.min.js" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\js" SkipUnchangedFiles="true" />
   </Target>
+
+  <!--
+    The editor bundles (task P6-08, ADR-0013). CodeMirror and Quill are bundled locally with esbuild
+    rather than loaded from a CDN, so the CSP in spec section 20.5 can stay strict, and they are
+    split per editor so a page with only plain-text zones downloads neither.
+
+    Run as part of Build rather than left to a developer's terminal, which is what D13 means by "CI
+    must run the front-end bundle build, so a missing bundle fails the build rather than the page" —
+    a missing bundle is otherwise invisible until an author opens a zone and finds a textarea where
+    an editor should be.
+
+    Inputs and Outputs make it incremental: the bundle is rebuilt when a source file changes and
+    skipped when nothing has.
+  -->
+  <ItemGroup>
+    <EditorBundleSource Include="$(MSBuildProjectDirectory)\scripts\*.js" />
+    <EditorBundleSource Include="$(MSBuildProjectDirectory)\package.json" />
+  </ItemGroup>
+
+  <Target Name="BuildEditorBundles" BeforeTargets="Build"
+          Inputs="@(EditorBundleSource)"
+          Outputs="$(MSBuildProjectDirectory)\wwwroot\js\cms-source-editor.js;$(MSBuildProjectDirectory)\wwwroot\js\cms-wysiwyg-editor.js">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\js;$(MSBuildProjectDirectory)\wwwroot\css" />
+    <Exec Command="npm run editors" WorkingDirectory="$(MSBuildProjectDirectory)" />
+    <Exec Command="npm run editors-css" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
 </Project>

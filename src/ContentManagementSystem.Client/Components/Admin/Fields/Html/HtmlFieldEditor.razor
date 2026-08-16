@@ -1,0 +1,102 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Html
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+@using ContentManagementSystem.Shared.Contracts.Content
+
+<div class="cms-field cms-field--html cms-field--@(Mode.ToString().ToLowerInvariant())">
+
+    <div class="cms-field__toolbar">
+        <EditorModeSwitch Mode="Mode" ModeChanged="OnModeChangedAsync" />
+    </div>
+
+    @* The permitted-tags banner, and it is persistent rather than a tooltip: the whole point is
+       that an author can see what will survive before they paste something in. *@
+    <details class="cms-field__allowlist" open="@(Removals.Count > 0)">
+        <summary>
+            <span class="bi bi-shield-check" aria-hidden="true"></span>
+            @AllowedSummary
+        </summary>
+        @if (Allowed.Count > 0)
+        {
+            <p class="cms-field__allowlist-tags">
+                @foreach (var tag in Allowed)
+                {
+                    <code>@tag</code>
+                }
+            </p>
+            <p class="form-text">
+                Anything else is removed when this is saved — including every <code>on…</code>
+                handler attribute and every <code>&lt;script&gt;</code>, under every profile.
+            </p>
+        }
+        else
+        {
+            <p class="form-text">The list of permitted elements could not be loaded just now.</p>
+        }
+    </details>
+
+    @* The live warning. This is acceptance criterion P6 #3 and the reason the editor exists in this
+       shape: silent stripping is the number-one "the CMS ate my content" ticket, and the fix is to
+       stop it being silent rather than to stop it happening. *@
+    <div class="cms-field__strip-warning" role="status" aria-live="polite" id="@WarningId">
+        @if (Removals.Count > 0)
+        {
+            <div class="alert alert-warning mb-0">
+                <p class="mb-1">
+                    <span class="bi bi-scissors" aria-hidden="true"></span>
+                    <strong>@WarningSummary</strong>
+                </p>
+                <ul class="mb-0">
+                    @foreach (var removal in Removals.Take(RemovalsShown))
+                    {
+                        <li>
+                            @removal.Describe()
+                            @if (removal.Value is { Length: > 0 } excerpt)
+                            {
+                                @* Encoded, never MarkupString: this is attacker-influenced text. *@
+                                <code>@excerpt</code>
+                            }
+                        </li>
+                    }
+                </ul>
+                @if (Removals.Count > RemovalsShown)
+                {
+                    <p class="mb-0">…and @(Removals.Count - RemovalsShown) more.</p>
+                }
+            </div>
+        }
+    </div>
+
+    <div class="cms-field__panes">
+
+        @if (Mode is not EditorMode.Preview)
+        {
+            <div class="cms-field__pane cms-field__pane--source">
+                <SourceEditor @ref="Source"
+                              Text="@Text"
+                              TextChanged="OnTextChangedAsync"
+                              ReadOnly="@Field.Disabled"
+                              Language="html"
+                              Label="@SurfaceLabel"
+                              OnScrolled="ScrollCallback" />
+            </div>
+        }
+
+        @if (Mode is not EditorMode.Edit)
+        {
+            <div class="cms-field__pane cms-field__pane--preview">
+                <MarkupPreviewPane Id="@PreviewId"
+                                   Source="@Text"
+                                   Format="@MarkupFormats.Html"
+                                   Profile="@ProfileName"
+                                   ScrollTo="@(Mode is EditorMode.Split ? SourceFraction : null)" />
+            </div>
+        }
+
+    </div>
+
+    <div class="cms-field__footer">
+        <FieldCounter Id="@CountId" Text="@Text" MaxLength="MaxLength" SoftLimit="SoftLimit" />
+    </div>
+
+</div>

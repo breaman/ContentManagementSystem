@@ -1,0 +1,32 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--boolean form-check form-switch">
+
+    <input type="checkbox"
+           role="switch"
+           id="@Field.ControlId"
+           class="form-check-input"
+           aria-labelledby="@Field.LabelledBy"
+           aria-describedby="@DescribedBy"
+           aria-invalid="@Field.AriaInvalid"
+           disabled="@Field.Disabled"
+           checked="@IsOn"
+           @onchange="OnChangedAsync" />
+
+    @* A word beside the switch, not a colour and not a position. "On" and "Off" is what a
+       screen reader announces anyway; printing it makes the two states distinguishable in a
+       screenshot, at 200% zoom, and to anyone who cannot tell the two ends of a track apart. *@
+    <label class="form-check-label cms-field__switch-state" for="@Field.ControlId">
+        @(IsOn ? OnLabel : OffLabel)
+    </label>
+
+    @if (IsUnset)
+    {
+        <p class="form-text" id="@UnsetId">
+            Nothing has been chosen here yet, so the page falls back to whatever the template does by
+            default. Touching the switch decides it either way.
+        </p>
+    }
+
+</div>

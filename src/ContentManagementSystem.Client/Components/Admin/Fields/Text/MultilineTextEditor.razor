@@ -1,0 +1,59 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Text
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+
+<div class="cms-field cms-field--multiline">
+
+    <textarea id="@Field.ControlId"
+              class="form-control @InvalidClass"
+              rows="6"
+              aria-labelledby="@Field.LabelledBy"
+              aria-describedby="@DescribedBy"
+              aria-invalid="@Field.AriaInvalid"
+              disabled="@Field.Disabled"
+              maxlength="@HardStop"
+              value="@Text"
+              @oninput="OnInputAsync"
+              @onchange="OnInputAsync"></textarea>
+
+    <div class="cms-field__footer">
+
+        <FieldCounter Id="@CountId" Text="@Text" ShowWords="true"
+                      MaxLength="MaxLength" SoftLimit="SoftLimit" />
+
+        @if (CanPreview)
+        {
+            <button type="button" class="btn btn-sm btn-link cms-field__preview-toggle"
+                    aria-expanded="@IsPreviewing.ToString().ToLowerInvariant()"
+                    aria-controls="@PreviewId"
+                    @onclick="() => IsPreviewing = !IsPreviewing">
+                @(IsPreviewing ? "Hide preview" : "Preview")
+            </button>
+        }
+
+    </div>
+
+    @if (IsPreviewing)
+    {
+        @* Line by line with a <br> between, which is exactly what MultilineTextRenderer emits — not
+           a CSS approximation of it. A preview that used white-space: pre-wrap would also preserve
+           runs of spaces the delivered page collapses, and would be wrong in the one direction an
+           author is most likely to be lining something up in. *@
+        <div class="cms-field__preview" id="@PreviewId">
+            <p class="cms-field__preview-label">As the page will show it</p>
+            <div class="cms-content">
+                <p>
+                    @for (var index = 0; index < Lines.Count; index++)
+                    {
+                        if (index > 0)
+                        {
+                            <br />
+                        }
+                        @Lines[index]
+                    }
+                </p>
+            </div>
+        </div>
+    }
+
+</div>

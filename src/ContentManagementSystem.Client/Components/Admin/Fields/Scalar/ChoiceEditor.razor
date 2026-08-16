@@ -1,0 +1,79 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--choice">
+
+    @if (Options.Count == 0)
+    {
+        @* No option list configured, which the field type reads as "accepts any value". A select
+           with nothing in it would be a control an author cannot use at all. *@
+        <input type="text"
+               id="@Field.ControlId"
+               class="form-control @InvalidClass"
+               aria-labelledby="@Field.LabelledBy"
+               aria-describedby="@Field.DescribedBy"
+               aria-invalid="@Field.AriaInvalid"
+               disabled="@Field.Disabled"
+               value="@Single"
+               @onchange="OnTypedAsync" />
+    }
+    else if (IsMultiple)
+    {
+        @* A checkbox group rather than a multi-select list box: a native multiple select needs
+           Ctrl-click to add a second value and to keep the first, which is undiscoverable, and
+           loses the whole selection to one stray click. *@
+        <fieldset class="cms-field__options" disabled="@Field.Disabled"
+                  aria-labelledby="@Field.LabelledBy" aria-describedby="@DescribedBy">
+            @for (var index = 0; index < Options.Count; index++)
+            {
+                var option = Options[index];
+                var id = OptionId(index, option);
+
+                <div class="form-check">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           id="@id"
+                           checked="@Chosen.Contains(option)"
+                           @onchange="args => OnToggledAsync(option, args)" />
+                    <label class="form-check-label" for="@id">@option</label>
+                </div>
+            }
+        </fieldset>
+
+        @if (CountRule is { Length: > 0 } rule)
+        {
+            <p class="form-text" id="@CountId">@rule</p>
+        }
+    }
+    else
+    {
+        <select id="@Field.ControlId"
+                class="form-select @InvalidClass"
+                aria-labelledby="@Field.LabelledBy"
+                aria-describedby="@Field.DescribedBy"
+                aria-invalid="@Field.AriaInvalid"
+                disabled="@Field.Disabled"
+                value="@Single"
+                @onchange="OnTypedAsync">
+            @* An explicit empty entry, so a non-required property can be put back to nothing.
+               Without it the first option is chosen the moment the control is touched and there is
+               no way to undo that. *@
+            <option value="">@(Field.Slot.IsRequired ? "Choose one…" : "Nothing")</option>
+            @foreach (var option in Options)
+            {
+                <option value="@option" selected="@(option == Single)">@option</option>
+            }
+        </select>
+
+        @if (Single is { Length: > 0 } chosen && !Options.Contains(chosen))
+        {
+            @* Stored content outlives the option list it was authored against. Saying so beats
+               silently dropping the value out of a select that no longer offers it. *@
+            <p class="form-text text-warning-emphasis" role="status">
+                This page holds <code>@chosen</code>, which is no longer one of the options.
+                Choosing something else replaces it.
+            </p>
+        }
+    }
+
+</div>

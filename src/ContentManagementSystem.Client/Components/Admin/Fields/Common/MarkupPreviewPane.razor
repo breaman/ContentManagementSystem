@@ -1,0 +1,64 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Common
+
+<div class="cms-preview" id="@Id">
+
+    <div class="cms-preview__header">
+        <p class="cms-preview__label" id="@($"{Id}-label")">As the page will show it</p>
+
+        @if (IsRendering)
+        {
+            <span class="cms-preview__state" role="status">Rendering…</span>
+        }
+    </div>
+
+    @if (Failed)
+    {
+        <p class="cms-preview__failed alert alert-warning" role="status">
+            <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>
+            The preview could not be rendered just now. What you have typed is untouched — try again
+            in a moment.
+        </p>
+    }
+
+    @* The rendered markup, in the content typography layer rather than the backoffice's. Emitting
+       it as markup is safe because it has been through the same allowlist the delivery path
+       applies, on the server, on this request (ADR-0008). *@
+    <div class="cms-preview__body cms-content"
+         aria-labelledby="@($"{Id}-label")"
+         @ref="Body">
+        @Html
+    </div>
+
+    @if (Removals.Count > 0)
+    {
+        @* The other half of a preview: what publishing will take out. An author who pasted an
+           iframe into a markdown zone finds out here rather than from the live page. *@
+        <div class="cms-preview__removals alert alert-warning" role="status">
+            <p class="cms-preview__removals-heading">
+                <span class="bi bi-scissors" aria-hidden="true"></span>
+                @Summary
+            </p>
+            <ul>
+                @foreach (var removal in Removals.Take(RemovalsShown))
+                {
+                    <li>
+                        @removal.Describe()
+                        @if (removal.Value is { Length: > 0 } excerpt)
+                        {
+                            @* Encoded by Razor, never MarkupString: this is attacker-influenced
+                               text by construction. *@
+                            <code>@excerpt</code>
+                        }
+                    </li>
+                }
+            </ul>
+            @if (Removals.Count > RemovalsShown)
+            {
+                <p class="cms-preview__removals-more">
+                    …and @(Removals.Count - RemovalsShown) more.
+                </p>
+            }
+        </div>
+    }
+
+</div>

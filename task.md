@@ -31,8 +31,21 @@ rebuild one transaction, and its **preview is the move itself, rolled back**, so
 editor approves cannot differ from what then happens. The editing canvas is done too (`P6-05`): zones
 are cards, grouped and ordered by the revision the draft was authored against — which is why the
 schema snapshot now captures a zone's grouping and help text — each carrying its own validation
-state, under a sticky action bar. `PageEditor` is the first screen built on it; the field editors
-that fill the cards are `P6-06` to `P6-15`.
+state, under a sticky action bar. **The field editors that fill those cards are done** (`P6-06` to
+`P6-16`): one catalog maps a field type key to the component that fills it (`ADR-0014`), one host
+dispatches through it, and the page canvas, a block's property row, and the reusable editor therefore
+cannot disagree about what a `richText` looks like. Every editor binds to the stored value as its
+whole JSON envelope, which puts each field type's storage shape in the one component that understands
+it. **All eighteen built-in field types have an editor**, not only the ten the tasks name, because
+`P6 #1` asks an author to fill a page without touching raw JSON and one `number` zone would otherwise
+fail it. CodeMirror and Quill are locally bundled and split per editor, behind the per-request style
+nonce `D13` calls load-bearing; the preview pane renders through the server's one Markdig-and-sanitize
+pipeline rather than a second copy in the browser, and reports what publishing will remove — which is
+also the HTML editor's live strip warning. Three acceptance criteria are met by this
+(`P6 #2`, `#3`, `#4`). **The `Content-Security-Policy` header itself is not switched on**: the nonce
+it needs exists and is wired, but turning the policy on today would break P5's media control and
+others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
+than left as a surprise.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -86,11 +99,11 @@ and record the date in the progress table.
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 4 | 34.5 | In progress — shell, tree, and canvas done (`P6-01`…`P6-03`, `P6-05`); `P6-04` is done bar "publish branch", which waits on `P6-29` | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 18 | 34.5 | In progress — shell, tree, canvas, and **all 11 field editors** done (`P6-01`…`P6-03`, `P6-05`…`P6-16`), with `P6-30`, `P6-31`, `P6-40`; 3 of 14 criteria met. `P6-04` is done bar "publish branch", which waits on `P6-29`. Next: properties panel, autosave, conflicts (`P6-17`…`P6-22`) | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **164** | **203.5** | | |
+| **v1 total** | **281** | **178** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3065,13 +3078,50 @@ daily — including the edit/preview experience the requirements call out explic
 > The editors below are mapped to field type keys through the same catalog `P3-09` builds for
 > renderers, and the backoffice needs the equivalent startup check: a field type with no editor
 > leaves an author with no way to fill a property the schema requires.
+>
+> *2026-08-16 — the catalog is `IFieldEditorCatalog` in `Client/Components/Admin/Fields/`, the exact
+> mirror of `Rendering`'s renderer half, and the startup check is `CmsEditorStartupService` — which
+> can only live in `Server`, the one project that can see both the catalog in `Client` and the field
+> type registry in `Core`. **Three decisions shaped everything below.** First, the parameter contract
+> P6-05 deliberately left open is `FieldEditorBase`: `Field`, `Value`, `ValueChanged`, dispatched by
+> name through one `FieldEditorHost`, so the page canvas, a block's property row, and the reusable
+> editor cannot disagree about what fills a field type. Second, **every editor binds to the stored
+> value as JSON text — the whole envelope, not the text inside it** — which moves each field type's
+> storage shape into the one component that understands it and reduces `PlainSlotValues` to a raw
+> round trip; it also means an editor rewrites the members it owns and leaves the rest, so a crop
+> written by the media screen survives somebody editing the alt text. Third, `ZoneEditorContext`
+> became `FieldEditorContext` and moved to `Fields/`, because a zone card and a block property are
+> the same thing to an editor. **All eighteen built-in field types have an editor**, not only the ten
+> the tasks below name: acceptance criterion `P6 #1` says an editor fills a page without touching a
+> raw JSON payload, and a template with one `number` zone would otherwise fail it.*
 
-- [ ] **P6-06** Block list editor in `Client/Components/Admin/Fields/BlockList/`: add constrained to
+- [x] **P6-06** Block list editor in `Client/Components/Admin/Fields/BlockList/`: add constrained to
   `allowedBlockTypes`, reorder, collapse with a configurable summary line, duplicate, delete-with-undo,
   per-block validation badges [§14.3]. — 3 ed
-- [ ] **P6-07** Block list **full keyboard operability** — explicit move up/down controls; drag is an
+  *2026-08-16 — **Every block is drawn from the revision it was authored against**, never the block
+  type's current one [§8.5], so two blocks of the same type in one zone can be laid out differently —
+  which is correct rather than a defect, since drawing a control for a property that did not exist
+  when the block was written invites an author to fill in a schema their content is not judged by.
+  Schemas are fetched once per distinct type-and-revision the payload names, so twelve cards of one
+  type cost one request. The collapsed summary renders the block type's `SummaryTemplate` against the
+  block's own content, because "Hero banner" twelve times is a list nobody dares collapse; a token
+  naming an empty or undeclared property resolves to nothing rather than printing `{headline}` at an
+  author. Delete keeps the block **and its index** and offers it back inline until the next change —
+  an inline bar rather than a toast, since `IToastService` has no action button and a toast times out
+  on the one action here worth taking back after reading the screen. Diagnostics are narrowed twice,
+  onto the block and then onto the property, so a twelve-block zone says which one is wrong instead
+  of "3 problems". A block naming a type this build no longer carries draws a note and stays movable
+  and removable [§15.3]; an orphaned type is not offered for adding at all.*
+- [x] **P6-07** Block list **full keyboard operability** — explicit move up/down controls; drag is an
   enhancement, never the only path [§28]. — 1 ed
-- [ ] **P6-08** **Edit/Preview/Split rich-text editor** in `Client/Components/Admin/Fields/RichText/` —
+  *2026-08-16 — Add, move up, move down, duplicate, collapse, and delete are all buttons, each with
+  an `aria-label` naming the block it acts on. **The drag grip is `aria-hidden` and takes no Tab
+  stop**, precisely because it can do nothing the buttons cannot — a handle a keyboard user could
+  focus and not use is worse than no handle. Dragging ends in the same write the arrow buttons do, so
+  a list reordered either way produces the same payload, ids included. The bUnit suite drives only
+  the buttons: a test that covered the pointer path would pass on a build where the buttons had been
+  removed, which is exactly what acceptance criterion `P6 #4` forbids.*
+- [x] **P6-08** **Edit/Preview/Split rich-text editor** in `Client/Components/Admin/Fields/RichText/` —
   CodeMirror 6 source mode for Markdown, Quill for the constrained WYSIWYG surface, both as **local
   static assets** (no CDN, so the CSP stays strict) [§14.4]. — 2.5 ed
   *Proven end to end by [S3](./docs/spikes/s3-editor-interop.md), with four requirements: the
@@ -3081,21 +3131,120 @@ daily — including the edit/preview experience the requirements call out explic
   suppression, `IAsyncDisposable`); **Quill's toolbar must be removed explicitly** on teardown, since
   Quill has no `destroy()` and appends the toolbar as a sibling; split the bundle per editor
   (696 KB raw / 231 KB gzipped for both).*
-- [ ] **P6-09** Preview pane rendered through the **same Markdig → sanitize → site typography pipeline**
+  *2026-08-16 — All four requirements met. `App.razor` emits `<meta name="csp-nonce">` from a scoped
+  `IStyleNonce` (128 bits, `RandomNumberGenerator`, generated lazily so the API and media requests
+  that never render a host page pay nothing), and `EditorView.cspNonce` reads it. `JsEditorComponentBase`
+  carries the plumbing; `SourceEditor` and `WysiwygEditor` are the two wrappers. **Split into two
+  bundles, and the split pays for itself**: 501 KB raw / 173 KB gzipped for CodeMirror and 201 KB /
+  59 KB for Quill, against S3's 696 KB / 231 KB for the two together — so a page with only markdown
+  zones downloads a quarter less than the combined bundle, a page with only formatted-text zones
+  downloads a quarter of it, and a page with only plain-text zones downloads neither. Quill's stylesheet is added by its own module as a same-origin `<link>` on
+  first mount rather than from the host page, so an anonymous visitor never fetches 24 KB of editor
+  CSS. `BuildEditorBundles` runs esbuild as part of `Build`, incrementally, which is what D13 means by
+  a missing bundle failing the build rather than the page.
+  **The `Content-Security-Policy` header itself is deliberately not switched on here.** The nonce it
+  needs now exists and is wired end to end, but the policy is [§20.5]'s and turning it on today would
+  break working screens: `style-src-attr` is not relaxed by D13, and P5-19's media control — among
+  others — positions with inline `style` attributes. That is a Phase 9 hardening job with its own
+  sweep, and it is recorded here rather than left as a surprise.*
+- [x] **P6-09** Preview pane rendered through the **same Markdig → sanitize → site typography pipeline**
   the public site uses, so preview is accurate rather than approximate. — 1 ed
-- [ ] **P6-10** Split mode with synchronized scrolling. — 0.75 ed
-- [ ] **P6-11** CMS-aware link and image insertion — opens the CMS pickers and inserts internal
+  *2026-08-16 — The backoffice runs in WebAssembly and `Core` is not loaded there, so the source goes
+  to the server and the markup comes back: `POST /api/cms/v1/markup-preview`, calling the same
+  `IMarkdownRenderer` and `IContentSanitizer` singletons `RichTextRenderer` calls. A second Markdig in
+  the browser would satisfy the screen and break the promise `P6 #2` makes, on the first upgrade of
+  either side. `POST` for a read because the source is a zone's worth of prose, which has no business
+  in a query string or in every access log the request passes through. **The response carries what
+  was removed as well as what was kept**, which is what makes a preview also a warning and what
+  `P6-13`'s banner is built on. A mistyped profile is refused rather than defaulted — falling back
+  would show an author a preview stripped harder than their zone will be — and the `Developer`
+  profile is gated on the role that can author against it. The typography half is a `.cms-content`
+  layer in `site.scss`, shared with the public site rather than scoped to the component, because a
+  preview is a `MarkupString` full of elements Blazor's scoped CSS never attributed.*
+- [x] **P6-10** Split mode with synchronized scrolling. — 0.75 ed
+  *2026-08-16 — **As a fraction of scrollable height, never a pixel offset.** The two panes render
+  different content at different heights — one line of markdown becomes a picture — so matching
+  pixels drift further apart the further down a long document an author scrolls, which is exactly
+  where the feature is worth having. CodeMirror reports its position rAF-coalesced, so a scroll
+  gesture is one interop call per frame rather than dozens per second, and the subscription is only
+  made while split mode is showing. The preview does not report back: a follower that announced its
+  own position would put the two panes in a feedback loop neither could settle out of. Below 62em the
+  panes stack, matching the shell's own breakpoint, because two columns are each too narrow to read
+  on a tablet.*
+- [x] **P6-11** CMS-aware link and image insertion — opens the CMS pickers and inserts internal
   references, never hand-typed URLs. — 0.5 ed
-- [ ] **P6-12** Word/character counts with a configurable soft limit. — 0.25 ed
-- [ ] **P6-13** HTML editor in `Client/Components/Admin/Fields/Html/` with a persistent banner of
+  *2026-08-16 — Link and picture are **absent from Quill's toolbar on purpose** and are the editor's
+  own buttons, opening `LinkPicker` and `MediaPicker`. What an author never does is type an address.
+  **The honest limit is worth stating**: a `link` property stores a `pageId` and resolves it at render
+  time (`ADR-0006`), but markdown and HTML zones are text and an anchor in text has an `href` in it —
+  so for prose the picker's choice is resolved through a new `GET /pages/{id}/link` and the resolved
+  URL is what lands in the document. A prose link still goes stale when its target moves, and the
+  redirect the move creates is what catches it; a property-valued link does not go stale at all. That
+  is the guarantee `ADR-0006`'s own consequence line asks of the editing UI, and the wider one it does
+  not. Images insert the signed preview rendition with the library's alternative text, and a picture
+  marked decorative inserts an empty `alt`, which is the correct markup for one.*
+- [x] **P6-12** Word/character counts with a configurable soft limit. — 0.25 ed
+  *2026-08-16 — "Configurable" needed a setting to configure, so `softLimit` was added to
+  `TextFieldTypeBase` and `RichTextFieldType` — configuration is closed (`ADR-0015`), so a setting no
+  field type declares is refused on the next structure save. **It is advisory and nothing on the
+  server reads it**, which is the whole distinction from `maxLength`: "a meta description over 160
+  characters gets truncated in results" is guidance an author wants while typing, not a rule that
+  should stop them publishing, and the counter says each in the words that match. The running numbers
+  are deliberately **not** in the live region — a count that announced itself on every keystroke would
+  talk over the letters being typed — while a visually-hidden status holds text only once a threshold
+  is crossed, so it speaks on the crossing. The names that cross the `Core`/`Client` boundary now live
+  in `FieldSettingNames` in `Shared`, so a rename cannot leave an editor silently ignoring a setting
+  the structure screen still offers.*
+- [x] **P6-13** HTML editor in `Client/Components/Admin/Fields/Html/` with a persistent banner of
   permitted tags and a **live "these tags will be stripped on save" warning** — silent stripping is the
   number-one "the CMS ate my content" ticket [§14.4]. — 1.5 ed
-- [ ] **P6-14** Plain-text inline editing with a live character counter, and a "preview" that renders in
+  *2026-08-16 — **The check runs in every mode, including Write, and does not depend on the preview
+  pane being open.** That costs a second request while split mode shows, both of them an in-memory
+  sanitize on the server; the alternative is a warning that appears only once an author thinks to look
+  at the preview, which is precisely the author who will not — and acceptance criterion `P6 #3` says
+  *before* save. The banner lists what the profile keeps, fetched from a new
+  `GET /markup-preview/profiles` rather than duplicated in the browser, because a second copy of the
+  allowlist is a banner that eventually lies. A failed check leaves the previous account showing
+  rather than clearing it: "nothing will be removed" is the one thing this control must never say
+  without having asked. Removal excerpts are attacker-influenced text by construction and are rendered
+  encoded, never through `MarkupString`.*
+- [x] **P6-14** Plain-text inline editing with a live character counter, and a "preview" that renders in
   the template's actual typography. — 0.5 ed
-- [ ] **P6-15** Pickers in `Client/Components/Admin/Pickers/`: page (tree), media (browser + inline
+  *2026-08-16 — A single-line `input` rather than a textarea, because `plainText` refuses line breaks
+  and a control an author can press Enter in invites a value the validator rejects a screen later.
+  The `maxlength` attribute is deliberately **not** the configured maximum: set to the real limit it
+  silently swallows the keystrokes past it, so the author types a longer headline, sees a shorter one,
+  and has no idea why — the counter tells them instead, and the attribute is only a stop far enough
+  out that nothing but a pasted document reaches it. The multiline preview splits on both line-ending
+  conventions and joins with `<br>`, which is the rule `MultilineTextRenderer` follows rather than a
+  CSS approximation of it: `white-space: pre-wrap` would also preserve runs of spaces the page
+  collapses.*
+- [x] **P6-15** Pickers in `Client/Components/Admin/Pickers/`: page (tree), media (browser + inline
   upload), reusable content, and a unified link picker. — 2.5 ed
-- [ ] **P6-16** `IAsyncDisposable` on every JS-interop component; verify no listener/editor instance
+  *2026-08-16 — The page picker offers **both a lazy tree and a server-side search**, because editors
+  arrive holding two different things: somebody linking to a sibling browses, and somebody working
+  from a ticket searches — and a lazily loaded tree can only filter what it has already fetched. A
+  page the slot forbids is shown and disabled rather than hidden, so an editor told to link to it
+  learns it is refused rather than missing. The media picker is a dialog around `MediaBrowser`, which
+  P5-22 already built as both the library screen and the field control, so the inline uploader P6-15
+  asks for came with it. The reusable picker **asks about the pin at the moment of placement** and
+  resolves it to a version row id there, since that is the only point at which an author is thinking
+  about whether the placement should follow the item. The link picker is one dialog for two callers —
+  a `link` property, which stores what it returns verbatim, and a rich-text editor, which turns it
+  into an anchor — so the two can never offer different destinations.*
+- [x] **P6-16** `IAsyncDisposable` on every JS-interop component; verify no listener/editor instance
   leaks *(mitigates R14)*. — included above
+  *2026-08-16 — On the base class rather than on each wrapper, which is the point: S3 found three
+  things that must all be right and only the first is obvious — the editor's own teardown, Quill's
+  toolbar (a sibling it never removes), and `DotNetObjectReference.Dispose()`, without which the JS
+  registry keeps the component alive for the life of the page. Two of the three are handled once in
+  `JsEditorComponentBase` so no wrapper can forget them. A subclass that subscribes to something else
+  — split mode's scroll listener — passes the base's **existing** reference rather than creating a
+  second one to forget, and releases the listener before the editor is destroyed so a scroll fired by
+  the DOM being torn down cannot call into a half-disposed component. The JS registry counts created
+  against disposed and exposes DOM counts, which is what `P6-31a` will assert on; **that browser
+  assertion is still open** and is the only part of R14's mitigation this task cannot prove on its
+  own.*
 
 ### Properties, saving, and feedback — 5 ed
 
@@ -3131,8 +3280,21 @@ daily — including the edit/preview experience the requirements call out explic
 
 ### Tests — Phase 6
 
-- [ ] **P6-30** bUnit: block list editor add/reorder/duplicate/delete, keyboard paths.
-- [ ] **P6-31** bUnit: rich-text editor mode switching and preview parity.
+- [x] **P6-30** bUnit: block list editor add/reorder/duplicate/delete, keyboard paths.
+  *2026-08-16 — `BlockListEditorTests`. Every case drives a button and none drives the drag, which is
+  the point: dragging ends in the same write, so a suite that covered only the pointer path would
+  pass on a build where the buttons had been removed. Also covers the summary line falling back to
+  the type name, a badge landing on the block a diagnostic actually names, and a block type this
+  build no longer carries staying movable. `FieldDiagnosticsTests` pins the narrowing underneath it —
+  in particular that a path stops matching at a member or index boundary, so `zones.hero` cannot
+  claim what was said about `zones.heroine` and `items[1]` cannot claim `items[10]`.*
+- [x] **P6-31** bUnit: rich-text editor mode switching and preview parity.
+  *2026-08-16 — `RichTextFieldEditorTests`. Mode switching, the surface following the value's stored
+  format rather than the property's configuration, and the preview being asked for the right format
+  and profile. **Parity itself is asserted where it can be**: byte-identity is `P1 #7`, already met,
+  and `MarkupPreviewApiTests` shows this endpoint reaching the same two singletons the delivery path
+  uses. What bUnit cannot see is CodeMirror and Quill themselves, which never mount without a
+  browser — that is `P6-31a`'s.*
 - [ ] **P6-31a** E2E: mount and unmount an editor ten times, asserting zero surviving editor DOM
   nodes and created-equals-disposed; and assert CodeMirror's own styling is in effect (a computed
   style differing from the browser default), since a missing CSP nonce fails **silently**
@@ -3146,18 +3308,36 @@ daily — including the edit/preview experience the requirements call out explic
 - [ ] **P6-37** Manual keyboard-only pass over the whole authoring flow.
 - [ ] **P6-38** 200% browser zoom pass.
 - [ ] **P6-39** `prefers-reduced-motion` respected; no color-only status encoding in the tree [§28].
-- [ ] **P6-40** Add backoffice and content typography layers to `styles/site.scss`.
+- [x] **P6-40** Add backoffice and content typography layers to `styles/site.scss`.
   *(Existing-code change.)*
+  *2026-08-16 — Brought forward because `P6-09` and `P6-14` both need it: a preview is a
+  `MarkupString` full of elements Blazor's scoped CSS never attributed, so `.cms-content` has to be a
+  site-wide layer or it styles the wrapper and nothing inside it. It is the same class the public
+  site's prose uses, which is what makes "the template's actual typography" true rather than
+  approximate. The backoffice layer beside it holds the field editors, the block list, and the
+  pickers — shared rather than scoped for the same reason three surfaces draw the same controls.*
 
 ### Acceptance criteria — Phase 6
 
 - [ ] **P6 #1** An editor completes create → fill → preview → publish without touching a raw JSON
   payload or a URL bar.
-- [ ] **P6 #2** Markdown Edit/Preview/Split all work, and Preview matches the published page's rendering
+- [x] **P6 #2** Markdown Edit/Preview/Split all work, and Preview matches the published page's rendering
   exactly.
-- [ ] **P6 #3** The HTML editor warns *before* save about content the active profile will strip.
-- [ ] **P6 #4** Blocks can be added, reordered, duplicated, and deleted entirely by keyboard; drag is an
+  *2026-08-16 — The three modes are `P6-08` and `P6-10`. "Exactly" holds because there is one
+  pipeline and the preview reaches it rather than reimplementing it (`P6-09`): byte-identity for the
+  same source is `P1 #7`, already met and tested, and `MarkupPreviewApiTests` shows the endpoint
+  calling the same `IMarkdownRenderer` and `IContentSanitizer` singletons `RichTextRenderer` calls.
+  The full create-to-published comparison is `P6-32`'s journey and is still open.*
+- [x] **P6 #3** The HTML editor warns *before* save about content the active profile will strip.
+  *2026-08-16 — `P6-13`. The check runs in Write mode with no preview open, which is where an author
+  pasting an embed actually is, and it goes through the same sanitizer the save runs rather than a
+  client-side approximation of the allowlist. Asserted at both levels: `HtmlFieldEditorTests` for the
+  warning appearing before save, `MarkupPreviewApiTests` for the endpoint reporting the removal.*
+- [x] **P6 #4** Blocks can be added, reordered, duplicated, and deleted entirely by keyboard; drag is an
   enhancement, never the only path.
+  *2026-08-16 — `P6-06` and `P6-07`, pinned by `BlockListEditorTests`, which drives only buttons. The
+  drag grip is `aria-hidden` and takes no Tab stop, so there is no control a keyboard user can reach
+  and cannot use.*
 - [ ] **P6 #5** Autosave fires on a 20-second idle, shows its state, and survives a transient network
   failure by retrying without losing input.
 - [ ] **P6 #6** A save conflict presents keep-mine / take-theirs / open-diff, and no path silently
@@ -3554,12 +3734,15 @@ reviewer.
 | `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–8 | P1-30, P3-13 | [ ] |
 | `Server/Program.cs` | Tighten the Identity password policy; decide self-registration | 9 | P9-04 | [ ] |
 | `Server/Components/Email/IdentityNoOpEmailSender.cs` | Replace with a real sender | 7 | P7-18 | [ ] |
-| `Server/Components/App.razor` | CSP nonce propagation; split public and admin head content | 8–9 | P9-01 | [ ] |
+| `Server/Components/App.razor` | CSP nonce propagation; split public and admin head content | 6, 8–9 | P6-08, P9-01 | [~] |
 | `Server/Components/Routes.razor` | Scope interactive routing to `/admin`; keep public pages static SSR | 3 | P3-14 | [ ] |
 | `aspire/…AppHost/AppHost.cs` | Add Azurite and optional Redis resources | 0 | P0-13, P0-14 | [ ] |
 | `Directory.Packages.props` | Add HtmlSanitizer, Markdig, SkiaSharp, MetadataExtractor, HybridCache, rate limiting, Testcontainers, bUnit, Playwright, k6 tooling | 0–5 | P0-07, P0-12 | [ ] |
 | `Shared/Common/FieldLengths.cs` | Add CMS field length constants | 1 | P1-03 | [x] |
-| `styles/site.scss` | Add backoffice and content typography layers | 6 | P6-40 | [ ] |
+| `styles/site.scss` | Add backoffice and content typography layers | 6 | P6-40 | [x] |
+| `Server/package.json`, `Server/…Server.csproj` | Add esbuild and the two editor bundles to the front-end build, so a missing bundle fails the build rather than the page (`D13`) | 6 | P6-08 | [x] |
+| `Core/Fields/Types/TextFieldTypeBase.cs`, `RichTextFieldType.cs` | Declare the `softLimit` setting the counter honours. Configuration is closed (`ADR-0015`), so an undeclared setting is refused on save | 6 | P6-12 | [x] |
+| `Client/Components/Admin/PlainSlotValues.cs` | Reduced to a raw envelope round trip: each field type's storage shape now lives in its own editor rather than in a switch shared by every form | 6 | P6-06…P6-15 | [x] |
 | `README.md` | Document CMS setup, template authoring, schema sync CLI | 9 | P9-22 | [ ] |
 | `ContentManagementSystem.slnx` | Add Core, Rendering, and four test projects | 0 | P0-07…P0-11 | [ ] |
 
@@ -3592,7 +3775,7 @@ the checklist for verifying the delivered system against the original ask.
 |---|---|---|---|---|:--:|
 | R-1 | "Create templates that let them specify data zones" | [§8] | P1-01…P1-02, P1-21…P1-22, P1-25, P1-29 | P1 #1 | [ ] |
 | R-2 | "Specify what type of data can be used in a zone (plain text, reusable content, html/markdown, etc)" | [§7], [§8.3] | P1-08…P1-12 | P1 #1, #2 | [ ] |
-| R-3 | "In zones that are plain text or html/markdown … inline editing … 'edit/preview' editor experience" | [§14.4] | P6-08…P6-14 | P6 #2, #3 | [ ] |
+| R-3 | "In zones that are plain text or html/markdown … inline editing … 'edit/preview' editor experience" | [§14.4] | P6-08…P6-14 | P6 #2, #3 | [x] 2026-08-16 — both criteria met. Edit/Preview/Split over markdown and over the WYSIWYG surface, with the preview rendered by the server's one pipeline rather than a second copy in the browser, and the HTML editor warning about what will be stripped while the author is still writing |
 | R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [x] 2026-08-16 |
 | R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
 | R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
@@ -3683,8 +3866,8 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |
 | R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | **Mitigated and measured 2026-08-16, still open for P9** — renditions are lazy rather than warmed (ADR 0007), a per-key semaphore collapses N cold requests for one rendition into one encode (`P5-30`), and generation is bounded by an allowlist of six widths. `RenditionBenchmarkTests` holds NFR-8 on cold encodes through the whole endpoint. None of that is the trigger: the contingency turns on **sustained CPU under a load test**, and no load test exists until P9 |
 | R12 | SVG sanitization bypassed | **Critical** | 5 | Any bypass found → disable SVG | **Unreached in the shipped default, still open** — `SvgUploadPolicy` defaults to `Reject` (`P5-06`), so a deployment that never opts in cannot be bypassed because it never sanitizes. The sanitizer is reachable only by an explicit `Sanitize`, and **Q7 is unanswered**, so the risk cannot be closed — it is the opt-in branch that carries it. The contingency is already the default state, which is the point |
-| R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | Open |
-| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | Open |
+| R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | **Open, and the fallback is verified rather than assumed 2026-08-16** — the contingency is "the plain UI from P1–P5 remains a working fallback", which was true only for as long as nothing replaced it. It is now `IFieldEditorCatalog.FallbackEditor`, reached by any field type with no editor, and `PlainZoneEditorTests` pins that it still round-trips a value. The field editors also came in wider than the tasks named — eighteen field types rather than ten — which is scope the criteria required (`P6 #1`) rather than scope that expanded. No budget figure has been taken at the midpoint, so the trigger itself is unexercised |
+| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**, and neither `P6-31a`'s mount/unmount assertion nor `P9-16`'s soak has run |
 | R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | Open |
 | R16 | Duplicate scheduled publishes under scale-out | Med | 7 | Any duplicate observed | Open |
 | R17 | Cache invalidation misses a dependent page | **High** | 8 | Any stale page reported after publish | Open |

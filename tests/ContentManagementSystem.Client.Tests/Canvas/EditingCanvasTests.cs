@@ -1,6 +1,7 @@
 using Bunit;
 
 using ContentManagementSystem.Client.Components.Admin.Canvas;
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Structure;
@@ -218,10 +219,10 @@ public class EditingCanvasTests : IDisposable
     /// </summary>
     /// <remarks>
     /// Deliberately not <c>PlainZoneEditor</c>: what the canvas promises a body is the contract in
-    /// <see cref="ZoneEditorContext"/>, and testing it through today's textarea would let a change
+    /// <see cref="FieldEditorContext"/>, and testing it through today's textarea would let a change
     /// to that textarea decide whether the contract still holds.
     /// </remarks>
-    private static string Body(ZoneEditorContext context) =>
+    private static string Body(FieldEditorContext context) =>
         $"""
          <input data-editor id="{context.ControlId}" data-disabled="{context.Disabled}"
                 aria-labelledby="{context.LabelledBy}"

@@ -1,43 +1,8 @@
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Shared.Content;
 using ContentManagementSystem.Shared.Contracts.Api;
 
 namespace ContentManagementSystem.Client.Components.Admin.Canvas;
-
-/// <summary>How bad the worst thing said about one zone is.</summary>
-public enum ZoneSeverity
-{
-    /// <summary>Nothing was said about the zone.</summary>
-    None,
-
-    /// <summary>Something worth reading, which does not block a publish.</summary>
-    Warning,
-
-    /// <summary>Something that blocks a publish.</summary>
-    Error,
-}
-
-/// <summary>
-/// What validation said about one zone.
-/// </summary>
-/// <param name="Errors">Everything blocking a publish, in the order validation found it.</param>
-/// <param name="Warnings">Everything non-blocking.</param>
-public sealed record ZoneDiagnostics(
-    IReadOnlyList<ApiDiagnostic> Errors,
-    IReadOnlyList<ApiDiagnostic> Warnings)
-{
-    /// <summary>Nothing at all, which is what most zones have to show.</summary>
-    public static readonly ZoneDiagnostics Empty = new([], []);
-
-    /// <summary>The worst of what was said, which is what the card's badge reports.</summary>
-    public ZoneSeverity Severity => Errors.Count > 0
-        ? ZoneSeverity.Error
-        : Warnings.Count > 0
-            ? ZoneSeverity.Warning
-            : ZoneSeverity.None;
-
-    /// <summary>Whether there is anything at all to show.</summary>
-    public bool Any => Errors.Count > 0 || Warnings.Count > 0;
-}
 
 /// <summary>
 /// Sorts a validation result onto the zone cards it concerns (task P6-05, spec section 14.6).

@@ -3,11 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "devDependencies": {
+    "@codemirror/commands": "~6.10.4",
+    "@codemirror/lang-html": "~6.4.12",
+    "@codemirror/lang-markdown": "~6.5.2",
+    "@codemirror/state": "~6.7.1",
+    "@codemirror/view": "~6.43.8",
     "bootstrap": "~5.3.8",
+    "codemirror": "~6.0.2",
+    "esbuild": "~0.28.2",
+    "quill": "~2.0.3",
     "sass": "~1.97.1"
   },
   "scripts": {
     "sass-dev": "sass --watch ./styles/site.scss ./wwwroot/css/site.css",
-    "sass-prod": "sass --style=compressed ./styles/site.scss ./wwwroot/css/site.css"
+    "sass-prod": "sass --style=compressed ./styles/site.scss ./wwwroot/css/site.css",
+    "editors": "esbuild scripts/cms-source-editor.js scripts/cms-wysiwyg-editor.js --bundle --splitting --format=esm --minify --outdir=wwwroot/js",
+    "editors-css": "node -e \"require('fs').copyFileSync('node_modules/quill/dist/quill.snow.css','wwwroot/css/quill.snow.css')\"",
+    "build": "npm run sass-prod && npm run editors && npm run editors-css"
   }
 }

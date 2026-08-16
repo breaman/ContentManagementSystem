@@ -1,0 +1,18 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--date">
+
+    <input type="date"
+           id="@Field.ControlId"
+           class="form-control @InvalidClass"
+           aria-labelledby="@Field.LabelledBy"
+           aria-describedby="@Field.DescribedBy"
+           aria-invalid="@Field.AriaInvalid"
+           disabled="@Field.Disabled"
+           min="@Min"
+           max="@Max"
+           value="@Stored"
+           @onchange="OnChangedAsync" />
+
+</div>

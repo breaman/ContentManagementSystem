@@ -1,0 +1,6 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields
+
+@* One line of dispatch, and deliberately no switch: which component draws a field type is the
+   catalog's answer (ADR-0014), so a deployment that replaces one does not have to patch the form
+   that hosts it. *@
+<DynamicComponent Type="Editor" Parameters="Parameters" />

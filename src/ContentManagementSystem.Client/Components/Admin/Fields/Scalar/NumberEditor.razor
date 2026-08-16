@@ -1,0 +1,24 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--number">
+
+    <input type="number"
+           id="@Field.ControlId"
+           class="form-control @InvalidClass"
+           aria-labelledby="@Field.LabelledBy"
+           aria-describedby="@DescribedBy"
+           aria-invalid="@Field.AriaInvalid"
+           disabled="@Field.Disabled"
+           min="@Text(Min)"
+           max="@Text(Max)"
+           step="@StepAttribute"
+           value="@Text(Number)"
+           @onchange="OnChangedAsync" />
+
+    @if (Bounds is { Length: > 0 } bounds)
+    {
+        <p class="form-text" id="@BoundsId">@bounds</p>
+    }
+
+</div>

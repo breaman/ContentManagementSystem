@@ -1,10 +1,17 @@
-﻿<!DOCTYPE html>
+﻿@inject ContentManagementSystem.Server.Services.IStyleNonce Nonce
+
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    @* The per-request style nonce, exposed to JavaScript because the library that needs it runs in
+       the browser and the value is generated here (D13, task P6-08). CodeMirror injects its theme as
+       a <style> element at runtime and reads this through EditorView.cspNonce; without it the editor
+       renders unstyled, and does so silently. *@
+    <meta name="csp-nonce" content="@Nonce.Value" />
     <ResourcePreloader />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="@Assets["css/site.css"]" />

@@ -1,3 +1,4 @@
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Shared.Services;
 
@@ -39,5 +40,15 @@ builder.Services.AddScoped<IReusableClient, HttpReusableClient>();
 
 // The media library, the picker, and the resumable uploader; ServerMediaClient is its twin.
 builder.Services.AddScoped<IMediaClient, HttpMediaClient>();
+
+// The editor's preview pane, rendered by the server's one Markdig-and-sanitize pipeline rather than
+// by a second copy of it in the browser (task P6-09). ServerMarkupPreviewClient is its twin.
+builder.Services.AddScoped<IMarkupPreviewClient, HttpMarkupPreviewClient>();
+
+// Which component fills in each field type (ADR-0014, tasks P6-06 to P6-15). A singleton: the
+// mapping is a static table and cannot change without a new build. The server registers the same
+// interface, and additionally checks it against the registered field types at startup — the browser
+// cannot, because the registry is a server-side fact it learns over HTTP.
+builder.Services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
 
 await builder.Build().RunAsync();

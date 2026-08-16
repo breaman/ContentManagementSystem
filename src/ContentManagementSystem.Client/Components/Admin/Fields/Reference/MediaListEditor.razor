@@ -1,0 +1,78 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Reference
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Media
+@using ContentManagementSystem.Client.Components.Admin.Pickers
+
+<div class="cms-field cms-field--media-list" aria-labelledby="@Field.LabelledBy"
+     aria-describedby="@Field.DescribedBy" id="@Field.ControlId">
+
+    @if (Items.Count == 0)
+    {
+        <p class="cms-field__chosen text-body-secondary">Nothing in this gallery yet.</p>
+    }
+    else
+    {
+        <ol class="cms-field__gallery">
+            @for (var index = 0; index < Items.Count; index++)
+            {
+                var position = index;
+
+                <li class="cms-field__gallery-item">
+
+                    <div class="cms-field__gallery-header">
+                        <h4 class="cms-field__gallery-heading" id="@ItemHeadingId(position)">
+                            Picture @(position + 1) of @Items.Count
+                        </h4>
+
+                        @* Explicit move controls, never drag alone — the rule P6-07 states for
+                           blocks applies wherever an author owns an order (spec section 28). *@
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                disabled="@(Field.Disabled || position == 0)"
+                                aria-label="@($"Move picture {position + 1} earlier")"
+                                @onclick="() => MoveAsync(position, -1)">
+                            <span class="bi bi-arrow-up" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                disabled="@(Field.Disabled || position == Items.Count - 1)"
+                                aria-label="@($"Move picture {position + 1} later")"
+                                @onclick="() => MoveAsync(position, 1)">
+                            <span class="bi bi-arrow-down" aria-hidden="true"></span>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                disabled="@Field.Disabled"
+                                aria-label="@($"Remove picture {position + 1}")"
+                                @onclick="() => RemoveAsync(position)">
+                            <span class="bi bi-x-lg" aria-hidden="true"></span>
+                        </button>
+                    </div>
+
+                    @* The single picker's control per item, so a crop means the same thing in a
+                       gallery as it does in a single media property. *@
+                    <MediaSlotEditor PropertyKey="@($"{Field.Slot.Key}-{position}")"
+                                     Disabled="@Field.Disabled"
+                                     Value="@ItemJson(position)"
+                                     ValueChanged="json => OnItemChangedAsync(position, json)" />
+
+                </li>
+            }
+        </ol>
+    }
+
+    <div class="cms-field__actions">
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                disabled="@(Field.Disabled || IsFull)" @onclick="() => IsPicking = true">
+            Add a picture
+        </button>
+    </div>
+
+    @if (CountRule is { Length: > 0 } rule)
+    {
+        <p class="form-text">@rule</p>
+    }
+
+</div>
+
+<MediaPicker IsOpen="IsPicking"
+             Title="Add to the gallery"
+             OnPicked="OnPickedAsync"
+             OnCancel="() => IsPicking = false" />

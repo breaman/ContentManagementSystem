@@ -64,6 +64,10 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
         GetAsync<PageDetail>($"{Base}/pages/{id}", cancellationToken);
 
     /// <inheritdoc />
+    public Task<PageLink?> ResolveLinkAsync(int id, CancellationToken cancellationToken = default) =>
+        GetAsync<PageLink>($"{Base}/pages/{id}/link", cancellationToken);
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<CapturedSlot>> GetZonesAsync(
         int templateId,
         int revision,

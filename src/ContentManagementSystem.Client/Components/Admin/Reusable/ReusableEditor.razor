@@ -1,6 +1,7 @@
 @page "/admin/reusable/{Id:int}"
 @rendermode InteractiveWebAssembly
 @attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Client.Components.Admin.Fields
 @using ContentManagementSystem.Client.Components.Admin.Structure
 @using ContentManagementSystem.Shared.Contracts.Content
 @using ContentManagementSystem.Shared.Contracts.Security
@@ -65,37 +66,32 @@ else
                 @foreach (var slot in Slots)
                 {
                     <div class="mb-3">
-                        <label class="form-label" for="@($"prop-{slot.Key}")">
+                        @* A heading rather than a <label for>, following the zone card: half the
+                           field types are several controls, and a label pointing at one of them is
+                           a lie. The editor names itself with aria-labelledby instead. *@
+                        <p class="form-label" id="@($"prop-{slot.Key}-name")">
                             @slot.Name
                             @if (slot.IsRequired)
                             {
                                 <span class="text-danger" aria-hidden="true">*</span>
                                 <span class="visually-hidden">(required to publish)</span>
                             }
-                        </label>
+                        </p>
 
-                        @if (Editable(slot.FieldTypeKey))
+                        @if (slot.Description is { Length: > 0 } help)
                         {
-                            <textarea id="@($"prop-{slot.Key}")" class="form-control" rows="3"
-                                      value="@Values.GetValueOrDefault(slot.Key)"
-                                      @onchange="e => Values[slot.Key] = e.Value?.ToString() ?? string.Empty">
-                            </textarea>
+                            <p class="form-text" id="@($"prop-{slot.Key}-help")">@help</p>
                         }
-                        else
-                        {
-                            <textarea id="@($"prop-{slot.Key}")" class="form-control font-monospace" rows="4"
-                                      readonly value="@Values.GetValueOrDefault(slot.Key)"></textarea>
-                        }
+
+                        @* The same catalog the page canvas dispatches through (ADR-0014). A reusable
+                           item is a block type's properties and a page zone is a template's, and an
+                           author filling either should meet the same control. *@
+                        <FieldEditorHost Field="ContextFor(slot)"
+                                         Value="@Values.GetValueOrDefault(slot.Key, string.Empty)"
+                                         ValueChanged="value => OnPropertyChanged(slot.Key, value)" />
 
                         <div class="form-text">
                             <code>@slot.Key</code> · @slot.FieldTypeKey
-                            @if (!Editable(slot.FieldTypeKey))
-                            {
-                                <text>
-                                    — shown as stored. A control for this field type arrives with the
-                                    authoring experience in Phase 6.
-                                </text>
-                            }
                         </div>
                     </div>
                 }

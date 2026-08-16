@@ -34,6 +34,11 @@ public abstract class StubPageClient : IPageClient
         CancellationToken cancellationToken = default) => throw Unexpected();
 
     /// <inheritdoc />
+    public virtual Task<PageLink?> ResolveLinkAsync(
+        int id,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
     public virtual Task<IReadOnlyList<CapturedSlot>> GetZonesAsync(
         int templateId,
         int revision,

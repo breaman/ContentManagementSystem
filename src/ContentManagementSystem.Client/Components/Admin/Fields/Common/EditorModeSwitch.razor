@@ -1,0 +1,21 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Common
+
+@* A radio group rather than three buttons: the three modes are one choice with one answer, and a
+   screen reader announcing "Split, radio button, 3 of 3, selected" says what a pressed-looking
+   button does not. Arrow keys move between them for free. *@
+<div class="cms-mode-switch btn-group" role="radiogroup" aria-label="How to show this editor">
+
+    @foreach (var candidate in Modes)
+    {
+        <button type="button"
+                role="radio"
+                class="btn btn-sm @(Mode == candidate ? "btn-secondary" : "btn-outline-secondary")"
+                aria-checked="@((Mode == candidate).ToString().ToLowerInvariant())"
+                title="@Hint(candidate)"
+                @onclick="() => ModeChanged.InvokeAsync(candidate)">
+            <span class="bi @Icon(candidate)" aria-hidden="true"></span>
+            @Label(candidate)
+        </button>
+    }
+
+</div>

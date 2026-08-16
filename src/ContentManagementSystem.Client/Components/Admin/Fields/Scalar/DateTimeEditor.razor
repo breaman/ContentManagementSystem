@@ -1,0 +1,27 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--datetime">
+
+    <input type="datetime-local"
+           id="@Field.ControlId"
+           class="form-control @InvalidClass"
+           aria-labelledby="@Field.LabelledBy"
+           aria-describedby="@DescribedBy"
+           aria-invalid="@Field.AriaInvalid"
+           disabled="@Field.Disabled"
+           value="@Local"
+           @onchange="OnChangedAsync" />
+
+    @* Which clock this is being read on. An instant typed without knowing that is an instant typed
+       in a time zone the author has assumed, and the assumption is only ever discovered by a reader
+       in another one. *@
+    <p class="form-text" id="@ZoneId">
+        Your time (@ZoneName).
+        @if (Stored is { Length: > 0 } stored)
+        {
+            <text>Stored as <code>@stored</code>.</text>
+        }
+    </p>
+
+</div>

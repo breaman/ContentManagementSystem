@@ -1,0 +1,35 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.BlockList
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="Add a block"
+             ConfirmLabel="Add it"
+             CanConfirm="@(Selected is not null)"
+             OnConfirm="ConfirmAsync"
+             OnCancel="OnCancel">
+
+    <ul class="cms-picker cms-picker--blocks" role="listbox" aria-label="Block types">
+        @foreach (var type in BlockTypes)
+        {
+            <li role="option" aria-selected="@(Selected?.Key == type.Key)">
+                <button type="button"
+                        class="cms-picker__option @(Selected?.Key == type.Key ? "cms-picker__option--chosen" : "")"
+                        @onclick="() => Selected = type"
+                        @ondblclick="() => ChooseAsync(type)">
+                    <span class="cms-picker__option-title">
+                        @if (type.IconKey is { Length: > 0 } icon)
+                        {
+                            <span class="bi bi-@icon" aria-hidden="true"></span>
+                        }
+                        @type.Name
+                    </span>
+                    @if (type.Description is { Length: > 0 } description)
+                    {
+                        <span class="cms-picker__option-help">@description</span>
+                    }
+                </button>
+            </li>
+        }
+    </ul>
+
+</ModalDialog>

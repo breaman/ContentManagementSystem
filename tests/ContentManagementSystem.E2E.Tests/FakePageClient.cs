@@ -57,6 +57,10 @@ public sealed class FakePageClient : IPageClient
             null));
 
     /// <inheritdoc />
+    public Task<PageLink?> ResolveLinkAsync(int id, CancellationToken cancellationToken = default) =>
+        Task.FromResult<PageLink?>(new PageLink(id, "/pricing", IsPublished: true, "Pricing"));
+
+    /// <inheritdoc />
     public Task<PageDetail?> GetAsync(int id, CancellationToken cancellationToken = default) =>
         Task.FromResult<PageDetail?>(new PageDetail(
             Summary(Id, "Pricing", "pricing", depth: 0, published: 4, unpublished: true, children: true),

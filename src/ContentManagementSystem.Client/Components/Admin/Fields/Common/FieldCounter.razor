@@ -1,0 +1,31 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Common
+
+<p class="cms-field-count @StateClass mb-0" id="@Id">
+
+    @* The running numbers are NOT in the live region. A count that announced itself on every
+       keystroke would talk over the letters being typed, which is worse than not counting. *@
+    <span class="cms-field-count__numbers">
+        <span>@Format(Characters, "character")</span>
+        @if (ShowWords)
+        {
+            <span class="cms-field-count__words">@Format(Words, "word")</span>
+        }
+        @if (Limit is { } limit)
+        {
+            <span class="cms-field-count__limit">of @limit</span>
+        }
+    </span>
+
+    @* This one is, and it only ever holds text when a threshold has been crossed — so it speaks on
+       the crossing rather than on the typing (spec section 28). *@
+    <span class="cms-field-count__state" role="status" aria-live="polite">
+        @if (Message is { Length: > 0 } message)
+        {
+            <span class="cms-field-count__message">
+                <span class="bi @Icon" aria-hidden="true"></span>
+                @message
+            </span>
+        }
+    </span>
+
+</p>

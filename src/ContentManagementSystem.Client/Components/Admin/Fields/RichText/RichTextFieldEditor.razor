@@ -1,0 +1,99 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.RichText
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+@using ContentManagementSystem.Client.Components.Admin.Pickers
+@using ContentManagementSystem.Shared.Contracts.Content
+
+<div class="cms-field cms-field--rich-text cms-field--@(Mode.ToString().ToLowerInvariant())">
+
+    <div class="cms-field__toolbar">
+
+        <EditorModeSwitch Mode="Mode" ModeChanged="OnModeChangedAsync" />
+
+        @if (Mode is not EditorMode.Preview)
+        {
+            <div class="cms-field__insertions btn-group" role="group" aria-label="Insert">
+                @* The two buttons the WYSIWYG toolbar deliberately does not carry. They open the CMS
+                   pickers, so an internal reference is stored as identity and survives the target
+                   being moved (task P6-11, ADR-0006). *@
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        disabled="@Field.Disabled" @onclick="OpenLinkAsync">
+                    <span class="bi bi-link-45deg" aria-hidden="true"></span>
+                    Link
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        disabled="@Field.Disabled" @onclick="() => IsPickingImage = true">
+                    <span class="bi bi-image" aria-hidden="true"></span>
+                    Picture
+                </button>
+            </div>
+        }
+
+        <span class="cms-field__format">
+            @* Which format the stored value is in, stated rather than assumed. A property switched
+               from markdown to HTML still has to read what is already stored, so the editor follows
+               the value and not the configuration. *@
+            @(IsHtml ? "Formatted text" : "Markdown")
+        </span>
+
+    </div>
+
+    <div class="cms-field__panes">
+
+        @if (Mode is not EditorMode.Preview)
+        {
+            <div class="cms-field__pane cms-field__pane--source">
+                @if (IsHtml)
+                {
+                    <WysiwygEditor @ref="Wysiwyg"
+                                   Text="@Text"
+                                   TextChanged="OnTextChangedAsync"
+                                   ReadOnly="@Field.Disabled"
+                                   Label="@SurfaceLabel" />
+                }
+                else
+                {
+                    <SourceEditor @ref="Source"
+                                  Text="@Text"
+                                  TextChanged="OnTextChangedAsync"
+                                  ReadOnly="@Field.Disabled"
+                                  Language="markdown"
+                                  Label="@SurfaceLabel"
+                                  OnScrolled="ScrollCallback" />
+                }
+            </div>
+        }
+
+        @if (Mode is not EditorMode.Edit)
+        {
+            <div class="cms-field__pane cms-field__pane--preview">
+                <MarkupPreviewPane Id="@PreviewId"
+                                   Source="@Text"
+                                   Format="@(IsHtml ? MarkupFormats.Html : MarkupFormats.Markdown)"
+                                   Profile="@Profile"
+                                   ScrollTo="@(Mode is EditorMode.Split ? SourceFraction : null)" />
+            </div>
+        }
+
+    </div>
+
+    <div class="cms-field__footer">
+        <FieldCounter Id="@CountId" Text="@Text" ShowWords="true"
+                      MaxLength="MaxLength" SoftLimit="SoftLimit" />
+    </div>
+
+</div>
+
+<LinkPicker IsOpen="IsPickingLink"
+            Title="Link to"
+            ConfirmLabel="Insert the link"
+            WantsText="@(SelectedText.Length == 0)"
+            InitialText="@SelectedText"
+            OnPicked="OnLinkPickedAsync"
+            OnCancel="() => IsPickingLink = false" />
+
+<MediaPicker IsOpen="IsPickingImage"
+             Title="Insert a picture"
+             RestrictToKind="image"
+             OnPicked="OnImagePickedAsync"
+             OnCancel="() => IsPickingImage = false" />

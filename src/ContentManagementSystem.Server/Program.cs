@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Fields;
@@ -207,6 +208,12 @@ try
     // resolved is a deployment-time failure rather than a page-time one (task P3-09).
     builder.Services.AddHostedService<CmsRenderingStartupService>();
 
+    // Which component an author fills each field type in with, and the startup check that every
+    // registered field type has one (ADR-0014, tasks P6-06 to P6-15). This is the only place both
+    // halves are in scope: the catalog is in Client and the registry is in Core.
+    builder.Services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
+    builder.Services.AddHostedService<CmsEditorStartupService>();
+
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
 
@@ -216,7 +223,12 @@ try
     builder.Services.AddScoped<IPageClient, ServerPageClient>();
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();
+    builder.Services.AddScoped<IMarkupPreviewClient, ServerMarkupPreviewClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
+
+    // One nonce per request, read by the host page and handed to CodeMirror through a meta tag
+    // (D13, task P6-08). Scoped is what makes "per request" true.
+    builder.Services.AddScoped<IStyleNonce, StyleNonce>();
 
     // The shell's layout store, which can do nothing here: static rendering has no JavaScript, so it
     // answers with the default geometry and the browser restores the editor's own on hydration.

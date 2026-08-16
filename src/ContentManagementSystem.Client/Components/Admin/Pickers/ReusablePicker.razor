@@ -1,0 +1,90 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Pickers
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="Choose reusable content"
+             ConfirmLabel="Place it"
+             CanConfirm="@(Selected is not null)"
+             SizeClass="modal-lg"
+             OnConfirm="ConfirmAsync"
+             OnCancel="OnCancel">
+
+    <div class="cms-picker cms-picker--reusable">
+
+        <div class="cms-picker__search">
+            <label class="form-label" for="@($"{PickerId}-search")">Search by name or key</label>
+            <input type="search" id="@($"{PickerId}-search")" class="form-control"
+                   value="@Search" @oninput="OnSearchAsync" />
+        </div>
+
+        @if (Restriction is { Length: > 0 } restriction)
+        {
+            <p class="form-text">@restriction</p>
+        }
+
+        @if (Items is null)
+        {
+            <p role="status">Loading the library…</p>
+        }
+        else if (Items.Count == 0)
+        {
+            <p role="status">Nothing in the library matches that.</p>
+        }
+        else
+        {
+            <ul class="cms-picker__results" role="listbox" aria-label="Reusable content">
+                @foreach (var item in Items)
+                {
+                    <li role="option" aria-selected="@(Selected?.Id == item.Id)">
+                        <button type="button"
+                                class="cms-picker__option @(Selected?.Id == item.Id ? "cms-picker__option--chosen" : "")"
+                                disabled="@(!IsAllowed(item))"
+                                @onclick="() => Selected = item">
+                            <span class="cms-picker__option-title">@item.Name</span>
+                            <span class="cms-picker__option-meta">
+                                <code>@item.Key</code> · @item.BlockTypeKey
+                                @if (item.PublishedVersionNumber is null)
+                                {
+                                    @* Placing an unpublished item is allowed and renders nothing
+                                       until somebody publishes it, which is a surprise worth
+                                       spending a line to avoid. *@
+                                    <text> · </text>
+                                    <span class="text-warning-emphasis">not published yet</span>
+                                }
+                                else if (item.HasUnpublishedChanges)
+                                {
+                                    <text> · showing v@item.PublishedVersionNumber</text>
+                                }
+                                @if (!IsAllowed(item))
+                                {
+                                    <text> · not allowed here</text>
+                                }
+                            </span>
+                            @if (item.Description is { Length: > 0 } description)
+                            {
+                                <span class="cms-picker__option-help">@description</span>
+                            }
+                        </button>
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (Selected is not null)
+        {
+            <div class="cms-picker__pin form-check">
+                <input class="form-check-input" type="checkbox" id="@($"{PickerId}-pin")"
+                       checked="@IsPinned" @onchange="args => IsPinned = (bool?)args.Value ?? false" />
+                <label class="form-check-label" for="@($"{PickerId}-pin")">
+                    Keep showing the version that is published right now, even after it is republished
+                </label>
+                <p class="form-text">
+                    Leave this off and the page follows the item, which is what makes one publish of a
+                    shared banner update every page carrying it.
+                </p>
+            </div>
+        }
+
+    </div>
+
+</ModalDialog>

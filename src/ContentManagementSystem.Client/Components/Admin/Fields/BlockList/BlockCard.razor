@@ -1,0 +1,176 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.BlockList
+@using ContentManagementSystem.Client.Components.Admin.Fields
+
+<li class="cms-block @SeverityClass @(IsCollapsed ? "cms-block--collapsed" : "")"
+    id="@CardId"
+    draggable="@(Field.Disabled ? "false" : "true")"
+    @ondragstart="() => OnDragStart.InvokeAsync(Position)"
+    @ondragover:preventDefault="true"
+    @ondragover="() => IsDropTarget = true"
+    @ondragleave="() => IsDropTarget = false"
+    @ondrop="OnDropAsync">
+
+    <div class="cms-block__header">
+
+        @* The drag handle is an enhancement and says so: it is aria-hidden and not focusable,
+           because everything it can do is also on the buttons beside it (P6-07). A handle that took
+           a Tab stop would add a control a keyboard user can reach and cannot use. *@
+        <span class="cms-block__grip bi bi-grip-vertical" aria-hidden="true"></span>
+
+        <button type="button"
+                class="cms-block__disclosure"
+                aria-expanded="@((!IsCollapsed).ToString().ToLowerInvariant())"
+                aria-controls="@BodyId"
+                @onclick="() => OnToggleCollapse.InvokeAsync()">
+            <span class="bi @(IsCollapsed ? "bi-chevron-right" : "bi-chevron-down")" aria-hidden="true"></span>
+            <span class="cms-block__type">
+                @if (BlockType?.IconKey is { Length: > 0 } icon)
+                {
+                    <span class="bi bi-@icon" aria-hidden="true"></span>
+                }
+                @TypeName
+            </span>
+            <span class="cms-block__summary">@Summary</span>
+        </button>
+
+        @if (Diagnostics.Any)
+        {
+            @* A word and a count, never a colour alone (P6-39). *@
+            <span class="badge @BadgeClass cms-block__badge">@BadgeText</span>
+        }
+
+        <span class="cms-block__position">@(Position + 1) of @Count</span>
+
+        <div class="cms-block__controls">
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    disabled="@(Field.Disabled || Position == 0)"
+                    aria-label="@($"Move {Summary} up")"
+                    @onclick="() => OnMove.InvokeAsync(-1)">
+                <span class="bi bi-arrow-up" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    disabled="@(Field.Disabled || Position == Count - 1)"
+                    aria-label="@($"Move {Summary} down")"
+                    @onclick="() => OnMove.InvokeAsync(1)">
+                <span class="bi bi-arrow-down" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary"
+                    disabled="@(Field.Disabled || !CanAdd)"
+                    aria-label="@($"Duplicate {Summary}")"
+                    @onclick="() => OnDuplicate.InvokeAsync()">
+                <span class="bi bi-copy" aria-hidden="true"></span>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger"
+                    disabled="@Field.Disabled"
+                    aria-label="@($"Remove {Summary}")"
+                    @onclick="() => OnDelete.InvokeAsync()">
+                <span class="bi bi-trash" aria-hidden="true"></span>
+            </button>
+        </div>
+
+    </div>
+
+    <div class="cms-block__body" id="@BodyId" hidden="@IsCollapsed">
+
+        @if (BlockType is null)
+        {
+            <p class="alert alert-warning mb-0" role="status">
+                This block was authored against <code>@Block.BlockTypeKey</code>, which this
+                deployment no longer has. Its content is kept and saved back untouched; it can be
+                moved or removed from here, and it renders nothing on the site.
+            </p>
+        }
+        else if (IsSchemaLoading)
+        {
+            <p role="status">Loading this block's properties…</p>
+        }
+        else if (Schema.Count == 0)
+        {
+            <p class="text-body-secondary mb-0">
+                The revision this block was written against declared no properties.
+            </p>
+        }
+        else
+        {
+            @foreach (var slot in Schema)
+            {
+                var property = slot;
+
+                <div class="cms-block__property" id="@PropertyAnchor(property.Key)" tabindex="-1">
+
+                    <div class="cms-block__property-header">
+                        <h5 class="cms-block__property-name" id="@LabelId(property.Key)">
+                            @property.Name
+                            @if (property.IsRequired)
+                            {
+                                <span class="cms-block__required" aria-hidden="true">*</span>
+                                <span class="visually-hidden">(required to publish)</span>
+                            }
+                        </h5>
+                    </div>
+
+                    @if (property.Description is { Length: > 0 } help)
+                    {
+                        <p class="cms-block__property-help" id="@HelpId(property.Key)">@help</p>
+                    }
+
+                    @* The same catalog the canvas dispatches through, so a rich-text editor inside a
+                       block is the identical component to one filling a zone (ADR-0014). *@
+                    <FieldEditorHost Field="ContextFor(property)"
+                                     Value="@Block.ValueOf(property.Key)"
+                                     ValueChanged="json => OnPropertyChanged.InvokeAsync(new BlockPropertyChange(property.Key, json))" />
+
+                    @if (DiagnosticsFor(property.Key) is { Any: true } inside)
+                    {
+                        <ul class="cms-block__property-diagnostics">
+                            @foreach (var diagnostic in inside.Errors)
+                            {
+                                <li class="cms-block__diagnostic cms-block__diagnostic--error">
+                                    <span class="bi bi-exclamation-octagon-fill" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Blocking:</span>
+                                    @diagnostic.Message
+                                </li>
+                            }
+                            @foreach (var diagnostic in inside.Warnings)
+                            {
+                                <li class="cms-block__diagnostic cms-block__diagnostic--warning">
+                                    <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Worth checking:</span>
+                                    @diagnostic.Message
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                </div>
+            }
+        }
+
+        @if (BlockDiagnostics.Any)
+        {
+            @* Anything said about the block itself rather than about one of its properties — a
+               missing id, a type the property does not allow — which would otherwise have no row
+               to land on. *@
+            <ul class="cms-block__diagnostics">
+                @foreach (var diagnostic in BlockDiagnostics.Errors)
+                {
+                    <li class="cms-block__diagnostic cms-block__diagnostic--error">
+                        <span class="bi bi-exclamation-octagon-fill" aria-hidden="true"></span>
+                        <span class="visually-hidden">Blocking:</span>
+                        @diagnostic.Message
+                    </li>
+                }
+                @foreach (var diagnostic in BlockDiagnostics.Warnings)
+                {
+                    <li class="cms-block__diagnostic cms-block__diagnostic--warning">
+                        <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>
+                        <span class="visually-hidden">Worth checking:</span>
+                        @diagnostic.Message
+                    </li>
+                }
+            </ul>
+        }
+
+    </div>
+
+</li>

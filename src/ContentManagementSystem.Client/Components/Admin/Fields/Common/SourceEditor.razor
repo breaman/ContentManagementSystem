@@ -1,0 +1,13 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Common
+@inherits JsEditorComponentBase
+
+@* CodeMirror mounts into this element and owns everything beneath it. Blazor renders nothing
+   inside, so its diffing never fights the editor over the DOM.
+
+   No ARIA here on purpose: a bare <div> may not carry aria-label, and the label would not reach
+   the control anyway — CodeMirror's editable surface is a contenteditable element it creates
+   inside this one. The name is set on that element when the editor mounts. *@
+<div class="cms-source-editor"
+     id="@EditorId"
+     data-readonly="@(ReadOnly ? "" : null)"
+     @ref="Host"></div>

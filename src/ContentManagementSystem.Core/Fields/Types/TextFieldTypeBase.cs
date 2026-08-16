@@ -37,6 +37,10 @@ public abstract class TextFieldTypeBase : FieldTypeBase
             FieldConfigurationSetting.Text(
                 "patternMessage",
                 "What to tell an editor when a value does not match the pattern. The default says only that the format is wrong, which a pattern of any complexity makes useless."),
+            FieldConfigurationSetting.Integer(
+                FieldSettingNames.SoftLimit,
+                "Length the editor's counter starts warning at. Advisory only — nothing refuses a value for passing it.",
+                minimum: 1),
         ],
         [new FieldSettingRange("minLength", "maxLength")]);
 

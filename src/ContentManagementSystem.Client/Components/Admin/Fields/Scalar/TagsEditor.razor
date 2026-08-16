@@ -1,0 +1,60 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Fields.Scalar
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
+
+<div class="cms-field cms-field--tags">
+
+    @if (Tags.Count > 0)
+    {
+        @* A list, not a row of divs: the count is what a screen reader announces on entering it,
+           and "list of 7 items" is the fastest way to learn how many tags a page carries. *@
+        <ul class="cms-field__tags" aria-labelledby="@Field.LabelledBy">
+            @foreach (var tag in Tags)
+            {
+                <li class="cms-field__tag">
+                    <span class="cms-field__tag-text">@tag</span>
+                    <button type="button" class="btn-close cms-field__tag-remove"
+                            disabled="@Field.Disabled"
+                            aria-label="@($"Remove the tag {tag}")"
+                            @onclick="() => RemoveAsync(tag)"></button>
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="cms-field__tag-entry">
+        <input type="text"
+               id="@Field.ControlId"
+               class="form-control @InvalidClass"
+               aria-labelledby="@Field.LabelledBy"
+               aria-describedby="@DescribedBy"
+               aria-invalid="@Field.AriaInvalid"
+               disabled="@(Field.Disabled || IsFull)"
+               maxlength="@MaxLength"
+               placeholder="Add a tag"
+               value="@Draft"
+               @oninput="args => Draft = args.Value?.ToString() ?? string.Empty"
+               @onkeydown="OnKeyDownAsync" />
+
+        <button type="button" class="btn btn-outline-secondary"
+                disabled="@(Field.Disabled || IsFull || Draft.Trim().Length == 0)"
+                @onclick="() => AddAsync(Draft)">
+            Add
+        </button>
+    </div>
+
+    <p class="form-text" id="@HintId">
+        @* Enter adds, and so does the button. A control whose only affordance is a key nobody
+           mentioned is a control half the people using it will type a comma into instead — which is
+           why a comma adds too. *@
+        Press Enter or comma to add each tag.
+        @if (CountRule is { Length: > 0 } rule)
+        {
+            <text>@rule</text>
+        }
+        @if (IsFull)
+        {
+            <text>You have added as many as this property allows.</text>
+        }
+    </p>
+
+</div>

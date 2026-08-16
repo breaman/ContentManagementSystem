@@ -1,6 +1,5 @@
 @namespace ContentManagementSystem.Client.Components.Admin.Canvas
-@using ContentManagementSystem.Client.Components.Admin.Media
-@using ContentManagementSystem.Shared.Contracts.Fields
+@inherits ContentManagementSystem.Client.Components.Admin.Fields.FieldEditorBase
 
 @* No form-floating wrapper here, and that is not an oversight: the zone's label is the card's
    heading, and a floating label would print the zone's name a second time inside its own control. *@
@@ -12,24 +11,17 @@
               aria-describedby="@Field.DescribedBy"
               aria-invalid="@Field.AriaInvalid"
               disabled="@Field.Disabled"
-              value="@Value"
+              value="@Text"
               @onchange="OnChangedAsync"></textarea>
-}
-else if (Field.Zone.FieldTypeKey == FieldTypeKeys.Media)
-{
-    <MediaSlotEditor PropertyKey="@Field.Zone.Key"
-                     Disabled="@Field.Disabled"
-                     Value="@Value"
-                     ValueChanged="OnValueAsync" />
 }
 else
 {
     <textarea id="@Field.ControlId" class="form-control font-monospace" rows="4" readonly
               aria-labelledby="@Field.LabelledBy"
               aria-describedby="@Field.DescribedBy"
-              value="@Value"></textarea>
+              value="@Stored"></textarea>
     <p class="form-text">
-        Shown as stored. A control for <code>@Field.Zone.FieldTypeKey</code> arrives with the field
-        editors in P6-06 to P6-15; until then this zone is edited elsewhere and saved back untouched.
+        Shown as stored. No editor is registered for <code>@Field.Slot.FieldTypeKey</code> in this
+        build, so this zone is edited elsewhere and saved back untouched.
     </p>
 }

@@ -15,10 +15,15 @@ namespace ContentManagementSystem.Client.Components.Admin.Pages;
 /// </summary>
 /// <remarks>
 /// The zones are laid out by <see cref="EditingCanvas"/> — grouped, ordered, and each card carrying
-/// its own validation state — and the controls inside the cards are still
-/// <see cref="PlainZoneEditor"/> until the field editors of P6-06 to P6-15 arrive. What this screen
-/// owns is the loop around them: reading a page, folding the cards back into a payload envelope, and
-/// the four writes in the action bar.
+/// its own validation state — and the control inside each card comes from the field editor catalog
+/// through <c>FieldEditorHost</c> (ADR-0014, P6-06 to P6-15). What this screen owns is the loop
+/// around them: reading a page, folding the cards back into a payload envelope, and the four writes
+/// in the action bar.
+/// <para>
+/// It holds each zone's value as the stored JSON envelope rather than as the text inside it, which
+/// is what lets it stay ignorant of every field type: a <c>richText</c> value keeps its format
+/// beside its text and a <c>media</c> value keeps a crop, and neither fact is this screen's.
+/// </para>
 /// <para>
 /// The form is built from the revision the draft <em>captured</em>, never from the template's
 /// current zones (spec section 8.5). A page authored before a zone was added has no value under that

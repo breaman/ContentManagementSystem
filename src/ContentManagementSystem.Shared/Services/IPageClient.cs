@@ -43,6 +43,17 @@ public interface IPageClient
     /// <param name="cancellationToken">Token observed while loading.</param>
     Task<PageDetail?> GetAsync(int id, CancellationToken cancellationToken = default);
 
+    /// <summary>Resolves a page's current URL, for writing a link into rich text (task P6-11).</summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while loading.</param>
+    /// <returns>Where the page sits, or null when there is no such page.</returns>
+    /// <remarks>
+    /// Only prose needs this. A <c>link</c> or <c>pageReference</c> property stores the id and lets
+    /// the renderer resolve it late, which is what makes those links survive a move (ADR-0006); a
+    /// markdown or HTML zone is text and has to carry an address.
+    /// </remarks>
+    Task<PageLink?> ResolveLinkAsync(int id, CancellationToken cancellationToken = default);
+
     /// <summary>Reads the zone definitions of the revision a draft was authored against.</summary>
     /// <param name="templateId">Identity of the template.</param>
     /// <param name="revision">The captured revision (spec section 8.5).</param>

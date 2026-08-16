@@ -1,0 +1,82 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Pickers
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="@Title"
+             ConfirmLabel="Choose"
+             CanConfirm="@(Selected is not null)"
+             SizeClass="modal-lg"
+             OnConfirm="ConfirmAsync"
+             OnCancel="OnCancel">
+
+    <div class="cms-picker cms-picker--page">
+
+        <div class="cms-picker__search">
+            <label class="form-label" for="@($"{PickerId}-search")">Search by title, slug, or id</label>
+            <input type="search" id="@($"{PickerId}-search")" class="form-control"
+                   value="@Search" @oninput="OnSearchAsync" />
+        </div>
+
+        @if (Restriction is { Length: > 0 } restriction)
+        {
+            <p class="form-text">@restriction</p>
+        }
+
+        @if (IsSearching)
+        {
+            <p role="status">Searching…</p>
+        }
+        else if (Search is { Length: > 0 })
+        {
+            @* A flat result list rather than a pruned tree, for the reason the backoffice tree's own
+               filter gives: a lazily loaded tree can only hide what it has already fetched, so a
+               pruning filter would answer "no results" for most of the site. *@
+            @if (Results.Count == 0)
+            {
+                <p role="status">Nothing matches that.</p>
+            }
+            else
+            {
+                <ul class="cms-picker__results" role="listbox" aria-label="Matching pages">
+                    @foreach (var match in Results)
+                    {
+                        <li role="option" aria-selected="@IsChosen(match)">
+                            <button type="button"
+                                    class="cms-picker__option @(IsChosen(match) ? "cms-picker__option--chosen" : "")"
+                                    disabled="@(!IsAllowed(match))"
+                                    @onclick="() => Selected = match">
+                                <span class="cms-picker__option-title">@match.Title</span>
+                                <span class="cms-picker__option-meta">
+                                    <code>@match.Slug</code> · @match.TemplateKey
+                                    @if (!IsAllowed(match))
+                                    {
+                                        <text> · not allowed here</text>
+                                    }
+                                </span>
+                            </button>
+                        </li>
+                    }
+                </ul>
+            }
+        }
+        else if (Roots is null)
+        {
+            <p role="status">Loading the site…</p>
+        }
+        else
+        {
+            <ul class="cms-picker__tree" role="tree" aria-label="Content tree">
+                @foreach (var node in Roots)
+                {
+                    <PagePickerBranch Node="node"
+                                      Level="1"
+                                      Selected="Selected"
+                                      IsAllowed="IsAllowed"
+                                      OnSelected="chosen => Selected = chosen" />
+                }
+            </ul>
+        }
+
+    </div>
+
+</ModalDialog>

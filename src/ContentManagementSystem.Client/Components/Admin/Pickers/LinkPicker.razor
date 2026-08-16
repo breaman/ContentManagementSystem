@@ -1,0 +1,141 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Pickers
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="@Title"
+             ConfirmLabel="@ConfirmLabel"
+             CanConfirm="@CanConfirm"
+             SizeClass="modal-lg"
+             OnConfirm="ConfirmAsync"
+             OnCancel="OnCancel">
+
+    <div class="cms-picker cms-picker--link">
+
+        <fieldset class="cms-picker__kinds">
+            <legend class="form-label">What are you linking to?</legend>
+            @foreach (var candidate in Kinds)
+            {
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="@($"{PickerId}-kind")"
+                           id="@($"{PickerId}-kind-{candidate}")"
+                           checked="@(Kind == candidate)"
+                           @onchange="() => Kind = candidate" />
+                    <label class="form-check-label" for="@($"{PickerId}-kind-{candidate}")">
+                        @LinkKinds.Label(candidate)
+                    </label>
+                </div>
+            }
+        </fieldset>
+
+        <div class="cms-picker__destination">
+
+            @if (Kind == LinkKinds.Page)
+            {
+                <p class="cms-picker__chosen">
+                    @if (PageTitle is { Length: > 0 } title)
+                    {
+                        <span><strong>@title</strong> <code>@PageSlug</code></span>
+                    }
+                    else
+                    {
+                        <span class="text-body-secondary">No page chosen yet.</span>
+                    }
+                </p>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => IsBrowsingPages = true">
+                    @(PageId is null ? "Find a page" : "Choose a different page")
+                </button>
+                <p class="form-text">
+                    Stored as the page itself, not as its address — so this link still works after the
+                    page is moved or renamed.
+                </p>
+            }
+            else if (Kind == LinkKinds.Media)
+            {
+                <p class="cms-picker__chosen">
+                    @if (MediaName is { Length: > 0 } name)
+                    {
+                        <span><strong>@name</strong></span>
+                    }
+                    else
+                    {
+                        <span class="text-body-secondary">No file chosen yet.</span>
+                    }
+                </p>
+                <button type="button" class="btn btn-outline-secondary" @onclick="() => IsBrowsingMedia = true">
+                    @(MediaId is null ? "Find a file" : "Choose a different file")
+                </button>
+            }
+            else if (Kind == LinkKinds.External)
+            {
+                <div class="form-floating">
+                    <input type="url" class="form-control" id="@($"{PickerId}-url")"
+                           placeholder="https://example.com"
+                           value="@Url" @oninput="args => Url = args.Value?.ToString()" />
+                    <label for="@($"{PickerId}-url")">Address</label>
+                </div>
+                @if (UrlProblem is { Length: > 0 } problem)
+                {
+                    <p class="form-text text-danger" role="status">@problem</p>
+                }
+            }
+            else if (Kind == LinkKinds.Email)
+            {
+                <div class="form-floating">
+                    <input type="email" class="form-control" id="@($"{PickerId}-email")"
+                           placeholder="someone@@example.com"
+                           value="@Email" @oninput="args => Email = args.Value?.ToString()" />
+                    <label for="@($"{PickerId}-email")">Email address</label>
+                </div>
+            }
+            else if (Kind == LinkKinds.Anchor)
+            {
+                <div class="form-floating">
+                    <input type="text" class="form-control" id="@($"{PickerId}-anchor")"
+                           placeholder="section-two"
+                           value="@Anchor" @oninput="args => Anchor = args.Value?.ToString()" />
+                    <label for="@($"{PickerId}-anchor")">Anchor on this page</label>
+                </div>
+                <p class="form-text">Without the <code>#</code>.</p>
+            }
+
+        </div>
+
+        @if (WantsText)
+        {
+            <div class="form-floating">
+                <input type="text" class="form-control" id="@($"{PickerId}-text")"
+                       placeholder="Read the guide"
+                       value="@Text" @oninput="args => Text = args.Value?.ToString()" />
+                <label for="@($"{PickerId}-text")">Words to show</label>
+            </div>
+        }
+
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="@($"{PickerId}-blank")"
+                   checked="@IsNewWindow"
+                   @onchange="args => IsNewWindow = (bool?)args.Value ?? false" />
+            <label class="form-check-label" for="@($"{PickerId}-blank")">Open in a new tab</label>
+            @if (IsNewWindow)
+            {
+                @* Not a warning about security — the renderer adds rel="noopener" itself — but about
+                   the reader, who is the one a new tab happens to. *@
+                <p class="form-text">
+                    Readers do not always notice a new tab, and it takes the back button away from
+                    them. Worth reserving for a file download or a form that must not lose its place.
+                </p>
+            }
+        </div>
+
+    </div>
+
+</ModalDialog>
+
+<PagePicker IsOpen="IsBrowsingPages"
+            Title="Choose a page to link to"
+            OnPicked="OnPagePicked"
+            OnCancel="() => IsBrowsingPages = false" />
+
+<MediaPicker IsOpen="IsBrowsingMedia"
+             Title="Choose a file to link to"
+             OnPicked="OnMediaPicked"
+             OnCancel="() => IsBrowsingMedia = false" />

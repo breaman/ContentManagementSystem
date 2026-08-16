@@ -2,6 +2,7 @@ using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Preview;
 using ContentManagementSystem.Core.Publishing;
+using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
@@ -43,7 +44,8 @@ public sealed class ServerPageClient(
     ITemplateService templates,
     IPreviewTokenService previews,
     IDuplicationService duplication,
-    IRecycleBinService recycleBin) : IPageClient
+    IRecycleBinService recycleBin,
+    ILinkResolver links) : IPageClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<PageTreeNode>> GetTreeAsync(
@@ -61,6 +63,20 @@ public sealed class ServerPageClient(
     /// <inheritdoc />
     public async Task<PageDetail?> GetAsync(int id, CancellationToken cancellationToken = default) =>
         (await pages.GetAsync(id, cancellationToken)).Value;
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Unpublished targets included, for the reason the endpoint gives: the caller is the backoffice,
+    /// and an editor linking to a section that goes live next week has to be able to find its URL.
+    /// </remarks>
+    public async Task<PageLink?> ResolveLinkAsync(int id, CancellationToken cancellationToken = default)
+    {
+        var resolved = await links.ResolveAsync([id], includeUnpublished: true, cancellationToken);
+
+        return resolved.TryGetValue(id, out var link)
+            ? new PageLink(link.PageId, link.Url, link.IsPublished, link.Title)
+            : null;
+    }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<CapturedSlot>> GetZonesAsync(
