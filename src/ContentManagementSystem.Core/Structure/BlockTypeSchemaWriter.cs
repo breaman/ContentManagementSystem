@@ -39,17 +39,24 @@ internal static class BlockTypeSchemaWriter
                 property.Name,
                 property.FieldTypeKey,
                 property.ConfigurationJson,
-                property.IsRequired))
+                property.IsRequired,
+                property.Description,
+                property.Group))
             .ToList();
 
         foreach (var composed in Composed(blockType))
         {
+            // A composed property's group is the composition it came from when it names none of its
+            // own: the group is how an editor sees that these four fields arrived together, and a
+            // composition with no grouping would otherwise scatter its properties into the host's.
             slots.Add(new ContentSlot(
                 composed.Property.Key,
                 composed.Property.Name,
                 composed.Property.FieldTypeKey,
                 composed.Property.ConfigurationJson,
-                composed.Property.IsRequired));
+                composed.Property.IsRequired,
+                composed.Property.Description,
+                composed.Property.Group is { Length: > 0 } group ? group : composed.Composition.Name));
         }
 
         return slots;

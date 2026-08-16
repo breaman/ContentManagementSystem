@@ -1,3 +1,4 @@
+using ContentManagementSystem.Client.Components.Admin.Canvas;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -10,14 +11,14 @@ using Microsoft.AspNetCore.Components.Authorization;
 namespace ContentManagementSystem.Client.Components.Admin.Pages;
 
 /// <summary>
-/// The generic zone form, and the publish controls beside it (task P2-23).
+/// The generic zone form, and the publish controls beside it (task P2-23, now on the P6-05 canvas).
 /// </summary>
 /// <remarks>
-/// <strong>Deliberately plain.</strong> Every zone is a textarea, whatever its field type, and the
-/// real per-field-type editors — rich text, media pickers, the block canvas — arrive in Phase 6 with
-/// the component resolution ADR 0014 set up. What this screen exists to prove is the loop underneath
-/// them: a template's captured zones become controls, what is typed into them round-trips through
-/// the payload envelope, and publishing snapshots it without disturbing the draft.
+/// The zones are laid out by <see cref="EditingCanvas"/> — grouped, ordered, and each card carrying
+/// its own validation state — and the controls inside the cards are still
+/// <see cref="PlainZoneEditor"/> until the field editors of P6-06 to P6-15 arrive. What this screen
+/// owns is the loop around them: reading a page, folding the cards back into a payload envelope, and
+/// the four writes in the action bar.
 /// <para>
 /// The form is built from the revision the draft <em>captured</em>, never from the template's
 /// current zones (spec section 8.5). A page authored before a zone was added has no value under that
@@ -53,6 +54,9 @@ public partial class PageEditor : ComponentBase
     /// <summary>The last dry-run check, or null when none has been made since the last change.</summary>
     private PublishValidation? Validation { get; set; }
 
+    /// <summary>The last outcome, sorted onto the zone cards it concerns.</summary>
+    private CanvasDiagnostics Diagnostics { get; set; } = CanvasDiagnostics.Empty;
+
     /// <summary>Why the last write did not happen.</summary>
     private IReadOnlyList<ApiDiagnostic>? Errors { get; set; }
 
@@ -68,7 +72,7 @@ public partial class PageEditor : ComponentBase
     /// <summary>Whether a write is in flight.</summary>
     private bool IsBusy { get; set; }
 
-    /// <summary>Whether the caller may edit, which the fieldset reads.</summary>
+    /// <summary>Whether the caller may edit, which is what makes the canvas read-only.</summary>
     private bool CanEdit { get; set; }
 
     /// <summary>
@@ -99,14 +103,34 @@ public partial class PageEditor : ComponentBase
         CanEdit = await HoldsAnyAsync(CmsRoles.ContentEditors);
     }
 
-    /// <summary>Whether the zone gets a plain editable control rather than a read-only one.</summary>
+    /// <summary>
+    /// What the action bar says when there is nothing to report.
+    /// </summary>
     /// <remarks>
-    /// The rules for moving values between a payload and a textarea live in
-    /// <see cref="PlainSlotValues"/>, shared with the reusable-content editor: a zone and a
-    /// block-type property are the same thing to a payload, and two copies of those rules would
-    /// eventually disagree about what an emptied box means.
+    /// Only the all-clear: the canvas's own summary counts anything that is wrong, and a status line
+    /// repeating it would be the second place an editor has to look to learn the same thing. The
+    /// "Saved 14:32" this slot is really for arrives with autosave in P6-18.
     /// </remarks>
-    private static bool Editable(string fieldTypeKey) => PlainSlotValues.Editable(fieldTypeKey);
+    private string? StatusLine => Validation is { CanPublish: true } ? "Ready to publish" : null;
+
+    /// <summary>
+    /// Takes a zone's new value, and retires everything the last check said about the old one.
+    /// </summary>
+    /// <remarks>
+    /// A validation result describes a payload, not a page. The moment one card changes, the badge
+    /// on the card beside it is describing content that no longer exists — and a stale green is worse
+    /// than no green, because it is the one an editor believes.
+    /// </remarks>
+    private void OnZoneChanged(string key, string value)
+    {
+        Values[key] = value;
+
+        Validation = null;
+        Diagnostics = CanvasDiagnostics.Empty;
+        AcknowledgeWarnings = false;
+        Errors = null;
+        Warnings = null;
+    }
 
     /// <summary>Re-reads the page and rebuilds the form from what the server now holds.</summary>
     /// <remarks>
@@ -141,6 +165,11 @@ public partial class PageEditor : ComponentBase
             Warnings = result.Warnings;
             Notice = "Draft saved. The published version is untouched.";
 
+            // The saved payload is not the one the last check ran against — the check is stale by
+            // definition, and keeping its verdict on the cards would answer for content nobody has
+            // checked.
+            Validation = null;
+
             // Re-read rather than patching the row version in place; see ReloadAsync.
             await ReloadAsync();
 
@@ -169,8 +198,11 @@ public partial class PageEditor : ComponentBase
             if (!result.IsSuccess)
             {
                 // Only warnings blocked it, so offer the explicit second attempt rather than making
-                // the editor wonder what to change.
+                // the editor wonder what to change — and show them, on the cards they belong to.
+                // "Publish anyway" over an unstated warning is a button that asks for consent to
+                // something nobody has been told (spec section 22.2).
                 AcknowledgeWarnings = result.Warnings.Count > 0;
+                Warnings = result.Warnings;
 
                 return result.Errors;
             }
@@ -219,6 +251,13 @@ public partial class PageEditor : ComponentBase
         finally
         {
             IsBusy = false;
+
+            // Whatever this write produced is what the cards now show. The dry-run check is the
+            // fallback rather than the first choice: a refused save is about the payload in front of
+            // the editor, while the last check may be about the one before it.
+            Diagnostics = CanvasDiagnostics.From(
+                Errors ?? Validation?.Errors,
+                Warnings ?? Validation?.Warnings);
         }
     }
 

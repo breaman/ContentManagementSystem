@@ -18,9 +18,11 @@ namespace ContentManagementSystem.Core.Content.Schema;
 ///   {
 ///     "key": "hero",
 ///     "name": "Hero",
+///     "description": "The banner above the fold.",
 ///     "fieldTypeKey": "blocks",
 ///     "isRequired": true,
 ///     "sortOrder": 0,
+///     "group": "Above the fold",
 ///     "configuration": { "allowedBlockTypes": ["hero-banner"], "max": 3 }
 ///   }
 /// ]
@@ -33,6 +35,16 @@ namespace ContentManagementSystem.Core.Content.Schema;
 /// far more often than it is written, and nesting it avoids a second parse per property on every
 /// read; it also keeps the column diffable by a human reviewing a structure promotion.
 /// </para>
+/// <para>
+/// <c>description</c> and <c>group</c> are written but not read back into
+/// <see cref="ContentPropertySchema"/>: they are the editor's help text and the editor's grouping
+/// (task P6-05), and validation has no use for either. They are captured rather than read live off
+/// the zone because the canvas that lays a page out must be built from the revision the draft was
+/// authored against, exactly as its controls are (spec section 8.5) — a page whose template has since
+/// regrouped its zones would otherwise be rearranged under an editor mid-edit. Both are omitted when
+/// empty, so a snapshot cut before this existed reads as "no help text, no grouping", which is what
+/// it meant.
+/// </para>
 /// </remarks>
 public static class ContentSchemaSnapshot
 {
@@ -41,6 +53,12 @@ public static class ContentSchemaSnapshot
 
     /// <summary>Member holding the editor-facing label.</summary>
     public const string NameMember = "name";
+
+    /// <summary>Member holding the help text shown under the editor control.</summary>
+    public const string DescriptionMember = "description";
+
+    /// <summary>Member holding the tab or accordion the editor groups the slot into.</summary>
+    public const string GroupMember = "group";
 
     /// <summary>Member holding the field type key.</summary>
     public const string FieldTypeKeyMember = "fieldTypeKey";
@@ -119,8 +137,8 @@ public static class ContentSchemaSnapshot
         return Write(zones
             .OrderBy(zone => zone.SortOrder)
             .ThenBy(zone => zone.Key, StringComparer.Ordinal)
-            .Select(zone => (zone.Key, zone.Name, zone.FieldTypeKey, zone.ConfigurationJson,
-                zone.IsRequired, zone.SortOrder)));
+            .Select(zone => (zone.Key, zone.Name, zone.Description, zone.FieldTypeKey,
+                zone.ConfigurationJson, zone.IsRequired, zone.SortOrder, zone.Group)));
     }
 
     /// <summary>
@@ -136,8 +154,9 @@ public static class ContentSchemaSnapshot
         return Write(properties
             .OrderBy(property => property.SortOrder)
             .ThenBy(property => property.Key, StringComparer.Ordinal)
-            .Select(property => (property.Key, property.Name, property.FieldTypeKey,
-                property.ConfigurationJson, property.IsRequired, property.SortOrder)));
+            .Select(property => (property.Key, property.Name, property.Description,
+                property.FieldTypeKey, property.ConfigurationJson, property.IsRequired,
+                property.SortOrder, property.Group)));
     }
 
     /// <summary>
@@ -158,8 +177,9 @@ public static class ContentSchemaSnapshot
     {
         ArgumentNullException.ThrowIfNull(slots);
 
-        return Write(slots.Select((slot, index) => (slot.Key, slot.Name, slot.FieldTypeKey,
-            slot.ConfigurationJson, slot.IsRequired, SortOrder: index)));
+        return Write(slots.Select((slot, index) => (slot.Key, slot.Name, slot.Description,
+            slot.FieldTypeKey, slot.ConfigurationJson, slot.IsRequired, SortOrder: index,
+            slot.Group)));
     }
 
     private static ContentPropertySchema ReadSlot(JsonElement entry, int index)
@@ -200,8 +220,8 @@ public static class ContentSchemaSnapshot
             : null;
 
     private static string Write(
-        IEnumerable<(string Key, string Name, string FieldTypeKey, string? ConfigurationJson,
-            bool IsRequired, int SortOrder)> slots)
+        IEnumerable<(string Key, string Name, string? Description, string FieldTypeKey,
+            string? ConfigurationJson, bool IsRequired, int SortOrder, string? Group)> slots)
     {
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -214,9 +234,20 @@ public static class ContentSchemaSnapshot
                 writer.WriteStartObject();
                 writer.WriteString(KeyMember, slot.Key);
                 writer.WriteString(NameMember, slot.Name);
+
+                if (!string.IsNullOrWhiteSpace(slot.Description))
+                {
+                    writer.WriteString(DescriptionMember, slot.Description);
+                }
+
                 writer.WriteString(FieldTypeKeyMember, slot.FieldTypeKey);
                 writer.WriteBoolean(IsRequiredMember, slot.IsRequired);
                 writer.WriteNumber(SortOrderMember, slot.SortOrder);
+
+                if (!string.IsNullOrWhiteSpace(slot.Group))
+                {
+                    writer.WriteString(GroupMember, slot.Group);
+                }
 
                 if (!string.IsNullOrWhiteSpace(slot.ConfigurationJson))
                 {

@@ -1,0 +1,68 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Canvas
+
+<section class="cms-canvas__zone @SeverityClass" id="@Anchor" tabindex="-1"
+         aria-labelledby="@LabelId">
+
+    <header class="cms-canvas__zone-header">
+        <h3 class="cms-canvas__zone-name" id="@LabelId">
+            @Zone.Name
+            @if (Zone.IsRequired)
+            {
+                <span class="cms-canvas__required" aria-hidden="true">*</span>
+                <span class="visually-hidden">(required to publish)</span>
+            }
+        </h3>
+
+        @if (Diagnostics.Severity is not ZoneSeverity.None)
+        {
+            <span class="badge @BadgeClass cms-canvas__zone-badge">@BadgeText</span>
+        }
+
+        <span class="cms-canvas__zone-meta">
+            <code>@Zone.Key</code> · @Zone.FieldTypeKey
+        </span>
+    </header>
+
+    @if (!string.IsNullOrWhiteSpace(Zone.Description))
+    {
+        <p class="cms-canvas__zone-help" id="@HelpId">@Zone.Description</p>
+    }
+
+    <div class="cms-canvas__zone-body">
+        @if (Editor is not null)
+        {
+            @Editor(Context)
+        }
+    </div>
+
+    @if (Diagnostics.Any)
+    {
+        <ul class="cms-canvas__zone-diagnostics">
+            @foreach (var diagnostic in Diagnostics.Errors)
+            {
+                <li class="cms-canvas__diagnostic cms-canvas__diagnostic--error">
+                    <span class="bi bi-exclamation-octagon-fill" aria-hidden="true"></span>
+                    <span class="visually-hidden">Blocking:</span>
+                    @diagnostic.Message
+                    @if (Within(diagnostic) is { } where)
+                    {
+                        <code class="cms-canvas__diagnostic-path">@where</code>
+                    }
+                </li>
+            }
+            @foreach (var diagnostic in Diagnostics.Warnings)
+            {
+                <li class="cms-canvas__diagnostic cms-canvas__diagnostic--warning">
+                    <span class="bi bi-exclamation-triangle-fill" aria-hidden="true"></span>
+                    <span class="visually-hidden">Worth checking:</span>
+                    @diagnostic.Message
+                    @if (Within(diagnostic) is { } where)
+                    {
+                        <code class="cms-canvas__diagnostic-path">@where</code>
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+</section>

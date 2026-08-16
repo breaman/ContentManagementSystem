@@ -1,0 +1,76 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Canvas
+@using ContentManagementSystem.Client.Components.Admin.Structure
+
+<div class="cms-canvas">
+
+    <div class="cms-canvas__scroll">
+
+        <DiagnosticList Diagnostics="Unplaced.Errors" Heading="@PageErrorHeading" />
+        <DiagnosticList Diagnostics="Unplaced.Warnings" IsError="false"
+                        Heading="Worth checking first" />
+
+        @if (Groups.Count == 0)
+        {
+            <div class="cms-canvas__empty">
+                @if (EmptyState is not null)
+                {
+                    @EmptyState
+                }
+                else
+                {
+                    <p>This page's template revision captured no zones, so there is nothing to fill in.</p>
+                }
+            </div>
+        }
+
+        @* An unnamed section is the run of zones that declare no group: it is drawn exactly like a
+           named one minus the heading, rather than as a different kind of thing, so that whether a
+           template groups its zones changes only what an editor reads and never how the canvas
+           behaves. *@
+        @foreach (var group in Groups)
+        {
+            <section class="cms-canvas__group" aria-labelledby="@GroupLabelId(group)">
+
+                @if (group.Name is { Length: > 0 } name)
+                {
+                    <h2 class="cms-canvas__group-name" id="@GroupLabelId(group)">@name</h2>
+                }
+
+                @foreach (var zone in group.Zones)
+                {
+                    <ZoneCard Zone="zone"
+                              Diagnostics="Diagnostics.For(zone.Key)"
+                              Disabled="Disabled"
+                              Editor="Editor" />
+                }
+
+            </section>
+        }
+
+    </div>
+
+    @if (HasActionBar)
+    {
+        <footer class="cms-canvas__actions">
+
+            @if (Diagnostics.Any)
+            {
+                <span class="badge @SummaryClass cms-canvas__summary">@SummaryText</span>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Status))
+            {
+                <span class="cms-canvas__status">@Status</span>
+            }
+
+            @if (Actions is not null)
+            {
+                <div class="cms-canvas__buttons">
+                    @Actions
+                </div>
+            }
+
+        </footer>
+    }
+
+</div>

@@ -4,6 +4,7 @@ using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Data.Seeding;
 using ContentManagementSystem.Shared.Contracts.Fields;
+using ContentManagementSystem.Shared.Contracts.Structure;
 
 namespace ContentManagementSystem.Core.Tests.Content;
 
@@ -91,6 +92,45 @@ public class ContentSchemaSnapshotTests
             ]);
 
         ContentSchemaSnapshot.Read(written).Select(slot => slot.Key).Should().Equal("a", "b");
+    }
+
+    [Fact]
+    public void AZonesHelpTextAndGroupingAreCapturedWithIt()
+    {
+        var written = ContentSchemaSnapshot.WriteZones(
+            [
+                new Zone
+                {
+                    Key = "metaTitle",
+                    Name = "Meta title",
+                    Description = "Overrides the browser tab and the search result.",
+                    FieldTypeKey = FieldTypeKeys.PlainText,
+                    Group = "SEO",
+                },
+            ]);
+
+        // Captured rather than read live off the zone, for the reason every other part of a revision
+        // is: the editing canvas of task P6-05 lays a draft out from the revision it was authored
+        // against, and a template regrouped since would otherwise rearrange the page under whoever
+        // is editing it.
+        var slot = CapturedSlot.Read(JsonDocument.Parse(written).RootElement)
+            .Should().ContainSingle().Subject;
+
+        slot.Description.Should().Be("Overrides the browser tab and the search result.");
+        slot.Group.Should().Be("SEO");
+    }
+
+    [Fact]
+    public void ASnapshotCutBeforeGroupingExistedReadsAsUngrouped()
+    {
+        var slot = CapturedSlot
+            .Read(JsonDocument.Parse("""[ { "key": "hero", "fieldTypeKey": "blocks" } ]""").RootElement)
+            .Should().ContainSingle().Subject;
+
+        // Which is what it meant. Every zone of an old revision lands in one ungrouped canvas — the
+        // layout those pages have always had.
+        slot.Group.Should().BeNull();
+        slot.Description.Should().BeNull();
     }
 
     [Fact]

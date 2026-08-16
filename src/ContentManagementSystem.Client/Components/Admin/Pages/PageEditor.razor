@@ -1,9 +1,8 @@
 @page "/admin/pages/{Id:int}"
 @rendermode InteractiveWebAssembly
 @attribute [Authorize(Roles = CmsRoles.ContentReaders)]
-@using ContentManagementSystem.Client.Components.Admin.Media
+@using ContentManagementSystem.Client.Components.Admin.Canvas
 @using ContentManagementSystem.Shared.Contracts.Content
-@using ContentManagementSystem.Shared.Contracts.Fields
 @using ContentManagementSystem.Shared.Contracts.Security
 
 <PageTitle>@(Page?.Summary.Title ?? "Page")</PageTitle>
@@ -36,9 +35,6 @@ else
         </p>
     }
 
-    <DiagnosticList Diagnostics="Errors" Heading="@ErrorHeading" />
-    <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Worth knowing" />
-
     @if (Notice is { Length: > 0 })
     {
         <p class="alert alert-success" role="status">@Notice</p>
@@ -49,117 +45,66 @@ else
        the page. It renders nothing at all when no placement on this page is pinned. *@
     <PinnedPlacements Page="Page" OnUpdated="ReloadAsync" />
 
-    <h2 class="h5 mt-4">Content</h2>
-
     @if (Slots is null)
     {
         <p role="status">Loading zones…</p>
     }
-    else if (Slots.Count == 0)
-    {
-        <p>
-            This template's revision @Page.TemplateRevision captured no zones, so there is nothing to
-            fill in. <a href="@($"/admin/structure/templates/{Page.Summary.TemplateId}")">Add some</a>,
-            then republish the page to adopt them.
-        </p>
-    }
     else
     {
-        <EditForm Model="Values" OnValidSubmit="SaveAsync" FormName="save-draft">
-            <fieldset disabled="@(IsBusy || !CanEdit)">
-                @foreach (var slot in Slots)
-                {
-                    <div class="mb-3">
-                        <label class="form-label" for="@($"zone-{slot.Key}")">
-                            @slot.Name
-                            @if (slot.IsRequired)
-                            {
-                                <span class="text-danger" aria-hidden="true">*</span>
-                                <span class="visually-hidden">(required to publish)</span>
-                            }
-                        </label>
+        <EditingCanvas Zones="Slots"
+                       Diagnostics="Diagnostics"
+                       Disabled="@(IsBusy || !CanEdit)"
+                       PageErrorHeading="@ErrorHeading"
+                       Status="@StatusLine">
 
-                        @if (Editable(slot.FieldTypeKey))
-                        {
-                            <textarea id="@($"zone-{slot.Key}")" class="form-control" rows="3"
-                                      value="@Values.GetValueOrDefault(slot.Key)"
-                                      @onchange="e => Values[slot.Key] = e.Value?.ToString() ?? string.Empty">
-                            </textarea>
-                        }
-                        else if (slot.FieldTypeKey == FieldTypeKeys.Media)
-                        {
-                            @* The one structured field type with a real control before Phase 6, and
-                               it earns it: a media reference cannot be typed, and the crop it
-                               carries is what makes acceptance criterion P5 #7 reachable at all. *@
-                            <MediaSlotEditor PropertyKey="@slot.Key" Disabled="@(IsBusy || !CanEdit)"
-                                             Value="@Values.GetValueOrDefault(slot.Key, string.Empty)"
-                                             ValueChanged="value => Values[slot.Key] = value" />
-                        }
-                        else
-                        {
-                            <textarea id="@($"zone-{slot.Key}")" class="form-control font-monospace" rows="4"
-                                      readonly value="@Values.GetValueOrDefault(slot.Key)"></textarea>
-                        }
+            <Editor Context="zone">
+                <PlainZoneEditor Field="zone"
+                                 Value="@Values.GetValueOrDefault(zone.Zone.Key, string.Empty)"
+                                 ValueChanged="value => OnZoneChanged(zone.Zone.Key, value)" />
+            </Editor>
 
-                        <div class="form-text">
-                            <code>@slot.Key</code> · @slot.FieldTypeKey
-                            @if (!Editable(slot.FieldTypeKey) && slot.FieldTypeKey != FieldTypeKeys.Media)
-                            {
-                                <text>
-                                    — shown as stored. A control for this field type arrives with the
-                                    authoring experience in Phase 6.
-                                </text>
-                            }
-                        </div>
-                    </div>
-                }
+            <EmptyState>
+                <p>
+                    This template's revision @Page.TemplateRevision captured no zones, so there is
+                    nothing to fill in.
+                    <a href="@($"/admin/structure/templates/{Page.Summary.TemplateId}")">Add some</a>,
+                    then republish the page to adopt them.
+                </p>
+            </EmptyState>
 
+            <Actions>
                 <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
-                    <button type="submit" class="btn btn-primary">Save draft</button>
+                    <button type="button" class="btn btn-primary" disabled="@IsBusy"
+                            @onclick="SaveAsync">
+                        Save draft
+                    </button>
                 </AuthorizeView>
-            </fieldset>
-        </EditForm>
-    }
 
-    <h2 class="h5 mt-4">Publishing</h2>
-
-    @if (Validation is not null)
-    {
-        <p role="status">
-            @if (Validation.CanPublish)
-            {
-                <span class="badge text-bg-success">Ready to publish</span>
-            }
-            else
-            {
-                <span class="badge text-bg-danger">@Validation.Errors.Count problem(s) block publishing</span>
-            }
-        </p>
-
-        <DiagnosticList Diagnostics="Validation.Errors" Heading="Blocking" />
-        <DiagnosticList Diagnostics="Validation.Warnings" IsError="false" Heading="Worth checking first" />
-    }
-
-    <div class="d-flex gap-2">
-        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
-                @onclick="ValidateAsync">
-            Check before publishing
-        </button>
-
-        <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
-            <button type="button" class="btn btn-success" disabled="@IsBusy" @onclick="PublishAsync">
-                @(AcknowledgeWarnings ? "Publish anyway" : "Publish")
-            </button>
-
-            @if (Page.Summary.PublishedVersionNumber is not null)
-            {
-                <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
-                        @onclick="UnpublishAsync">
-                    Unpublish
+                <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
+                        @onclick="ValidateAsync">
+                    Check before publishing
                 </button>
-            }
-        </AuthorizeView>
 
+                <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
+                    <button type="button" class="btn btn-success" disabled="@IsBusy"
+                            @onclick="PublishAsync">
+                        @(AcknowledgeWarnings ? "Publish anyway" : "Publish")
+                    </button>
+
+                    @if (Page.Summary.PublishedVersionNumber is not null)
+                    {
+                        <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
+                                @onclick="UnpublishAsync">
+                            Unpublish
+                        </button>
+                    }
+                </AuthorizeView>
+            </Actions>
+
+        </EditingCanvas>
+    }
+
+    <div class="d-flex gap-2 mt-3">
         @* target="_blank" on purpose: preview is a look at another version, not a place to be
            navigated to — an editor who lost their unsaved form to it would not use it twice. *@
         <a class="btn btn-outline-secondary" href="@($"/preview/{Id}")" target="_blank"

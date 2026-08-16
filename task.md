@@ -28,7 +28,11 @@ done (`P6-01` to `P6-03`), and the tree's context menu and filter are done bar "
 (`P6-04`), which needs the bulk operation service of `P6-29`. Moving a page is new server work as
 well as new UI — `IPageService.MoveAsync` makes the tree position, the sibling order, and the route
 rebuild one transaction, and its **preview is the move itself, rolled back**, so the confirmation an
-editor approves cannot differ from what then happens.
+editor approves cannot differ from what then happens. The editing canvas is done too (`P6-05`): zones
+are cards, grouped and ordered by the revision the draft was authored against — which is why the
+schema snapshot now captures a zone's grouping and help text — each carrying its own validation
+state, under a sticky action bar. `PageEditor` is the first screen built on it; the field editors
+that fill the cards are `P6-06` to `P6-15`.
 **Version:** 1.0
 **Last updated:** 2026-08-16
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -82,11 +86,11 @@ and record the date in the progress table.
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 3 | 34.5 | In progress — shell and tree done (`P6-01`…`P6-03`); `P6-04` is done bar "publish branch", which waits on `P6-29` | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 4 | 34.5 | In progress — shell, tree, and canvas done (`P6-01`…`P6-03`, `P6-05`); `P6-04` is done bar "publish branch", which waits on `P6-29` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **163** | **203.5** | | |
+| **v1 total** | **281** | **164** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3033,8 +3037,26 @@ daily — including the edit/preview experience the requirements call out explic
   **Open: "publish branch" only.** It is a background job with per-item results, which is
   `BulkOperationService` in `P6-29`; a menu entry that published forty pages one request at a time,
   with no progress and no per-item reporting, would be the wrong thing wearing the right label.
-- [ ] **P6-05** Editing canvas in `Client/Components/Admin/Canvas/`: zone cards ordered by `SortOrder`,
+- [x] **P6-05** Editing canvas in `Client/Components/Admin/Canvas/`: zone cards ordered by `SortOrder`,
   grouped by `Zone.Group`, per-zone validation state, sticky action bar. — 3 ed
+  *2026-08-16 — `EditingCanvas` owns the card frame and nothing inside it: the body comes from a
+  `ZoneEditorContext` render fragment, because ADR-0014's editor catalog should be built with the
+  editors it maps (`P6-06` onwards) rather than have its parameter contract guessed at now. Two rules
+  decide the layout — **a named group is reopened** so its zones are drawn together wherever their
+  sort orders scattered them, while **a run of ungrouped zones is not merged** with the ungrouped
+  zones elsewhere, since merging on the absence of a name would drag a page's footer up above the SEO
+  group it was numbered after. **Grouping had to become part of the captured revision**: the canvas
+  must lay a draft out from the revision it was authored against [§8.5], so `ContentSchemaSnapshot`
+  now writes `group` and `description` and `CapturedSlot` reads them; snapshots cut before this read
+  as one ungrouped canvas, which is the layout those pages already had. Validation is sorted onto the
+  cards by the payload path each diagnostic carries, and **anything with no card to land on — a URL
+  collision, or a zone the revision no longer declares — is reported above them** rather than
+  bucketed under a key nothing renders. Each card is `id="zone-{key}"` with `tabindex="-1"`, which is
+  what `P6-20` will deep-link to. `PageEditor` is now a consumer of it rather than a second zone
+  form; the plain textareas moved into `PlainZoneEditor` and stay as R13's fallback. Two fixes fell
+  out of the rewiring: a publish refused only by warnings now shows the warnings it wants
+  acknowledged [§22.2], and editing a zone retires the last check instead of leaving a stale green
+  badge over content nobody has checked.*
 
 ### Field editors — 14.5 ed
 

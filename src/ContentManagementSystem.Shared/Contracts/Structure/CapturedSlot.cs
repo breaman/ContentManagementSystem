@@ -11,6 +11,14 @@ namespace ContentManagementSystem.Shared.Contracts.Structure;
 /// <param name="IsRequired">Whether an empty value blocks publishing.</param>
 /// <param name="SortOrder">Order the slot appears in the editor.</param>
 /// <param name="Configuration">Field-type-specific configuration, or null when there is none.</param>
+/// <param name="Description">
+/// Help text as it stood when the revision was cut, or null when the slot has none.
+/// </param>
+/// <param name="Group">
+/// The card group the editing canvas lays the slot out under, or null when it is ungrouped
+/// (task P6-05). Snapshots cut before grouping was captured answer null for every slot, which is
+/// one ungrouped canvas — the layout those pages have always had.
+/// </param>
 /// <remarks>
 /// Distinct from <see cref="ZoneDefinition"/>, and the difference is the whole point of revisions: a
 /// zone definition is what the template says <em>now</em> and carries a database identity, while this
@@ -24,7 +32,9 @@ public sealed record CapturedSlot(
     string FieldTypeKey,
     bool IsRequired,
     int SortOrder,
-    JsonElement? Configuration)
+    JsonElement? Configuration,
+    string? Description = null,
+    string? Group = null)
 {
     /// <summary>
     /// Reads the snapshot array a revision endpoint returns.
@@ -63,7 +73,9 @@ public sealed record CapturedSlot(
                     : 0,
                 entry.TryGetProperty("configuration", out var configuration)
                     ? configuration.Clone()
-                    : null));
+                    : null,
+                Text(entry, "description"),
+                Text(entry, "group")));
         }
 
         return [.. slots.OrderBy(slot => slot.SortOrder).ThenBy(slot => slot.Key, StringComparer.Ordinal)];

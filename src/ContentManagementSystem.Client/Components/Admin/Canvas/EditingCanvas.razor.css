@@ -1,0 +1,155 @@
+/* The editing canvas of spec section 14.1 (task P6-05).
+
+   Scoped to EditingCanvas, which is why the card styles are reachable through ::deep — the cards are
+   ZoneCard's markup, and the frame around them is the canvas's business. What the ::deep rules
+   deliberately do not reach is the inside of a card body: a field editor arriving in P6-06 onwards
+   styles its own control, and anything here that reached into one would have to be unpicked to let
+   it. */
+
+.cms-canvas {
+    display: flex;
+    flex-direction: column;
+    block-size: 100%;
+    min-block-size: 0;
+}
+
+/* The scrolling half. The action bar is the other half and does not move, which is the point of
+   splitting them: the canvas is the pane an editor scrolls furthest, and the publish button they
+   scrolled past is the one they will not find again. */
+.cms-canvas__scroll {
+    flex: 1 1 auto;
+    min-block-size: 0;
+    overflow-y: auto;
+    padding: 1rem;
+}
+
+.cms-canvas__group {
+    margin-block-end: 1.5rem;
+}
+
+.cms-canvas__group-name {
+    margin-block-end: 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+}
+
+.cms-canvas ::deep .cms-canvas__zone {
+    margin-block-end: 1rem;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-body-bg);
+    padding: 0.75rem 1rem 1rem;
+}
+
+/* Focus lands here when a deep link from the publish dialog sends an editor to a zone, so the card
+   has to be able to show that it did. */
+.cms-canvas ::deep .cms-canvas__zone:focus-visible {
+    outline: 2px solid var(--bs-focus-ring-color, var(--bs-primary));
+    outline-offset: 2px;
+}
+
+/* Severity is a left edge as well as a badge — never colour alone, and never colour as the only way
+   to tell two cards apart (P6-39, spec section 28). */
+.cms-canvas ::deep .cms-canvas__zone--error {
+    border-inline-start: 4px solid var(--bs-danger);
+}
+
+.cms-canvas ::deep .cms-canvas__zone--warning {
+    border-inline-start: 4px solid var(--bs-warning);
+}
+
+.cms-canvas ::deep .cms-canvas__zone-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-block-end: 0.5rem;
+}
+
+.cms-canvas ::deep .cms-canvas__zone-name {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.cms-canvas ::deep .cms-canvas__required {
+    color: var(--bs-danger);
+}
+
+/* Pushed to the end of the header, so the key and field type sit out of the way of the name an
+   editor is actually scanning for. */
+.cms-canvas ::deep .cms-canvas__zone-meta {
+    margin-inline-start: auto;
+    font-size: 0.8125rem;
+    color: var(--bs-secondary-color);
+}
+
+.cms-canvas ::deep .cms-canvas__zone-help {
+    margin-block-end: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+.cms-canvas ::deep .cms-canvas__zone-diagnostics {
+    margin: 0.75rem 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.875rem;
+}
+
+.cms-canvas ::deep .cms-canvas__diagnostic {
+    display: flex;
+    align-items: baseline;
+    gap: 0.375rem;
+}
+
+.cms-canvas ::deep .cms-canvas__diagnostic--error {
+    color: var(--bs-danger-text-emphasis);
+}
+
+.cms-canvas ::deep .cms-canvas__diagnostic--warning {
+    color: var(--bs-warning-text-emphasis);
+}
+
+.cms-canvas ::deep .cms-canvas__diagnostic-path {
+    color: var(--bs-secondary-color);
+}
+
+.cms-canvas__empty {
+    padding: 1.5rem;
+    border: 1px dashed var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+    color: var(--bs-secondary-color);
+}
+
+/* Sticky rather than merely last: the canvas is a scrolling column, and an action bar that scrolls
+   with it is one an editor loses. It sits at the foot of the pane on a wide screen and at the foot
+   of the stacked canvas below 62em, where the shell has already given it the full width. */
+.cms-canvas__actions {
+    position: sticky;
+    inset-block-end: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    padding: 0.625rem 1rem;
+    border-block-start: 1px solid var(--bs-border-color);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.cms-canvas__status {
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+}
+
+/* The buttons sit at the end of the bar on a wide pane and wrap onto their own line on a narrow one,
+   rather than being squeezed. */
+.cms-canvas__buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-inline-start: auto;
+}
