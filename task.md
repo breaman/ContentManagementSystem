@@ -1,6 +1,7 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
+**Status:** In progress — **Phase 6 is built out**, with 12 of its 14 criteria met and its gate open
+on the browser journeys and the manual keyboard pass alone. Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
 sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
 (`P3-29`), and Q8 (`P3-30`) still open. **Phase 4 is complete** — all 19 tasks, all 7 acceptance
@@ -23,35 +24,54 @@ responsive `<picture>` renderer (`P5-20`), the admin library and image editor (`
 resumable chunked upload (`P5-08`) — a transport in front of the same pipeline, not a second way
 into the library. **The one honest gap Phase 5 leaves behind is audit-log retention**, which has no
 implementation and is recorded against `P9-25` rather than absorbed here.
-**Phase 6 has started**: the three-pane shell, the real content tree, and moving pages within it are
-done (`P6-01` to `P6-03`), and the tree's context menu and filter are done bar "publish branch"
-(`P6-04`), which needs the bulk operation service of `P6-29`. Moving a page is new server work as
-well as new UI — `IPageService.MoveAsync` makes the tree position, the sibling order, and the route
-rebuild one transaction, and its **preview is the move itself, rolled back**, so the confirmation an
-editor approves cannot differ from what then happens. The editing canvas is done too (`P6-05`): zones
-are cards, grouped and ordered by the revision the draft was authored against — which is why the
-schema snapshot now captures a zone's grouping and help text — each carrying its own validation
-state, under a sticky action bar. **The field editors that fill those cards are done** (`P6-06` to
-`P6-16`): one catalog maps a field type key to the component that fills it (`ADR-0014`), one host
-dispatches through it, and the page canvas, a block's property row, and the reusable editor therefore
-cannot disagree about what a `richText` looks like. Every editor binds to the stored value as its
-whole JSON envelope, which puts each field type's storage shape in the one component that understands
-it. **All eighteen built-in field types have an editor**, not only the ten the tasks name, because
-`P6 #1` asks an author to fill a page without touching raw JSON and one `number` zone would otherwise
-fail it. CodeMirror and Quill are locally bundled and split per editor, behind the per-request style
-nonce `D13` calls load-bearing; the preview pane renders through the server's one Markdig-and-sanitize
-pipeline rather than a second copy in the browser, and reports what publishing will remove — which is
-also the HTML editor's live strip warning. Three acceptance criteria are met by this
-(`P6 #2`, `#3`, `#4`). **Properties, saving, and feedback are done too** (`P6-17` to `P6-22`): the
-right-hand pane edits everything about a page that is not its content and sends only the fields an
-editor touched, autosave writes the draft twenty seconds after the typing stops and on the way out,
-a lost race opens keep-mine / take-theirs / open-diff instead of being retried, and the publish
-dialog groups what is wrong by zone with a link into each card. Two server promises had to be made
-real for that: **the `409` now carries the draft that won** — `ETags` has claimed since `P2-20` that
-this is why a mismatch answers 409 rather than 412, but the problem mapper dropped it — and a new
+**Phase 6 is built out**: every feature task is done, and **12 of its 14 acceptance criteria are
+met**. The three-pane shell, the real content tree, moving pages, and the tree's context menu, filter
+and clipboard are done (`P6-01` to `P6-04`) — **"publish branch" included**, now that there is a bulk
+service to build it on. Moving a page is new server work as well as new UI: `IPageService.MoveAsync`
+makes the tree position, the sibling order, and the route rebuild one transaction, and its **preview
+is the move itself, rolled back**, so the confirmation an editor approves cannot differ from what
+then happens. The editing canvas is done (`P6-05`): zones are cards, grouped and ordered by the
+revision the draft was authored against — which is why the schema snapshot now captures a zone's
+grouping and help text — each carrying its own validation state, under a sticky action bar. **The
+field editors that fill those cards are done** (`P6-06` to `P6-16`): one catalog maps a field type
+key to the component that fills it (`ADR-0014`), one host dispatches through it, and the page canvas,
+a block's property row, and the reusable editor therefore cannot disagree about what a `richText`
+looks like. Every editor binds to the stored value as its whole JSON envelope, which puts each field
+type's storage shape in the one component that understands it. **All eighteen built-in field types
+have an editor**, not only the ten the tasks name, because `P6 #1` asks an author to fill a page
+without touching raw JSON and one `number` zone would otherwise fail it. CodeMirror and Quill are
+locally bundled and split per editor, behind the per-request style nonce `D13` calls load-bearing;
+the preview pane renders through the server's one Markdig-and-sanitize pipeline rather than a second
+copy in the browser, and reports what publishing will remove — which is also the HTML editor's live
+strip warning. **Properties, saving, and feedback are done** (`P6-17` to `P6-22`): the right-hand
+pane edits everything about a page that is not its content and sends only the fields an editor
+touched, autosave writes the draft twenty seconds after the typing stops and on the way out, a lost
+race opens keep-mine / take-theirs / open-diff instead of being retried, and the publish dialog
+groups what is wrong by zone with a link into each card. Two server promises had to be made real for
+that: **the `409` now carries the draft that won** — `ETags` has claimed since `P2-20` that this is
+why a mismatch answers 409 rather than 412, but the problem mapper dropped it — and a new
 `POST /pages/{id}/draft/diff` compares an unsaved payload against the stored draft, which the version
-diff cannot do because both copies of a contested draft are the same version row. Two more criteria
-are met (`P6 #5`, `#6`), each with its browser half still open in `P6-33` and `P6-34`.
+diff cannot do because both copies of a contested draft are the same version row.
+**The dashboard, the recycle bin, the shortcuts, and bulk operations closed the phase out**
+(`P6-23` to `P6-29`). `/admin` is a route for the first time, and it is the four tiles of [§14.9] over
+one read-only service: what the signed-in editor has in progress, what publishes or expires in the
+next week with a failed schedule called out, what has rotted — an overdue review, a live page
+pointing at a deleted one, a picture nobody described, the 404s still taking traffic — and what has
+been done lately. Every tile links into **the same query at a larger limit**, which is what makes
+`P6 #8`'s "correctly filtered" structural. `BulkOperationService` runs one operation over many pages
+without reimplementing any of them: each item goes through the same publish, delete, or patch a
+single request does, in a scope of its own, so validation, permissions, and audit rows are the same —
+and a batch over twenty-five items runs after the response has been written, carrying the caller's
+identity with it. The recycle bin lists subtree roots rather than deleted rows, and its one
+irreversible operation asks for the page's name to be typed. Keyboard shortcuts are one table read by
+both the listener and the reference dialog, and every one of them is an accelerator for a button that
+is also on the screen. **The test gates found real defects rather than confirming a clean bill**: the
+axe pass (`P6-36`) turned up three landmark and heading faults in the new screens, and the 200% zoom
+pass (`P6-38`) found four screens whose tables could not reflow. Both are fixed. **What is left is
+what no assertion supplies**: `P6-32` to `P6-34` need the whole application running in a browser —
+a Kestrel address, the WebAssembly runtime booting against it, and a database — which is a harness
+that does not exist yet, and `P6-37`'s keyboard-only pass is a thing a person does. The phase's exit
+gate is open on those four alone.
 **The `Content-Security-Policy` header itself is not switched on**: the nonce
 it needs exists and is wired, but turning the policy on today would break P5's media control and
 others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
@@ -109,11 +129,11 @@ and record the date in the progress table.
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 23 | 34.5 | In progress — shell, tree, canvas, **all 11 field editors**, and **properties, saving, and feedback** done (`P6-01`…`P6-03`, `P6-05`…`P6-22`), with `P6-30`, `P6-31`, `P6-40`; 5 of 14 criteria met. `P6-04` waits on `P6-29` for "publish branch" and `P6-17` on `P8-20`/`P8-02` for tags and the share image. Next: shortcuts, dashboard, recycle bin, bulk (`P6-23`…`P6-29`) | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **183** | **203.5** | | |
+| **v1 total** | **281** | **196** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3045,7 +3065,7 @@ daily — including the edit/preview experience the requirements call out explic
   move** — run and then rolled back — so the dialog cannot promise something the button then does
   differently. `ModalDialog` arrived here too (it is also P6-21's confirmation dialog): Bootstrap's
   markup without Bootstrap's JavaScript, with a real focus trap and focus restoration.*
-- [~] **P6-04** Tree context menu (new child, duplicate deep/shallow, copy, move, delete, publish
+- [x] **P6-04** Tree context menu (new child, duplicate deep/shallow, copy, move, delete, publish
   branch, unpublish) and inline filter over title/slug/id. — 0.5 ed
   *2026-08-16 — Menu opens on right-click and equally on **Shift+F10 or the Context Menu key**, with
   arrow-key navigation and Escape; entries that cannot act are omitted rather than disabled. Copy and
@@ -3057,9 +3077,14 @@ daily — including the edit/preview experience the requirements call out explic
   rather than pruning it — a lazily loaded tree can only hide what it has already fetched, so a
   pruning filter would answer "no results" for most of the site — and the backoffice search now
   matches a page id, which is what an editor arriving from a log line or a ticket is holding.*
-  **Open: "publish branch" only.** It is a background job with per-item results, which is
-  `BulkOperationService` in `P6-29`; a menu entry that published forty pages one request at a time,
-  with no progress and no per-item reporting, would be the wrong thing wearing the right label.
+  *2026-08-16 — **"publish branch" closed out** once `P6-29` existed to build it on. It is offered
+  only on a page that has children, and it is one selection the server resolves rather than a walk of
+  the tree: the tree lazily loads a level at a time, so a branch it has never opened looks like a
+  leaf and any count it produced itself would be wrong. The confirmation therefore says "you selected
+  1 page, this will publish 41", the batch reports per page, and a branch over
+  `BulkLimits.BackgroundThreshold` runs on the server rather than tying up the browser. Closing the
+  dialog does not cancel anything, and it says so — a background job belongs to the server the moment
+  it is accepted.*
 - [x] **P6-05** Editing canvas in `Client/Components/Admin/Canvas/`: zone cards ordered by `SortOrder`,
   grouped by `Zone.Group`, per-zone validation state, sticky action bar. — 3 ed
   *2026-08-16 — `EditingCanvas` owns the card frame and nothing inside it: the body comes from a
@@ -3252,9 +3277,10 @@ daily — including the edit/preview experience the requirements call out explic
   — split mode's scroll listener — passes the base's **existing** reference rather than creating a
   second one to forget, and releases the listener before the editor is destroyed so a scroll fired by
   the DOM being torn down cannot call into a half-disposed component. The JS registry counts created
-  against disposed and exposes DOM counts, which is what `P6-31a` will assert on; **that browser
-  assertion is still open** and is the only part of R14's mitigation this task cannot prove on its
-  own.*
+  against disposed and exposes DOM counts, which is what `P6-31a` asserts on — **and now does**: ten
+  mount/unmount cycles of each editor in Chromium, created equal to disposed, the registry empty, and
+  no surviving `.cm-editor`, `.ql-editor`, or `.ql-toolbar`. What that still cannot reach is R14's own
+  trigger, which is browser memory over two hours (`P9-16`).*
 
 ### Properties, saving, and feedback — 5 ed
 
@@ -3358,20 +3384,89 @@ daily — including the edit/preview experience the requirements call out explic
 
 ### Dashboard, bin, and bulk — 5.5 ed
 
-- [ ] **P6-23** Keyboard shortcuts plus a shortcut reference dialog. — 1 ed
-- [ ] **P6-24** Dashboard in `Client/Components/Admin/Dashboard/` [§14.9] — **My work** tile (drafts with
+- [x] **P6-23** Keyboard shortcuts plus a shortcut reference dialog. — 1 ed
+  *2026-08-16 — **One table, read by both halves**: `EditorShortcuts.All` is what the listener matches
+  against and what the reference dialog renders, so a chord that works undocumented and a chord that
+  is documented and does nothing are both unwritable without deleting one of the two uses. The
+  listener is on the **document**, not on a div — an editor's focus is usually inside something the
+  component tree does not own (a CodeMirror instance, a link in the properties panel), and a shortcut
+  that worked in one pane is one nobody trusts. Two rules keep it from being a nuisance: a
+  modifier-less chord inside a text field belongs to the field, which only the document can know and
+  is therefore the script's one judgement; and `preventDefault` is called only for a chord .NET
+  actually claimed, so Ctrl+F, Ctrl+T, and the browser's own find still belong to the browser. Alt is
+  matched as "not held" rather than ignored, because it is the tree's move modifier and composes
+  characters on several layouts. The chords are conservative — Ctrl/⌘+S, Ctrl/⌘+K, Ctrl/⌘+Shift+P,
+  Ctrl/⌘+E, and `?` for the list — and **every one is an accelerator for a button that is also on the
+  screen**, which is [§28]'s rule and is stated at the top of the dialog rather than assumed. An
+  editor who may not write is not offered the shortcuts that write, the same way the toolbar hides
+  the buttons.*
+- [x] **P6-24** Dashboard in `Client/Components/Admin/Dashboard/` [§14.9] — **My work** tile (drafts with
   unpublished changes, review assignments, rejected items). — 0.5 ed
-- [ ] **P6-25** Dashboard — **Scheduled** tile (publishes/expiries in the next 7 days, failures
+  *2026-08-16 — "Mine" is deliberately two things — pages I own and pages I was last to touch —
+  because ownership alone leaves a new editor's own unfinished draft off their own dashboard, which
+  is the one row they came for. **The review-assignment list is not drawn and the tile says why**:
+  assignment arrives with the workflow in `P7`, and an empty "assigned to you" reads as "nothing is
+  waiting on you" rather than as "this has not shipped". What can be reported honestly today is what
+  the version statuses already record — content in review, and content sent back.*
+- [x] **P6-25** Dashboard — **Scheduled** tile (publishes/expiries in the next 7 days, failures
   highlighted). — 0.5 ed
-- [ ] **P6-26** Dashboard — **Needs attention** tile (past `ReviewByDate`, broken references, images
+  *2026-08-16 — The overdue rows are the reason the tile exists. A scheduled publish whose moment
+  passed while the page is still unpublished is a job that did not run, and it is invisible
+  everywhere else in the backoffice because the page looks exactly like an ordinary draft. It is
+  drawn differently **and** said in words, never by colour alone (`P6-39`).*
+- [x] **P6-26** Dashboard — **Needs attention** tile (past `ReviewByDate`, broken references, images
   missing alt text, top `NotFoundLog` URLs). — 0.5 ed
-- [ ] **P6-27** Dashboard — **Recent activity** tile (permission-filtered `AuditLog` view); every tile
+  *2026-08-16 — Four lists, each a thing nobody would think to look for. The broken-reference sweep
+  reads **published** versions only: a draft pointing at a page nobody has created yet is work in
+  progress, while a live page pointing at a deleted one is a link a visitor is meeting now, and
+  mixing the two buries the second in the first. It checks all three target kinds through the global
+  query filters, so "gone" means the same thing here as it does to a visitor, and it over-reports by
+  the same design `ContentReference` does [§7.3] — the right direction to be wrong in when the
+  alternative is silence.*
+- [x] **P6-27** Dashboard — **Recent activity** tile (permission-filtered `AuditLog` view); every tile
   deep-links into a correctly filtered list. — 0.5 ed
-- [ ] **P6-28** Recycle bin UI in `Client/Components/Admin/RecycleBin/`: list, filter, subtree-aware
+  *2026-08-16 — Narrowed to the content tables rather than the whole audit log: this is an editorial
+  feed, and an identity table's rows are neither interesting here nor safe to show everyone who may
+  read content. Beyond that the filter **is** the tile's entry condition — `Content.Read` — because
+  v1 has no per-page permissions to filter by; those arrive with `P7` and this query narrows with
+  them rather than being rewritten. The deep link is the same server query at a larger limit
+  (`GET /dashboard/{tile}`), not a second screen that resembles it: two definitions of "needs
+  attention" would drift, and the tile would then advertise a list that did not contain what it
+  promised.*
+- [x] **P6-28** Recycle bin UI in `Client/Components/Admin/RecycleBin/`: list, filter, subtree-aware
   restore, permanent delete with typed-name confirmation [§14.10]. — 1 ed
-- [ ] **P6-29** `BulkOperationService` in `Core/Content/`: selection model, impact preview, background
+  *2026-08-16 — **It lists subtree roots, not deleted rows.** Deleting a section deletes everything
+  under it, and a bin showing all forty rows would ask an editor to restore one delete forty times,
+  in an order that matters — a child restored before its parent comes back at the site root. The
+  roots are what was deleted; the count beside each is what goes with it. Permanent deletion asks for
+  the page's name to be typed and is Administrator-only, with the button **absent** rather than
+  disabled for anybody else; a refusal — content elsewhere still pointing at the page — closes the
+  dialog rather than leaving a box open over a message it cannot act on. The filter is a predicate
+  over a list already in memory rather than a search, which is why it is not debounced the way the
+  tree's is.*
+- [x] **P6-29** `BulkOperationService` in `Core/Content/`: selection model, impact preview, background
   execution with progress above 25 items, per-item result reporting, per-item audit logging [§14.11].
   — 1.5 ed
+  *2026-08-16 — **Nothing here reimplements an operation.** Each item runs through the same
+  `IPublishingService`, `IRecycleBinService`, or `IPageService` a single-item request runs through,
+  in a scope of its own — which is what makes a bulk publish subject to the same validation, the same
+  permission checks, and the same audit rows as forty individual publishes, and why per-item audit
+  logging needed no code at all. A scope per item rather than per batch is failure isolation: a
+  failed item leaves nothing tracked behind for the next one to save on its behalf. **A background
+  job outlives the request that asked for it**, so the caller is captured while there is still one to
+  capture and each item's scope is given a synthetic request carrying that principal
+  (`IBulkOperationScopeFactory`, implemented over `HttpContext` in `Server`) — without it the job
+  would be refused on item one or, worse, recorded as having been done by nobody. Three shapes are
+  deliberate: a **delete** shows its whole subtree in the preview and queues only the selected roots,
+  since the recycle bin is subtree-aware already and queueing the descendants would report forty "no
+  such page" failures for a batch that worked; a **stale selection** warns and runs the rest, because
+  one page deleted while the editor read the dialog is no reason to drop the other thirty-nine; and a
+  job whose items all failed still reports `Completed`, because every one was attempted and every one
+  has a reason attached. Job state is **in memory for the life of the process**, which is stated
+  rather than hidden: a poll after a restart gets `page.job-not-found`, and a scaled-out deployment
+  (**Q4**) can only poll the instance that accepted the batch — a change to one class, not to its
+  callers. Tags are absent from the operation set on purpose: `Tag`/`PageTag` is `P8-20`'s, and an
+  operation that silently matched nothing would read as "these pages have no tags".*
 
 ### Tests — Phase 6
 
@@ -3390,19 +3485,88 @@ daily — including the edit/preview experience the requirements call out explic
   and `MarkupPreviewApiTests` shows this endpoint reaching the same two singletons the delivery path
   uses. What bUnit cannot see is CodeMirror and Quill themselves, which never mount without a
   browser — that is `P6-31a`'s.*
-- [ ] **P6-31a** E2E: mount and unmount an editor ten times, asserting zero surviving editor DOM
+- [x] **P6-31a** E2E: mount and unmount an editor ten times, asserting zero surviving editor DOM
   nodes and created-equals-disposed; and assert CodeMirror's own styling is in effect (a computed
   style differing from the browser default), since a missing CSP nonce fails **silently**
   [[S3](./docs/spikes/s3-editor-interop.md), [`D13`](./docs/adr/0013-backoffice-editor-bundle-and-style-nonce.md)].
+  *2026-08-16 — `EditorTeardownTests`, in Chromium. The built bundles are served from a synthetic
+  `https://` origin rather than from `file://`, because a module graph cannot be imported across
+  origins and because a real origin is somewhere a `Content-Security-Policy` **header** can be
+  attached — which is the whole exercise. Ten cycles of each editor: created equals disposed, the
+  registry is empty, and no `.cm-editor`, `.ql-editor`, or `.ql-toolbar` survives — the last of those
+  being S3's finding, since Quill appends its toolbar as a sibling and a teardown that clears the
+  container accumulates one per mount. The styling half is asserted **both ways**: with the nonce
+  wired, CodeMirror's injected theme is honoured and its computed `display` is `flex`; with the meta
+  tag removed and the same strict policy, it is `block` and nothing throws. That negative control is
+  the point — a suite asserting only the positive case would go green on a build with no nonce at
+  all. What this cannot see is the .NET half of teardown, since CodeMirror and Quill never mount
+  under bUnit; `JsEditorComponentBase`'s `DotNetObjectReference.Dispose()` is `P6-16`'s.*
 - [ ] **P6-32** E2E: full editor journey — create → edit → preview → publish → verify anonymous → edit
   again → verify published unchanged → rollback.
 - [ ] **P6-33** E2E: autosave survives a simulated transient network failure without losing input.
 - [ ] **P6-34** E2E: save conflict presents all three resolution options.
-- [ ] **P6-35** Performance: tree responsive at 5,000 pages with 500 siblings under one parent.
-- [ ] **P6-36** axe-core across every backoffice screen — zero critical or serious violations.
-- [ ] **P6-37** Manual keyboard-only pass over the whole authoring flow.
-- [ ] **P6-38** 200% browser zoom pass.
-- [ ] **P6-39** `prefers-reduced-motion` respected; no color-only status encoding in the tree [§28].
+  *2026-08-16 — **These three are open together, and for one reason.** Each needs the whole
+  application running in a browser: a real Kestrel address rather than `TestServer`, the WebAssembly
+  runtime booting against it, a signed-in editor, and a database behind it. The E2E project is
+  deliberately `Client`-only today — it renders components statically and drives Playwright over the
+  markup — so this is a piece of harness that does not exist rather than three tests somebody forgot
+  to write. Everything they gate is asserted a level down and said so in the criteria: `P6 #5` and
+  `P6 #6` are met by `AutosaveControllerTests`, `PageEditorSavingTests`, `ConflictDialogTests`, and
+  `PageApiTests`, and the journey's server half is `DraftAndPublishTests` and `DeliveryTests`. What
+  is missing is the only thing those cannot do — failing the way a real network fails, and racing the
+  way two real browsers race.*
+- [x] **P6-35** Performance: tree responsive at 5,000 pages with 500 siblings under one parent.
+  *2026-08-16 — `ContentTreeScaleTests`. The criterion's two halves are answered by two different
+  mechanisms, so they are asserted separately rather than by timing one big render and hoping. **5,000
+  pages** is answered by lazy loading, and what is asserted is the request count — a tree that
+  quietly fetched depth 5 would still look fast against a fixture and would not be on a real site.
+  **500 siblings** is answered by virtualization, and what is asserted is that the document holds a
+  bounded number of rows rather than 500, because rendering 500 rows is the slow thing and no
+  millisecond threshold is stable across machines. A wall-clock budget is asserted too, deliberately
+  loose: it exists to catch an accidental walk of every sibling per sibling, not to police hardware.
+  The third test is the one that makes the first two matter — at this size the filter has to be a
+  server-side search, because a tree holding twenty of five thousand pages would answer "no results"
+  for 99.6% of the site.*
+- [x] **P6-36** axe-core across every backoffice screen — zero critical or serious violations.
+  *2026-08-16 — Extended to the screens Phase 6 added: the dashboard, a dashboard tile, and the
+  recycle bin, with the content tree audited separately **as the pane it actually is** — running it
+  through the whole-page theory would report "page should contain a level-one heading" against a
+  component that is not a page. **It found three real defects rather than confirming a clean bill**:
+  four `section` elements inside one card were four landmarks announced by the same name (the groups
+  are now plain `div`s under headings, which is what they are); the tile screen skipped from `h1` to
+  `h3`, so the group heading level is now a parameter — the same list sits at two different depths;
+  and the tree pane needed the heading its host screen supplies. The gate runs `wcag2a`, `wcag2aa`,
+  `wcag21a`, `wcag21aa`, and best-practice over rendered markup, and asserts `results.Passes` is
+  non-empty so a document that rendered nothing cannot pass by having nothing to complain about.*
+- [~] **P6-37** Manual keyboard-only pass over the whole authoring flow.
+  *2026-08-16 — Written up rather than performed, in [`docs/phase-6-keyboard-pass.md`](./docs/phase-6-keyboard-pass.md):
+  what the automated suites already prove (block operability, the tree's menu and arrows, keyboard
+  moves, pane resizing, the shortcut table, and the axe gate), and the six things a person still has
+  to do with the pointer physically unplugged. **A keyboard pass is not a check that every control is
+  reachable — it is a check that reaching them is bearable**, and none of what makes it unbearable
+  fails an assertion. It has to be run again once the three-pane shell is mounted, since pane order
+  and the Tab path between panes are exactly what that changes.*
+- [x] **P6-38** 200% browser zoom pass.
+  *2026-08-16 — `ZoomTests`. 200% zoom is **a viewport of half the width**, not a screenshot scaled
+  up: a browser at 200% on a 1280-pixel display reports 640 CSS pixels, so the failure it produces is
+  a layout one. Every screen is rendered with the site's own `site.css` and measured for horizontal
+  overflow, which is WCAG 1.4.10's rule — content must reflow rather than make somebody scroll in two
+  directions to read one line. **It found four screens that did not**: the page list, the version
+  history, the preview links, and the reusable library, all wide tables that could not narrow. Each
+  now scrolls inside its own `table-responsive` container, which is the difference between one
+  element scrolling and the page doing it. A negative control asserts that something known to be too
+  wide does fail the measurement, because an overflow check passes for the wrong reason the moment
+  the stylesheet fails to load.*
+- [x] **P6-39** `prefers-reduced-motion` respected; no color-only status encoding in the tree [§28].
+  *2026-08-16 — `ReducedMotionTests`. The motion half is asserted against the stylesheets themselves:
+  `prefers-reduced-motion` is a media query, so a rendering test would have to emulate the preference
+  and compute a style, and bUnit has no browser to compute one in — what can be checked is the thing
+  that actually goes wrong, an `animation` or `transition` added without a guard beside it. Bootstrap's
+  own components carry their guard inside the framework, so only this repository's stylesheets are
+  judged, and a second test fails if the file walk found none, since the first would otherwise pass
+  vacuously. The colour half drives `PageStatusIndicator` through every state and asserts each is a
+  **word** — and not merely present but announced, since the icon is `aria-hidden` and the
+  visually-hidden text is all a screen reader has.*
 - [x] **P6-40** Add backoffice and content typography layers to `styles/site.scss`.
   *(Existing-code change.)*
   *2026-08-16 — Brought forward because `P6-09` and `P6-14` both need it: a preview is a
@@ -3414,8 +3578,17 @@ daily — including the edit/preview experience the requirements call out explic
 
 ### Acceptance criteria — Phase 6
 
-- [ ] **P6 #1** An editor completes create → fill → preview → publish without touching a raw JSON
+- [x] **P6 #1** An editor completes create → fill → preview → publish without touching a raw JSON
   payload or a URL bar.
+  *2026-08-16 — The JSON half was met when the eighteenth field editor landed (`P6-06`…`P6-16`):
+  every built-in field type has a control, so no zone falls back to a raw envelope. The **URL-bar**
+  half needed one more thing, and it was missing until now — `/admin` was not a route at all, so an
+  editor arriving at the backoffice reached the page list by typing its address. `P6-24`'s dashboard
+  is that route, and it carries the section bar of [§14.1] (content, media, reusable, structure,
+  recycle bin) because `AdminShell` is still mounted by nothing; when the shell is composed the bar
+  moves into it and nothing else changes. Create, fill, preview, and publish are then reachable by
+  clicking: dashboard → content → new page → the canvas → Preview draft → Publish.
+  **The browser journey that walks it end to end is `P6-32`, still open.***
 - [x] **P6 #2** Markdown Edit/Preview/Split all work, and Preview matches the published page's rendering
   exactly.
   *2026-08-16 — The three modes are `P6-08` and `P6-10`. "Exactly" holds because there is one
@@ -3449,21 +3622,66 @@ daily — including the edit/preview experience the requirements call out explic
   retried, and keep-mine resending **the same text** with the winner's token. `PageApiTests` pins the
   server end — the 409 body carries the draft that won, and a refusal nothing won carries no `conflict`
   member at all. `P6-34` remains: the same three options in a browser.*
-- [ ] **P6 #7** The tree remains responsive at 5,000 pages with 500 siblings under one parent.
-- [ ] **P6 #8** The dashboard surfaces the signed-in user's drafts, review tasks, and overdue content,
+- [x] **P6 #7** The tree remains responsive at 5,000 pages with 500 siblings under one parent.
+  *2026-08-16 — `P6-35`, pinned by `ContentTreeScaleTests` on the two mechanisms that make it true
+  rather than on a stopwatch: one fetch per expansion however large the site, and a bounded number of
+  rows in the document however crowded the level. The third assertion is the one that keeps the
+  first two honest — the filter searches the server, because a tree holding twenty of five thousand
+  pages could only ever filter the twenty.*
+- [x] **P6 #8** The dashboard surfaces the signed-in user's drafts, review tasks, and overdue content,
   and every tile deep-links into a correctly filtered list.
-- [ ] **P6 #9** A deleted page leaves the public site immediately, remains in the recycle bin with full
+  *2026-08-16 — `P6-24`…`P6-27`. `DashboardTests` drives the server half — the editor's own drafts,
+  an overdue review, an undescribed image, the top 404s, a broken reference that appears only once it
+  is live, and a schedule whose moment came and went — and `DashboardScreenTests` drives the screen,
+  including that every tile links to its own list. The link opens the **same query at a larger
+  limit**, which is what makes "correctly filtered" structural rather than a promise. The one part of
+  the criterion that is not drawn is review assignment, which has nothing to write to until `P7`; the
+  tile says so rather than showing an empty list that reads as good news.*
+- [x] **P6 #9** A deleted page leaves the public site immediately, remains in the recycle bin with full
   history, and restores as a *draft*.
-- [ ] **P6 #10** Deleting and restoring a page with children moves the whole subtree, with the count
+  *2026-08-16 — The behaviour is `P2-08`'s and has been pinned by `RecycleBinAndDuplicationTests`
+  since Phase 2: the published pointer is retired inside the delete, the version rows and reference
+  rows stay, and a restore sets `PublishedVersionId` to null so nothing comes back live. What Phase 6
+  adds is the screen that makes it reachable (`P6-28`) and `RecycleBinScreenTests` over it.*
+- [x] **P6 #10** Deleting and restoring a page with children moves the whole subtree, with the count
   shown before confirming.
-- [ ] **P6 #11** A deep duplicate rewrites links between pages inside the copied subtree to the new
+  *2026-08-16 — The count comes first, from `IRecycleBinService.DescribeAsync` rather than from
+  anything the tree counted for itself, and the confirmation states both numbers — how many pages go,
+  and how many of them are live and leave the public site at once (`P6-04`, `ContentTreeMenuTests`).
+  The bin's own list carries the other half: each entry is the subtree root with its descendant count
+  beside it, so a restore is one act on the section rather than forty in an order that matters.*
+- [x] **P6 #11** A deep duplicate rewrites links between pages inside the copied subtree to the new
   copies, while links out of the subtree still point at the originals.
-- [ ] **P6 #12** A bulk publish of 100 pages runs as a background job with progress, and a partial
+  *2026-08-16 — `P2-09`'s `DuplicationService`, pinned by
+  `ADeepDuplicateRewritesLinksInsideTheSubtreeAndLeavesLinksOutOfItAlone`. Phase 6 reaches it from
+  the tree in two ways — "duplicate with children", and paste-as-copy, which is deliberately deep
+  because pasting half a section is never what was meant (`P6-04`).*
+- [x] **P6 #12** A bulk publish of 100 pages runs as a background job with progress, and a partial
   failure leaves successful items published while reporting the rest individually.
-- [ ] **P6 #13** axe-core reports zero critical or serious violations on every backoffice screen.
-- [ ] **P6 #14** The whole authoring flow is operable at 200% browser zoom.
+  *2026-08-16 — `P6-29`. `BulkOperationTests` covers both halves against a real database: a batch over
+  `BulkLimits.BackgroundThreshold` is accepted, answered `202` with a job to poll, and finishes after
+  the request has been answered; and a branch publish where one page has an unfilled required zone
+  leaves the other two published, names the page that failed, and carries the reason the single-item
+  publish would have given. A job whose items all failed still reports `Completed` — every one was
+  attempted — which is the distinction between a partial failure and a batch that stopped.*
+- [x] **P6 #13** axe-core reports zero critical or serious violations on every backoffice screen.
+  *2026-08-16 — `P6-36`, over eleven screens and the content tree pane, at `wcag2a` through
+  `wcag21aa` plus best-practice. It found three defects on the way in, all of them Phase 6's own and
+  all now fixed — which is the argument for the gate rather than against it.*
+- [x] **P6 #14** The whole authoring flow is operable at 200% browser zoom.
+  *2026-08-16 — `P6-38`, measured as WCAG 1.4.10 defines it: a 640-pixel viewport and no horizontal
+  overflow. Four screens failed it and were fixed. "Operable" beyond reflow — every control still
+  reachable by keyboard at that size — is the part a measurement cannot make, and it is step 6 of the
+  manual pass in `P6-37`.*
 
 **Exit gate:** editors complete the full flow unaided; a11y clean. — [ ] met on ____
+*2026-08-16 — **Twelve of fourteen criteria met**, and the a11y half of the gate is clean:
+`P6 #13` passes over every screen, `P6 #14` passes after four fixes, and `P6 #4` was met when the
+block list shipped. What the gate still waits on is the half that says *unaided*: `P6-32` to `P6-34`
+walk the full journey, a flaky network, and a save conflict **in a browser**, and `P6-37`'s
+keyboard-only pass has to be performed by a person. All four need something no assertion supplies —
+a running application and somebody using it — which is why the gate is left open rather than
+declared met on the strength of the layer beneath.*
 
 **Risks:** R13 (scope elasticity), R14 (JS interop memory leaks).
 
@@ -3850,6 +4068,10 @@ reviewer.
 | `Server/package.json`, `Server/…Server.csproj` | Add esbuild and the two editor bundles to the front-end build, so a missing bundle fails the build rather than the page (`D13`) | 6 | P6-08 | [x] |
 | `Core/Fields/Types/TextFieldTypeBase.cs`, `RichTextFieldType.cs` | Declare the `softLimit` setting the counter honours. Configuration is closed (`ADR-0015`), so an undeclared setting is refused on save | 6 | P6-12 | [x] |
 | `Client/Components/Admin/PlainSlotValues.cs` | Reduced to a raw envelope round trip: each field type's storage shape now lives in its own editor rather than in a switch shared by every form | 6 | P6-06…P6-15 | [x] |
+| `Server/Program.cs`, `Client/Program.cs` | Register the dashboard service and its two client halves, and replace `Core`'s identity-free bulk scope factory with the one that captures the signed-in editor — without which a background batch is refused on its first item or recorded as having been done by nobody | 6 | P6-24…P6-29 | [x] |
+| `Server/Api/Cms/CmsApiEndpoints.cs` | Map the dashboard and bulk endpoint groups | 6 | P6-27, P6-29 | [x] |
+| `Client/…/PageList.razor`, `PageVersions.razor`, `PagePreviewLinks.razor`, `ReusableLibrary.razor` | Wrap each wide table in `table-responsive`. All four overflowed a 640-pixel viewport, which is what 200% zoom reports on a 1280-pixel display — found by the zoom pass rather than by looking | 6 | P6-38 | [x] |
+| `Client/…/Dashboard/DashboardGroupList.razor` | Groups are `div`s under headings rather than labelled `section`s, and the heading level is a parameter. Four labelled sections in one card are four landmarks announced by the same name; a fixed level makes one of the two screens skip one — both found by the axe gate | 6 | P6-36 | [x] |
 | `README.md` | Document CMS setup, template authoring, schema sync CLI | 9 | P9-22 | [ ] |
 | `ContentManagementSystem.slnx` | Add Core, Rendering, and four test projects | 0 | P0-07…P0-11 | [ ] |
 
@@ -3885,7 +4107,7 @@ the checklist for verifying the delivered system against the original ask.
 | R-3 | "In zones that are plain text or html/markdown … inline editing … 'edit/preview' editor experience" | [§14.4] | P6-08…P6-14 | P6 #2, #3 | [x] 2026-08-16 — both criteria met. Edit/Preview/Split over markdown and over the WYSIWYG surface, with the preview rendered by the server's one pipeline rather than a second copy in the browser, and the HTML editor warning about what will be stripped while the author is still writing |
 | R-4 | "Reusable content … specified once but then reused in multiple (common footers, image carousels)" | [§9] | P4-01…P4-11 | P4 #1, #2 | [x] 2026-08-16 |
 | R-5 | "content editors should be able to create pages from those templates" | [§10.1], [§22.1] | P2-07, P2-16, P2-23 | P2 #1 | [x] 2026-08-14 |
-| R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [ ] |
+| R-6 | "populate the 'placeholder' areas with actual content" | [§6.2], [§14.3] | P2-10, P2-23, P6-05, P6-06 | P2 #2, P6 #1 | [x] 2026-08-16 — both criteria met. A zone is a card with the control its field type declares, and every built-in type has one, so filling a page never falls back to a raw payload; the layout comes from the revision the draft was authored against rather than the template's current one |
 | R-7 | "Pages … need to have a url specified so that end users would be able to navigate to the pages" | [§10.2]–[§10.4] | P3-01…P3-06, P3-13 | P3 #1 | [x] 2026-08-15 |
 | R-8 | "pages in draft mode before they get published out" | [§11.1], [§11.2] | P2-10, P2-11, P3-16 | P2 #3, P3 #2 | [x] 2026-08-15 |
 | R-9 | "pages should be versioned" | [§11.1]–[§11.5] | P2-11, P2-13, P2-14 | P2 #5, #6, #7 | [ ] |
@@ -3910,7 +4132,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #7 | Granular permissions | P7-01…P7-07 | [ ] |
 | #8 | Shareable preview links | P3-17…P3-19 | [x] 2026-08-15 |
 | #9 | Version diff & rollback | P2-13, P2-14 | [ ] |
-| #10 | Soft delete & recycle bin | P2-08, P6-28 | [ ] |
+| #10 | Soft delete & recycle bin | P2-08, P6-28 | [x] 2026-08-16 — the service since Phase 2, the screen since `P6-28`. The bin lists subtree roots rather than deleted rows, restores bring a page back as a draft, and the one irreversible operation is Administrator-only and asks for the name to be typed |
 | #11 | HTML sanitization / XSS defense | P1-18…P1-20, P9-06 | [ ] |
 | #12 | Upload validation & safe serving | P5-05…P5-07, P5-17 | [x] 2026-08-16 — decided at the sniffer and the sanitizer, so single-request upload, replace, and chunked assembly share one set of refusals |
 | #13 | Alt text enforced | P5-21 | [x] 2026-08-16 — at upload, at `PATCH`, and at publish on both the page and reusable paths; a placement override is one of the three ways out |
@@ -3973,8 +4195,8 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |
 | R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | **Mitigated and measured 2026-08-16, still open for P9** — renditions are lazy rather than warmed (ADR 0007), a per-key semaphore collapses N cold requests for one rendition into one encode (`P5-30`), and generation is bounded by an allowlist of six widths. `RenditionBenchmarkTests` holds NFR-8 on cold encodes through the whole endpoint. None of that is the trigger: the contingency turns on **sustained CPU under a load test**, and no load test exists until P9 |
 | R12 | SVG sanitization bypassed | **Critical** | 5 | Any bypass found → disable SVG | **Unreached in the shipped default, still open** — `SvgUploadPolicy` defaults to `Reject` (`P5-06`), so a deployment that never opts in cannot be bypassed because it never sanitizes. The sanitizer is reachable only by an explicit `Sanitize`, and **Q7 is unanswered**, so the risk cannot be closed — it is the opt-in branch that carries it. The contingency is already the default state, which is the point |
-| R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | **Open, and the fallback is verified rather than assumed 2026-08-16** — the contingency is "the plain UI from P1–P5 remains a working fallback", which was true only for as long as nothing replaced it. It is now `IFieldEditorCatalog.FallbackEditor`, reached by any field type with no editor, and `PlainZoneEditorTests` pins that it still round-trips a value. The field editors also came in wider than the tasks named — eighteen field types rather than ten — which is scope the criteria required (`P6 #1`) rather than scope that expanded. No budget figure has been taken at the midpoint, so the trigger itself is unexercised |
-| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**, and neither `P6-31a`'s mount/unmount assertion nor `P9-16`'s soak has run |
+| R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | **Open at the end of the phase's build, and the trigger was never pulled 2026-08-16** — the fallback is verified rather than assumed: `IFieldEditorCatalog.FallbackEditor` is reached by any field type with no editor and `PlainZoneEditorTests` pins that it still round-trips a value. Every task in the phase is now done or explicitly deferred, and what came in wider than the tasks named — eighteen field editors rather than ten, four dashboard tiles over one service, a bulk operation set of five — is scope the criteria required rather than scope that expanded. **No budget figure has been taken at any point**, so the trigger has never been evaluated; the risk stays open on that alone, and closing it would be recording a measurement nobody made |
+| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**. `P6-31a` has now run — ten mount/unmount cycles of each editor in Chromium, created equal to disposed, and no surviving editor node, toolbar included — which is the instrument reading zero on a short run. `P9-16`'s two-hour soak is what the trigger actually names, and it has not |
 | R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | Open |
 | R16 | Duplicate scheduled publishes under scale-out | Med | 7 | Any duplicate observed | Open |
 | R17 | Cache invalidation misses a dependent page | **High** | 8 | Any stale page reported after publish | Open |

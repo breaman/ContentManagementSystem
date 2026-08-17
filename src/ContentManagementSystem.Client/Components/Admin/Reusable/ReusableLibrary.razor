@@ -33,54 +33,59 @@ else if (Items.Count == 0)
 }
 else
 {
-    <table class="table">
-        <caption>Every reusable item, by name.</caption>
-        <thead>
-            <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Key</th>
-                <th scope="col">Shape</th>
-                <th scope="col">Draft</th>
-                <th scope="col">Published</th>
-                <th scope="col">State</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in Items)
-            {
+    @* A table of six columns cannot narrow to a 640-pixel viewport, which is what 200% zoom
+       reports on a 1280-pixel display. Scrolling it inside its own container is the difference
+       between one element scrolling and the whole page doing it (task P6-38). *@
+    <div class="table-responsive">
+        <table class="table">
+            <caption>Every reusable item, by name.</caption>
+            <thead>
                 <tr>
-                    <th scope="row"><a href="@($"/admin/reusable/{item.Id}")">@item.Name</a></th>
-                    <td><code>@item.Key</code></td>
-                    <td><code>@item.BlockTypeKey</code></td>
-                    <td>v@item.DraftVersionNumber</td>
-                    <td>
-                        @if (item.PublishedVersionNumber is { } published)
-                        {
-                            @($"v{published}")
-                        }
-                        else
-                        {
-                            <span class="text-body-secondary">—</span>
-                        }
-                    </td>
-                    <td>
-                        @if (item.PublishedVersionNumber is null)
-                        {
-                            <span class="badge text-bg-secondary">never published</span>
-                        }
-                        else if (item.HasUnpublishedChanges)
-                        {
-                            <span class="badge text-bg-warning">unpublished changes</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-success">live</span>
-                        }
-                    </td>
+                    <th scope="col">Name</th>
+                    <th scope="col">Key</th>
+                    <th scope="col">Shape</th>
+                    <th scope="col">Draft</th>
+                    <th scope="col">Published</th>
+                    <th scope="col">State</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr>
+                        <th scope="row"><a href="@($"/admin/reusable/{item.Id}")">@item.Name</a></th>
+                        <td><code>@item.Key</code></td>
+                        <td><code>@item.BlockTypeKey</code></td>
+                        <td>v@item.DraftVersionNumber</td>
+                        <td>
+                            @if (item.PublishedVersionNumber is { } published)
+                            {
+                                @($"v{published}")
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (item.PublishedVersionNumber is null)
+                            {
+                                <span class="badge text-bg-secondary">never published</span>
+                            }
+                            else if (item.HasUnpublishedChanges)
+                            {
+                                <span class="badge text-bg-warning">unpublished changes</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">live</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">

@@ -1,5 +1,6 @@
 using ContentManagementSystem.Client.Components.Admin.Canvas;
 using ContentManagementSystem.Client.Components.Admin.Properties;
+using ContentManagementSystem.Client.Components.Admin.Shortcuts;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
@@ -121,6 +122,9 @@ public partial class PageEditor : ComponentBase, IAsyncDisposable
 
     /// <summary>The draft that beat this editor's save, or null when none has.</summary>
     private DraftState? Theirs { get; set; }
+
+    /// <summary>Whether the shortcut reference dialog is showing (task P6-23).</summary>
+    private bool IsShortcutHelpOpen { get; set; }
 
     /// <summary>Whether the publish dialog is showing.</summary>
     private bool IsPublishDialogOpen { get; set; }
@@ -374,6 +378,47 @@ public partial class PageEditor : ComponentBase, IAsyncDisposable
         Page.TemplateRevision,
         Slots ?? [],
         Values);
+
+    /// <summary>
+    /// Runs whatever a keyboard shortcut asked for (task P6-23).
+    /// </summary>
+    /// <remarks>
+    /// Every branch calls the same method the button beside it calls, so a shortcut cannot reach a
+    /// path the visible control does not — including its permission checks. The two that a viewer
+    /// cannot use are absent from the table they were matched against rather than guarded here.
+    /// </remarks>
+    private async Task RunShortcutAsync(string id)
+    {
+        switch (id)
+        {
+            case EditorShortcuts.ShowHelp:
+                IsShortcutHelpOpen = true;
+
+                break;
+
+            case EditorShortcuts.Save when CanEdit && !IsBusy:
+                await SaveAsync();
+
+                break;
+
+            case EditorShortcuts.Check when !IsBusy:
+                await ValidateAsync();
+
+                break;
+
+            case EditorShortcuts.Publish when !IsBusy:
+                await BeginPublishAsync();
+
+                break;
+
+            case EditorShortcuts.Preview:
+                // A new tab, exactly as the link does: an editor who lost their unsaved form to a
+                // preview would not press this twice.
+                await Js.InvokeVoidAsync("open", $"/preview/{Id}", "_blank", "noopener");
+
+                break;
+        }
+    }
 
     /// <summary>Saves now, because the editor asked.</summary>
     private async Task SaveAsync()

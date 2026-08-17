@@ -1,0 +1,39 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Shortcuts
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="Keyboard shortcuts"
+             ConfirmLabel="Close"
+             CancelLabel="Close"
+             OnConfirm="OnClose"
+             OnCancel="OnClose">
+
+    <p class="text-body-secondary">
+        Press <kbd>Shift</kbd> + <kbd>?</kbd> at any time to see this list. Everything a shortcut does
+        is also a button on the screen — none of these is the only way to do anything.
+    </p>
+
+    @foreach (var group in Grouped)
+    {
+        <h3 class="h6">@group.Key</h3>
+        <dl class="row mb-3">
+            @foreach (var shortcut in group)
+            {
+                <dt class="col-5 col-sm-4 fw-normal">
+                    @* Split so each key is its own <kbd>, which is what makes a chord read as
+                       "Control and S" rather than as one long key name. *@
+                    @for (var i = 0; i < Keys(shortcut).Count; i++)
+                    {
+                        @if (i > 0)
+                        {
+                            <span> + </span>
+                        }
+                        <kbd>@Keys(shortcut)[i]</kbd>
+                    }
+                </dt>
+                <dd class="col-7 col-sm-8">@shortcut.Description</dd>
+            }
+        </dl>
+    }
+
+</ModalDialog>

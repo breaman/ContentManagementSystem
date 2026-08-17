@@ -1,3 +1,4 @@
+using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Shared.Contracts.Content;
 
 using Microsoft.AspNetCore.Components.Web;
@@ -42,6 +43,15 @@ public partial class ContentTree
     /// <summary>The page the delete confirmation is about.</summary>
     private PageSummary? _deleteSubject;
 
+    /// <summary>What a branch publish would cover, or null when none is being confirmed.</summary>
+    private BulkImpact? _branchImpact;
+
+    /// <summary>The branch publish's progress, or null before it has been confirmed.</summary>
+    private BulkJobStatus? _branchJob;
+
+    /// <summary>The page a branch publish is rooted at.</summary>
+    private PageSummary? _branchSubject;
+
     /// <summary>Whether a menu command is in flight.</summary>
     private bool _working;
 
@@ -64,10 +74,12 @@ public partial class ContentTree
     /// a page that was never published is a control an editor has to read and dismiss every time;
     /// its absence says the same thing and costs nothing to skip.
     /// <para>
-    /// "Publish branch" is not here yet. Publishing a subtree is a background job with per-item
-    /// results, which is <c>BulkOperationService</c> in P6-29 — and a menu entry that published
-    /// forty pages one request at a time, with no progress and no per-item reporting, would be the
-    /// wrong thing wearing the right label.
+    /// "Publish branch" is offered only on a page that has children, for the same reason: on a leaf
+    /// it is the entry above it under a longer name. It runs through <c>IBulkOperationService</c>
+    /// (P6-29) rather than looping over the tree here — the impact is confirmed before anything
+    /// happens, the batch reports per page, and a branch of more than
+    /// <see cref="BulkLimits.BackgroundThreshold"/> pages runs on the server rather than tying up the
+    /// browser.
     /// </para>
     /// </remarks>
     internal IReadOnlyList<TreeCommand> CommandsFor(PageSummary page)
@@ -96,6 +108,11 @@ public partial class ContentTree
         }
 
         commands.Add(TreeCommand.Publish);
+
+        if (page.HasChildren)
+        {
+            commands.Add(TreeCommand.PublishBranch);
+        }
 
         if (page.PublishedVersionNumber is not null)
         {
@@ -217,6 +234,11 @@ public partial class ContentTree
 
                     break;
 
+                case "publish-branch":
+                    await AskToPublishBranchAsync(page);
+
+                    break;
+
                 case "unpublish":
                     await UnpublishAsync(page);
 
@@ -298,6 +320,96 @@ public partial class ContentTree
 
         Toasts.ShowSuccess($"“{page.Title}” is live.", "Published");
     }
+
+    /// <summary>
+    /// Asks the server what publishing a branch would cover, and puts the answer in front of the
+    /// editor (task P6-04, spec section 14.11).
+    /// </summary>
+    /// <remarks>
+    /// The count comes from the server, resolved by the same code that will run the batch. The tree
+    /// could count the descendants it has fetched instead, and would be wrong every time: it lazily
+    /// loads one level at a time, so a branch it has never opened looks like a leaf.
+    /// </remarks>
+    private async Task AskToPublishBranchAsync(PageSummary page)
+    {
+        _branchSubject = page;
+
+        var result = await Client.PreviewBulkAsync(BranchRequest(page));
+
+        if (!result.IsSuccess)
+        {
+            _branchSubject = null;
+            _moveErrors = result.Errors;
+
+            return;
+        }
+
+        _branchImpact = result.Value;
+    }
+
+    /// <summary>Runs the confirmed branch publish, redrawing on every report of its progress.</summary>
+    private async Task ConfirmPublishBranchAsync()
+    {
+        if (_branchSubject is not { } page) return;
+
+        _working = true;
+
+        try
+        {
+            var result = await BulkOperationRunner.RunAsync(
+                Client,
+                Clock,
+                BranchRequest(page),
+                status =>
+                {
+                    _branchJob = status;
+
+                    StateHasChanged();
+
+                    return Task.CompletedTask;
+                });
+
+            if (!result.IsSuccess)
+            {
+                _branchImpact = null;
+                _branchSubject = null;
+                _moveErrors = result.Errors;
+
+                return;
+            }
+
+            // The level under the page is re-read rather than the whole tree: a branch publish
+            // changes publishing state throughout the subtree, and the rows an editor can see are
+            // the ones that have to stop saying "draft".
+            await RefreshAsync(page.Id);
+            await RefreshAsync(page.ParentId);
+        }
+        finally
+        {
+            _working = false;
+
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>Closes the branch dialog, at the confirmation or at the report.</summary>
+    /// <remarks>
+    /// Closing never cancels anything. A background job belongs to the server the moment it is
+    /// accepted, and a dialog that implied otherwise would have editors closing it to stop a publish
+    /// that then went ahead.
+    /// </remarks>
+    private void CloseBranchDialog()
+    {
+        _branchImpact = null;
+        _branchJob = null;
+        _branchSubject = null;
+
+        StateHasChanged();
+    }
+
+    /// <summary>The one request shape both the preview and the run are built from.</summary>
+    private static BulkOperationRequest BranchRequest(PageSummary page) =>
+        new(BulkOperation.Publish, new BulkSelection([page.Id], IncludeDescendants: true));
 
     /// <summary>Takes one page off the public site.</summary>
     private async Task UnpublishAsync(PageSummary page)

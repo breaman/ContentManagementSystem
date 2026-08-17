@@ -25,6 +25,7 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="previews">Shareable preview links.</param>
 /// <param name="duplication">Shallow and deep copies, which the tree's paste is built on.</param>
 /// <param name="recycleBin">Soft delete, which the tree's delete is built on.</param>
+/// <param name="bulk">One operation over many pages, which "publish branch" is built on.</param>
 /// <remarks>
 /// Used during pre-rendering, so a page screen arrives with its content already in the HTML rather
 /// than showing a spinner until the WebAssembly runtime finishes downloading. It calls the services
@@ -45,6 +46,7 @@ public sealed class ServerPageClient(
     IPreviewTokenService previews,
     IDuplicationService duplication,
     IRecycleBinService recycleBin,
+    IBulkOperationService bulk,
     ILinkResolver links) : IPageClient
 {
     /// <inheritdoc />
@@ -140,6 +142,52 @@ public sealed class ServerPageClient(
         int id,
         CancellationToken cancellationToken = default) =>
         Project(await recycleBin.DeleteAsync(id, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(
+        CancellationToken cancellationToken = default) =>
+        (await recycleBin.ListAsync(cancellationToken)).Value ?? [];
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<SubtreeResult>> RestoreAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Project(await recycleBin.RestoreAsync(id, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<PurgeResult>> PurgeAsync(
+        int id,
+        CancellationToken cancellationToken = default)
+    {
+        var purged = await recycleBin.PurgeAsync(id, cancellationToken);
+
+        // The service answers with a row count and the API dresses it as a PurgeResult, so this does
+        // the same rather than letting the pre-rendered screen see a different shape from the
+        // hydrated one.
+        return purged.IsSuccess
+            ? StructureClientResult<PurgeResult>.Success(new PurgeResult(id, purged.Value))
+            : StructureClientResult<PurgeResult>.Failure(
+                ApiDiagnostics.Project(purged.Diagnostics, ValidationSeverity.Error),
+                ApiDiagnostics.Project(purged.Diagnostics, ValidationSeverity.Warning));
+    }
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) =>
+        Project(await bulk.DescribeAsync(request, cancellationToken));
+
+    /// <inheritdoc />
+    public async Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) =>
+        Project(await bulk.StartAsync(request, cancellationToken));
+
+    /// <inheritdoc />
+    public Task<BulkJobStatus?> GetBulkAsync(
+        Guid jobId,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(bulk.Get(jobId).Value);
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PublishValidation>> ValidateAsync(

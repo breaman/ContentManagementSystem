@@ -28,6 +28,9 @@ public sealed class FakePageClient : IPageClient
     /// <summary>Identity of the draft version, which the diff compares to.</summary>
     public const int DraftVersionId = 22;
 
+    /// <summary>Identity of the bulk job the branch-publish report is rendered against.</summary>
+    public static readonly Guid JobId = new("2b7d4f60-9c31-4a58-b0d2-6f1c8e5a3d47");
+
     private static readonly Guid MovedBlock = new("0f6c0d1e-2a3b-4c5d-8e9f-101112131415");
 
     /// <inheritdoc />
@@ -175,6 +178,93 @@ public sealed class FakePageClient : IPageClient
         CancellationToken cancellationToken = default) =>
         Task.FromResult(StructureClientResult<SubtreeResult>.Success(
             new SubtreeResult(id, [id, 9], UnpublishedCount: 1, [])));
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// A section deleted with two pages under it, a page deleted on its own, and one of the section's
+    /// descendants — so the screen renders a root with a subtree, a root without one, and the row it
+    /// must <em>not</em> show as a root of its own (task P6-28).
+    /// </remarks>
+    public Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RecycleBinEntry>>(
+        [
+            new RecycleBinEntry(51, "Autumn campaign", "autumn", null, IsSubtreeRoot: true, 2,
+                WasPublished: true, DateTimeOffset.UtcNow.AddDays(-2), 1),
+            new RecycleBinEntry(52, "Autumn offers", "offers", 51, IsSubtreeRoot: false, 0,
+                WasPublished: true, DateTimeOffset.UtcNow.AddDays(-2), 1),
+            new RecycleBinEntry(53, "Old pricing", "old-pricing", null, IsSubtreeRoot: true, 0,
+                WasPublished: false, DateTimeOffset.UtcNow.AddHours(-3), 1),
+        ]);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<SubtreeResult>> RestoreAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<SubtreeResult>.Success(
+            new SubtreeResult(id, [id, 52], UnpublishedCount: 0, [])));
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<PurgeResult>> PurgeAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult(StructureClientResult<PurgeResult>.Success(new PurgeResult(id, 4)));
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// Two selected pages and a descendant swept in behind one of them, which is the shape the
+    /// confirmation exists to show: "you picked 2, this will publish 3" (task P6-29).
+    /// </remarks>
+    public Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Task.FromResult(StructureClientResult<BulkImpact>.Success(new BulkImpact(
+            request.Operation,
+            [
+                new BulkImpactItem(Id, "Pricing", IsPublished: true, WasSelected: true),
+                new BulkImpactItem(2, "Enterprise", IsPublished: true, WasSelected: false),
+                new BulkImpactItem(3, "Careers", IsPublished: false, WasSelected: true),
+            ],
+            SelectedCount: 2,
+            PublishedCount: 2,
+            RunsInBackground: false,
+            [])));
+    }
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return Task.FromResult(StructureClientResult<BulkJobStatus>.Success(new BulkJobStatus(
+            JobId,
+            request.Operation,
+            BulkJobState.Completed,
+            3,
+            [
+                new BulkItemResult(Id, "Pricing", Succeeded: true, []),
+                new BulkItemResult(2, "Enterprise", Succeeded: true, []),
+                // One failure with a reason attached, because a report that only ever shows successes
+                // never renders the branch the screen exists for.
+                new BulkItemResult(3, "Careers", Succeeded: false,
+                    [new ApiDiagnostic("field.required", "\"Hero title\" is required.", "zones.heroTitle")]),
+            ],
+            DateTimeOffset.UtcNow.AddSeconds(-4),
+            DateTimeOffset.UtcNow)));
+    }
+
+    /// <inheritdoc />
+    public async Task<BulkJobStatus?> GetBulkAsync(
+        Guid jobId,
+        CancellationToken cancellationToken = default) =>
+        (await StartBulkAsync(
+            new BulkOperationRequest(BulkOperation.Publish, new BulkSelection([Id])),
+            cancellationToken)).Value;
 
     /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(

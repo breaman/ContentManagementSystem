@@ -148,6 +148,72 @@ public interface IPageClient
         int id,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Lists what is in the recycle bin, most recently deleted first (task P6-28).
+    /// </summary>
+    /// <param name="cancellationToken">Token observed while loading.</param>
+    /// <remarks>
+    /// Every deleted page, roots and descendants alike. The screen shows the roots and offers each
+    /// one's subtree beneath it, so one delete of a section reads as one entry rather than as twelve
+    /// an editor restores one at a time — which is why the entries carry
+    /// <c>IsSubtreeRoot</c> rather than the list being filtered here.
+    /// </remarks>
+    Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Restores a page and everything deleted with it, as drafts (task P6-28).</summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while saving.</param>
+    /// <returns>What came back, with a warning if it had to come back at the site root.</returns>
+    Task<StructureClientResult<SubtreeResult>> RestoreAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Permanently removes a page already in the recycle bin (task P6-28).</summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="cancellationToken">Token observed while deleting.</param>
+    /// <returns>What was destroyed, or the reason it could not be.</returns>
+    /// <remarks>
+    /// The one irreversible operation the backoffice offers. It is refused while any stored content
+    /// still points at the page, and the refusal names the pages in the way — which the screen shows
+    /// rather than summarising, since "3 pages reference this" is not something anybody can act on.
+    /// </remarks>
+    Task<StructureClientResult<PurgeResult>> PurgeAsync(
+        int id,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reports what a bulk operation would run over, without running any of it (task P6-29).
+    /// </summary>
+    /// <param name="request">The operation and the selection.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The resolved selection, or the reason it was refused.</returns>
+    /// <remarks>
+    /// The count worth confirming is rarely the count an editor selected: publishing a branch of
+    /// three sections is forty-one pages. Resolving that server-side is what stops the confirmation
+    /// and the consequence disagreeing.
+    /// </remarks>
+    Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Runs one operation over a selection of pages (task P6-29, spec section 14.11).</summary>
+    /// <param name="request">The operation and the selection.</param>
+    /// <param name="cancellationToken">Token observed while starting the job.</param>
+    /// <returns>
+    /// The job — already finished for a small batch, and running for one large enough to have been
+    /// handed to the background. <c>BulkJobStatus.IsFinished</c> is what tells the two apart, and it
+    /// is what a screen decides to poll on.
+    /// </returns>
+    Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Reports where a bulk job has got to.</summary>
+    /// <param name="jobId">Identity of the job.</param>
+    /// <param name="cancellationToken">Token observed while polling.</param>
+    /// <returns>The job's progress and per-item results, or null when the server has no such job.</returns>
+    Task<BulkJobStatus?> GetBulkAsync(Guid jobId, CancellationToken cancellationToken = default);
+
     /// <summary>Runs the publish checks without publishing.</summary>
     /// <param name="id">Identity of the page.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>

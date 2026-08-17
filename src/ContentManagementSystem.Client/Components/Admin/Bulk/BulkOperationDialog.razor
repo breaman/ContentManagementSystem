@@ -1,0 +1,128 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Bulk
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Shared.Contracts.Content
+
+<ModalDialog IsOpen="IsOpen"
+             Title="@Title"
+             ConfirmLabel="@ConfirmLabel"
+             CancelLabel="@CancelLabel"
+             ConfirmClass="@ConfirmClass"
+             CanConfirm="CanConfirm"
+             IsBusy="IsBusy"
+             SizeClass="modal-lg"
+             OnConfirm="OnConfirmAsync"
+             OnCancel="OnClose">
+
+    @if (Job is { } job)
+    {
+        <p>
+            @if (job.IsFinished)
+            {
+                <text>@Outcome(job)</text>
+            }
+            else
+            {
+                <text>
+                    @job.Completed of @job.Total done. This is running on the server — closing this
+                    dialog does not stop it.
+                </text>
+            }
+        </p>
+
+        @* Native, so the browser and the screen reader agree on the number without an ARIA role
+           that has to be kept in step with the text beside it. *@
+        <progress class="w-100"
+                  max="@job.Total"
+                  value="@job.Completed"
+                  aria-label="@($"{Title}: {job.Completed} of {job.Total} done")">
+        </progress>
+
+        <LiveRegion Message="@Announcement" />
+
+        @if (Failures(job) is { Count: > 0 } failures)
+        {
+            <h3 class="h6 mt-3">These were not @PastTense</h3>
+            <ul class="list-unstyled mb-0">
+                @foreach (var failure in failures)
+                {
+                    <li class="mb-2">
+                        <span class="fw-semibold">@failure.Title</span>
+                        <ul class="mb-0 ps-3 small text-body-secondary">
+                            @foreach (var diagnostic in failure.Diagnostics)
+                            {
+                                <li>@diagnostic.Message</li>
+                            }
+                        </ul>
+                    </li>
+                }
+            </ul>
+        }
+    }
+    else if (Impact is { } impact)
+    {
+        <p>
+            @Question(impact)
+        </p>
+
+        @if (impact.RunsInBackground)
+        {
+            <p class="text-body-secondary">
+                That is more than @BulkLimits.BackgroundThreshold pages, so it runs in the background
+                and reports each page's result as it goes.
+            </p>
+        }
+
+        @if (impact.Warnings.Count > 0)
+        {
+            <ul class="mb-3 ps-3 small text-body-secondary">
+                @foreach (var warning in impact.Warnings)
+                {
+                    <li>@warning.Message</li>
+                }
+            </ul>
+        }
+
+        <div class="table-responsive cms-bulk__items">
+            <table class="table table-sm align-middle">
+                <caption class="visually-hidden">Every page this operation would touch.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Page</th>
+                        <th scope="col">In the selection</th>
+                        <th scope="col">On the public site</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in impact.Items)
+                    {
+                        <tr>
+                            <th scope="row" class="fw-normal">@item.Title</th>
+                            <td>
+                                @if (item.WasSelected)
+                                {
+                                    <span>Selected</span>
+                                }
+                                else
+                                {
+                                    <span class="text-body-secondary">Beneath a selected page</span>
+                                }
+                            </td>
+                            <td>
+                                @if (item.IsPublished)
+                                {
+                                    <span class="bi bi-cloud-check" aria-hidden="true"></span>
+                                    <span>Live</span>
+                                }
+                                else
+                                {
+                                    <span class="text-body-secondary">Not published</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+</ModalDialog>

@@ -184,6 +184,53 @@ public class ContentTreeMenuTests : IDisposable
     }
 
     [Fact]
+    public void PublishBranchIsOfferedOnlyOnAPageThatHasChildren()
+    {
+        var tree = _bunit.Render<ContentTree>();
+
+        Labels(tree, row: 0).Should().Contain("Publish branch…");
+        Labels(tree, row: 1).Should().NotContain(
+            "Publish branch…",
+            "on a leaf it is the entry above it wearing a longer name");
+    }
+
+    [Fact]
+    public void PublishBranchStatesWhatTheBranchCoversBeforePublishingAny()
+    {
+        var tree = _bunit.Render<ContentTree>();
+
+        Choose(tree, row: 0, "Publish branch…");
+
+        var dialog = tree.Find("[role=dialog]");
+
+        dialog.TextContent.Should().Contain("You selected 1 page(s)").And.Contain("publish 3");
+        _client.BulkStarts.Should().BeEmpty("the impact comes before the batch, not after it");
+
+        tree.FindAll("[role=dialog] .btn-outline-secondary").Single().Click();
+    }
+
+    [Fact]
+    public void ConfirmingAPublishBranchReportsThePagesThatCouldNotBePublished()
+    {
+        var tree = _bunit.Render<ContentTree>();
+
+        Choose(tree, row: 0, "Publish branch…");
+        tree.Find("[role=dialog] .btn-primary").Click();
+
+        _client.BulkStarts.Should().ContainSingle()
+            .Which.Selection.IncludeDescendants.Should().BeTrue(
+                "publishing a branch is one selection the server resolves, not a walk of the tree");
+
+        var dialog = tree.Find("[role=dialog]");
+
+        dialog.TextContent.Should().Contain("2 of 3 page(s) were published");
+        dialog.TextContent.Should().Contain("Careers").And.Contain("Hero title");
+
+        tree.FindAll("[role=dialog] .btn-primary").Single().Click();
+        tree.FindAll("[role=dialog]").Should().BeEmpty();
+    }
+
+    [Fact]
     public void NewChildAsksTheHostRatherThanCreatingThePageItself()
     {
         PageSummary? under = null;
@@ -273,6 +320,62 @@ public class ContentTreeMenuTests : IDisposable
 
         /// <summary>Every term the filter searched for.</summary>
         public List<string> Searches { get; } = [];
+
+        /// <summary>Every batch that was actually started.</summary>
+        public List<BulkOperationRequest> BulkStarts { get; } = [];
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// One selected page resolving to three, which is the whole reason the branch dialog exists:
+        /// the number worth confirming is not the number the editor clicked.
+        /// </remarks>
+        public override Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+            BulkOperationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            return Task.FromResult(StructureClientResult<BulkImpact>.Success(new BulkImpact(
+                request.Operation,
+                [
+                    new BulkImpactItem(1, "Pricing", IsPublished: true, WasSelected: true),
+                    new BulkImpactItem(2, "Enterprise", IsPublished: false, WasSelected: false),
+                    new BulkImpactItem(4, "Careers", IsPublished: false, WasSelected: false),
+                ],
+                SelectedCount: 1,
+                PublishedCount: 1,
+                RunsInBackground: false,
+                [])));
+        }
+
+        /// <inheritdoc />
+        /// <remarks>
+        /// Finished on the first answer, which is what a batch under the background threshold does,
+        /// and carrying one failure — a report that only ever shows successes never renders the half
+        /// of the dialog that matters.
+        /// </remarks>
+        public override Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+            BulkOperationRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(request);
+
+            BulkStarts.Add(request);
+
+            return Task.FromResult(StructureClientResult<BulkJobStatus>.Success(new BulkJobStatus(
+                Guid.NewGuid(),
+                request.Operation,
+                BulkJobState.Completed,
+                3,
+                [
+                    new BulkItemResult(1, "Pricing", Succeeded: true, []),
+                    new BulkItemResult(2, "Enterprise", Succeeded: true, []),
+                    new BulkItemResult(4, "Careers", Succeeded: false,
+                        [new ApiDiagnostic("field.required", "\"Hero title\" is required.", null)]),
+                ],
+                DateTimeOffset.UnixEpoch,
+                DateTimeOffset.UnixEpoch)));
+        }
 
         /// <inheritdoc />
         public override Task<IReadOnlyList<PageTreeNode>> GetTreeAsync(

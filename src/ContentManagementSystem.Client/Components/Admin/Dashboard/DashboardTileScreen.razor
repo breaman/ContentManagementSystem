@@ -1,0 +1,33 @@
+@page "/admin/dashboard/{Tile}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@namespace ContentManagementSystem.Client.Components.Admin.Dashboard
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Content?.Title ?? "Dashboard")</PageTitle>
+
+<p><a href="/admin">← Dashboard</a></p>
+
+@if (_unknown)
+{
+    <h1>No such tile</h1>
+    <p>The dashboard has no tile called “@Tile”.</p>
+}
+else if (Content is null)
+{
+    <p role="status">Loading…</p>
+}
+else
+{
+    <h1>@Content.Title</h1>
+
+    @if (Content.Note is { Length: > 0 } note)
+    {
+        <p class="text-body-secondary">@note</p>
+    }
+
+    @foreach (var group in Content.Groups)
+    {
+        <DashboardGroupList Group="group" HeadingLevel="2" />
+    }
+}

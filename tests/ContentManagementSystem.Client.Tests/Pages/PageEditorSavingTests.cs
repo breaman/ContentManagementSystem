@@ -2,6 +2,7 @@ using Bunit;
 
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Components.Admin.Pages;
+using ContentManagementSystem.Client.Components.Admin.Shortcuts;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
@@ -212,6 +213,38 @@ public class PageEditorSavingTests : IDisposable
                 Now.ToLocalTime().ToString("HH:mm"),
                 "\"Saved\" on its own is indistinguishable from \"saved twenty minutes ago and " +
                 "quietly broken since\""));
+    }
+
+    [Fact]
+    public async Task TheSaveShortcutRunsTheSameSaveTheButtonDoes()
+    {
+        var editor = Render();
+
+        Type(editor, "Typed and then saved by chord");
+
+        // Driven through the listener rather than through a key press, because the press it answers
+        // to lands on the document (task P6-23). What this pins is the wiring: the chord reaches the
+        // screen's own save, without waiting out the idle delay.
+        var claimed = await editor.InvokeAsync(() => editor.FindComponent<ShortcutListener>()
+            .Instance.MatchAsync("s", control: true, shift: false, alt: false));
+
+        claimed.Should().BeTrue("the chord is one the editor defined, so the browser must not keep it");
+
+        _client.SavedPayloads.Should().ContainSingle()
+            .Which.Should().Contain("Typed and then saved by chord");
+    }
+
+    [Fact]
+    public async Task TheHelpShortcutOpensTheListOfShortcuts()
+    {
+        var editor = Render();
+
+        await editor.InvokeAsync(() => editor.FindComponent<ShortcutListener>()
+            .Instance.MatchAsync("?", control: false, shift: true, alt: false));
+
+        editor.Find("[role=dialog]").TextContent.Should().Contain("Keyboard shortcuts");
+
+        editor.FindAll("[role=dialog] .btn-outline-secondary").First().Click();
     }
 
     private IRenderedComponent<PageEditor> Render() =>

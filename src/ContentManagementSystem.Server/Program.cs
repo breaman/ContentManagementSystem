@@ -3,6 +3,7 @@ using System.Diagnostics;
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Dashboard;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Media;
 using ContentManagementSystem.Core.Media.Delivery;
@@ -126,6 +127,10 @@ try
     // Pages, drafts, versions, publishing, and the recycle bin (tasks P2-05 to P2-15). Scoped,
     // unlike the stateless halves of the payload engine, because these hold a database context.
     builder.Services.AddCmsPages();
+    // The landing screen's four tiles (tasks P6-24 to P6-27). It reads across pages, media,
+    // references, the audit log, and the not-found log without owning any of them, which is why it
+    // is registered beside the page services rather than by them.
+    builder.Services.AddCmsDashboard();
     // URLs, redirects, and route resolution (tasks P3-04 and P3-05). Registered beside the page
     // services rather than with delivery, because it is the write path that depends on it: creating,
     // renaming, publishing, and recycling a page all rebuild routes inside their own transactions.
@@ -217,6 +222,11 @@ try
     builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
 
+    // A bulk job outlives the request that started it, and everything it runs authorizes the caller
+    // and stamps their identity on an audit row (task P6-29). This replaces Core's identity-free
+    // default with one that captures the signed-in editor, so item forty is still theirs.
+    builder.Services.AddScoped<IBulkOperationScopeFactory, HttpBulkOperationScopeFactory>();
+
     // Backs the structure admin screens while they pre-render, calling the services directly rather
     // than looping back through the HTTP API (task P1-29).
     builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
@@ -225,6 +235,7 @@ try
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();
     builder.Services.AddScoped<IMarkupPreviewClient, ServerMarkupPreviewClient>();
     builder.Services.AddScoped<ICurrentUserClient, ServerCurrentUserClient>();
+    builder.Services.AddScoped<IDashboardClient, ServerDashboardClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
     // One nonce per request, read by the host page and handed to CodeMirror through a meta tag

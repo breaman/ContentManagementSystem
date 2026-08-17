@@ -1,0 +1,68 @@
+@page "/admin"
+@page "/admin/dashboard"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@namespace ContentManagementSystem.Client.Components.Admin.Dashboard
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Dashboard</PageTitle>
+
+<h1>Dashboard</h1>
+
+@* The section bar of spec section 14.1. It lives here rather than in AdminShell because the shell is
+   not yet mounted by any route, and without it an editor arriving at /admin can reach the page list
+   only by typing its address — which is half of what acceptance criterion P6 #1 forbids. When the
+   shell is composed this moves into it and nothing else changes. *@
+<nav class="mb-3" aria-label="Backoffice sections">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/pages">Content</NavLink></li>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/media">Media</NavLink></li>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/reusable">Reusable</NavLink></li>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/templates">Structure</NavLink></li>
+        <AuthorizeView Roles="@CmsRoles.ContentDeleters" Context="deleter">
+            <li class="nav-item"><NavLink class="nav-link" href="/admin/recycle-bin">Recycle bin</NavLink></li>
+        </AuthorizeView>
+    </ul>
+</nav>
+
+@if (Content is null)
+{
+    <p role="status">Loading the dashboard…</p>
+}
+else
+{
+    <p class="text-body-secondary">
+        What is in progress, what is due, and what has gone quiet. Read @Generated.
+    </p>
+
+    <div class="row g-3">
+        @foreach (var tile in Content.Tiles)
+        {
+            <div class="col-12 col-xl-6">
+                <section class="card h-100" aria-labelledby="@($"tile-{tile.Tile}")">
+                    <div class="card-body">
+                        <h2 class="h5 card-title d-flex justify-content-between align-items-start"
+                            id="@($"tile-{tile.Tile}")">
+                            <span>@tile.Title</span>
+                            @* The deep link acceptance criterion P6 #8 asks for. It opens the same
+                               queries unabridged rather than a screen that resembles them. *@
+                            <a class="small" href="@($"/admin/dashboard/{tile.Tile}")">
+                                Show all<span class="visually-hidden"> of @tile.Title</span>
+                            </a>
+                        </h2>
+
+                        @if (tile.Note is { Length: > 0 } note)
+                        {
+                            <p class="small text-body-secondary">@note</p>
+                        }
+
+                        @foreach (var group in tile.Groups)
+                        {
+                            <DashboardGroupList Group="group" />
+                        }
+                    </div>
+                </section>
+            </div>
+        }
+    </div>
+}

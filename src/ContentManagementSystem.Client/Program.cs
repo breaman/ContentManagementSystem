@@ -50,6 +50,10 @@ builder.Services.AddScoped<IMarkupPreviewClient, HttpMarkupPreviewClient>();
 // editor's own database id — which the properties panel writes into OwnerUserId.
 builder.Services.AddScoped<ICurrentUserClient, HttpCurrentUserClient>();
 
+// The landing screen's four tiles (tasks P6-24 to P6-27). ServerDashboardClient is its twin, so the
+// dashboard pre-renders filled in rather than as four spinners.
+builder.Services.AddScoped<IDashboardClient, HttpDashboardClient>();
+
 // Which component fills in each field type (ADR-0014, tasks P6-06 to P6-15). A singleton: the
 // mapping is a static table and cannot change without a new build. The server registers the same
 // interface, and additionally checks it against the registered field types at startup — the browser

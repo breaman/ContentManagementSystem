@@ -1,0 +1,145 @@
+@page "/admin/recycle-bin"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentDeleters)]
+@namespace ContentManagementSystem.Client.Components.Admin.RecycleBin
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Recycle bin</PageTitle>
+
+<h1>Recycle bin</h1>
+<p class="text-body-secondary">
+    Deleted pages, with their full history. Restoring one brings it back as a <strong>draft</strong>
+    — it never silently reappears on the public site — and brings back everything that was deleted
+    with it.
+</p>
+
+<DiagnosticList Diagnostics="_errors" Heading="That did not happen" />
+<DiagnosticList Diagnostics="_warnings" IsError="false" Heading="Restored, with a warning" />
+
+<div class="mb-3 cms-bin__filter">
+    <label class="visually-hidden" for="@FilterId">Filter deleted pages by title, slug, or id</label>
+    <input id="@FilterId"
+           type="search"
+           class="form-control"
+           placeholder="Filter by title, slug, or id"
+           value="@_filter"
+           @oninput="OnFilterChanged" />
+</div>
+
+@if (Entries is null)
+{
+    <p role="status">Loading the recycle bin…</p>
+}
+else if (Entries.Count == 0)
+{
+    <p>The recycle bin is empty. Nothing has been deleted.</p>
+}
+else if (Roots.Count == 0)
+{
+    <p>Nothing in the recycle bin matches “@_filter”.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <caption>
+            Everything in the recycle bin. A page deleted as part of a section is listed under it
+            rather than on its own.
+        </caption>
+        <thead>
+            <tr>
+                <th scope="col">Page</th>
+                <th scope="col">Slug</th>
+                <th scope="col">Was live</th>
+                <th scope="col">Deleted</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var entry in Roots)
+            {
+                <tr>
+                    <th scope="row" class="fw-normal">
+                        @entry.Title
+                        @if (entry.DescendantCount > 0)
+                        {
+                            <span class="d-block small text-body-secondary">
+                                with @entry.DescendantCount page(s) beneath it
+                            </span>
+                        }
+                    </th>
+                    <td><code>@entry.Slug</code></td>
+                    <td>
+                        @if (entry.WasPublished)
+                        {
+                            <span class="bi bi-cloud-slash" aria-hidden="true"></span>
+                            <span>Was live</span>
+                        }
+                        else
+                        {
+                            <span class="text-body-secondary">Never published</span>
+                        }
+                    </td>
+                    <td>@Deleted(entry)</td>
+                    <td>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary me-1"
+                                disabled="@_working"
+                                @onclick="() => RestoreAsync(entry)">
+                            Restore<span class="visually-hidden"> “@entry.Title”</span>
+                        </button>
+                        <AuthorizeView Roles="@CmsRoles.Administrator" Context="administrator">
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger"
+                                    disabled="@_working"
+                                    @onclick="() => AskToPurge(entry)">
+                                Delete for good<span class="visually-hidden"> “@entry.Title”</span>
+                            </button>
+                        </AuthorizeView>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<LiveRegion Message="@_announcement" IsAssertive="true" />
+
+@* The typed-name confirmation of spec section 14.10. This is the one operation in the system with
+   no undo, so the ceremony is the point rather than friction to be minimised. *@
+<ModalDialog IsOpen="_purging is not null"
+             Title="Permanently delete this page?"
+             ConfirmLabel="Delete for good"
+             ConfirmClass="btn-danger"
+             CanConfirm="IsNameTyped"
+             IsBusy="_working"
+             OnConfirm="ConfirmPurgeAsync"
+             OnCancel="CancelPurge">
+    @if (_purging is { } entry)
+    {
+        <p>
+            <strong>@entry.Title</strong> and every version of it are removed from the database.
+            This cannot be undone, and no history is kept.
+        </p>
+
+        @if (entry.DescendantCount > 0)
+        {
+            <p class="mb-3">
+                The @entry.DescendantCount page(s) beneath it have to be deleted for good first —
+                permanent deletion is one page at a time, deepest first, so nothing is destroyed as
+                a side effect of destroying something else.
+            </p>
+        }
+
+        <div class="form-floating">
+            <input id="@ConfirmId"
+                   class="form-control"
+                   autocomplete="off"
+                   value="@_typedName"
+                   @oninput="OnTypedNameChanged" />
+            <label for="@ConfirmId">Type “@entry.Title” to confirm</label>
+        </div>
+    }
+</ModalDialog>

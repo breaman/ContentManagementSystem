@@ -192,4 +192,32 @@ public static class PageCodes
     /// which is what spec section 14.10 asks for.
     /// </remarks>
     public const string ParentStillDeleted = "page.parent-still-deleted";
+
+    /// <summary>A bulk selection named no pages at all.</summary>
+    /// <remarks>
+    /// Refused rather than treated as a job over nothing, because the ordinary way to reach it is a
+    /// screen that lost its selection between the confirmation opening and the button being pressed
+    /// (task P6-29).
+    /// </remarks>
+    public const string SelectionEmpty = "page.selection-empty";
+
+    /// <summary>A bulk selection is larger than one job is allowed to be.</summary>
+    public const string SelectionTooLarge = "page.selection-too-large";
+
+    /// <summary>
+    /// A page named in a bulk selection no longer exists.
+    /// </summary>
+    /// <remarks>
+    /// A warning rather than a refusal. A selection goes stale while an editor reads the
+    /// confirmation, and dropping the other thirty-nine pages because one of them was deleted in the
+    /// meantime is not the behaviour spec section 14.11 asks for.
+    /// </remarks>
+    public const string SelectionStale = "page.selection-stale";
+
+    /// <summary>The bulk job addressed does not exist, or has been evicted.</summary>
+    /// <remarks>
+    /// Job state is held in memory for the life of the process (task P6-29), so a poll that arrives
+    /// after a restart gets this rather than a report of a job the server can no longer describe.
+    /// </remarks>
+    public const string JobNotFound = "page.job-not-found";
 }

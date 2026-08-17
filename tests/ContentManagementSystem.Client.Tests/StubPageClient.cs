@@ -89,6 +89,35 @@ public abstract class StubPageClient : IPageClient
         CancellationToken cancellationToken = default) => throw Unexpected();
 
     /// <inheritdoc />
+    public virtual Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<StructureClientResult<SubtreeResult>> RestoreAsync(
+        int id,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<StructureClientResult<PurgeResult>> PurgeAsync(
+        int id,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
+    public virtual Task<BulkJobStatus?> GetBulkAsync(
+        Guid jobId,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
     public virtual Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) => throw Unexpected();

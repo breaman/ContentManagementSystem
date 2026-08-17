@@ -1,0 +1,67 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Dashboard
+@using ContentManagementSystem.Shared.Contracts.Dashboard
+
+@* A div rather than a section. A labelled section is a landmark, and four of them inside one card
+   are four landmarks a screen reader offers by the same name — which is what axe's landmark-unique
+   rule is about, and it is right: these are lists under headings, not regions to jump between. *@
+<div class="cms-dashboard__group">
+    @if (HeadingLevel == 2)
+    {
+        <h2 class="h6" id="@($"group-{Group.Key}")">
+            @Group.Title
+            @if (Group.TotalCount > 0)
+            {
+                <span class="badge text-bg-secondary ms-1">@Group.TotalCount</span>
+            }
+        </h2>
+    }
+    else
+    {
+        <h3 class="h6" id="@($"group-{Group.Key}")">
+            @Group.Title
+            @if (Group.TotalCount > 0)
+            {
+                <span class="badge text-bg-secondary ms-1">@Group.TotalCount</span>
+            }
+        </h3>
+    }
+
+    @if (Group.Items.Count == 0)
+    {
+        <p class="small text-body-secondary mb-0">@Group.EmptyMessage</p>
+    }
+    else
+    {
+        <ul class="list-unstyled mb-0">
+            @foreach (var item in Group.Items)
+            {
+                <li class="cms-dashboard__item @(item.IsOverdue ? "cms-dashboard__item--overdue" : null)">
+                    @if (Link(item) is { } href)
+                    {
+                        <a href="@href">@item.Title</a>
+                    }
+                    else
+                    {
+                        <span>@item.Title</span>
+                    }
+
+                    @* The word as well as the styling. A row that is only red is a row half the
+                       people reading it cannot tell apart from the rest (task P6-39). *@
+                    @if (item.IsOverdue)
+                    {
+                        <span class="badge text-bg-warning ms-1">Overdue</span>
+                    }
+
+                    <span class="d-block small text-body-secondary">@item.Detail</span>
+                </li>
+            }
+        </ul>
+
+        @if (Group.TotalCount > Group.Items.Count)
+        {
+            <p class="small text-body-secondary mb-0">
+                Showing @Group.Items.Count of @Group.TotalCount.
+            </p>
+        }
+    }
+</div>

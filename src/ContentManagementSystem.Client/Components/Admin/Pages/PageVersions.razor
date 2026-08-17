@@ -33,74 +33,79 @@ else if (Versions.Count == 0)
 }
 else
 {
-    <table class="table">
-        <caption>@Versions.Count version(s), newest first.</caption>
-        <thead>
-            <tr>
-                <th scope="col">Version</th>
-                <th scope="col">Title</th>
-                <th scope="col">Status</th>
-                <th scope="col">Created</th>
-                <th scope="col">Compare</th>
-                <th scope="col"><span class="visually-hidden">Actions</span></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var version in Versions)
-            {
+    @* A table of six columns cannot narrow to a 640-pixel viewport, which is what 200% zoom
+       reports on a 1280-pixel display. Scrolling it inside its own container is the difference
+       between one element scrolling and the whole page doing it (task P6-38). *@
+    <div class="table-responsive">
+        <table class="table">
+            <caption>@Versions.Count version(s), newest first.</caption>
+            <thead>
                 <tr>
-                    <th scope="row">
-                        v@version.VersionNumber
-                        @if (version.Label is { Length: > 0 } label)
-                        {
-                            <span class="badge text-bg-info ms-1">@label</span>
-                        }
-                    </th>
-                    <td>@version.Title</td>
-                    <td>
-                        @if (version.IsDraft)
-                        {
-                            <span class="badge text-bg-secondary">Draft</span>
-                        }
-                        @if (version.IsPublished)
-                        {
-                            <span class="badge text-bg-success">Published</span>
-                        }
-                        @if (!version.IsDraft && !version.IsPublished)
-                        {
-                            <span class="badge text-bg-light text-dark">@version.Status</span>
-                        }
-                    </td>
-                    <td>@version.CreatedOn?.ToString("g")</td>
-                    <td>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="diff-from"
-                                   id="@($"from-{version.Id}")" checked="@(FromVersionId == version.Id)"
-                                   @onchange="() => FromVersionId = version.Id" />
-                            <label class="form-check-label" for="@($"from-{version.Id}")">From</label>
-                        </div>
-                        <div class="form-check form-check-inline">
-                            <input class="form-check-input" type="radio" name="diff-to"
-                                   id="@($"to-{version.Id}")" checked="@(ToVersionId == version.Id)"
-                                   @onchange="() => ToVersionId = version.Id" />
-                            <label class="form-check-label" for="@($"to-{version.Id}")">To</label>
-                        </div>
-                    </td>
-                    <td>
-                        <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
-                            @if (!version.IsDraft)
-                            {
-                                <button type="button" class="btn btn-sm btn-outline-secondary"
-                                        disabled="@IsBusy" @onclick="() => RestoreAsync(version.Id)">
-                                    Restore into draft
-                                </button>
-                            }
-                        </AuthorizeView>
-                    </td>
+                    <th scope="col">Version</th>
+                    <th scope="col">Title</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Created</th>
+                    <th scope="col">Compare</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var version in Versions)
+                {
+                    <tr>
+                        <th scope="row">
+                            v@version.VersionNumber
+                            @if (version.Label is { Length: > 0 } label)
+                            {
+                                <span class="badge text-bg-info ms-1">@label</span>
+                            }
+                        </th>
+                        <td>@version.Title</td>
+                        <td>
+                            @if (version.IsDraft)
+                            {
+                                <span class="badge text-bg-secondary">Draft</span>
+                            }
+                            @if (version.IsPublished)
+                            {
+                                <span class="badge text-bg-success">Published</span>
+                            }
+                            @if (!version.IsDraft && !version.IsPublished)
+                            {
+                                <span class="badge text-bg-light text-dark">@version.Status</span>
+                            }
+                        </td>
+                        <td>@version.CreatedOn?.ToString("g")</td>
+                        <td>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="diff-from"
+                                       id="@($"from-{version.Id}")" checked="@(FromVersionId == version.Id)"
+                                       @onchange="() => FromVersionId = version.Id" />
+                                <label class="form-check-label" for="@($"from-{version.Id}")">From</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="diff-to"
+                                       id="@($"to-{version.Id}")" checked="@(ToVersionId == version.Id)"
+                                       @onchange="() => ToVersionId = version.Id" />
+                                <label class="form-check-label" for="@($"to-{version.Id}")">To</label>
+                            </div>
+                        </td>
+                        <td>
+                            <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                                @if (!version.IsDraft)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            disabled="@IsBusy" @onclick="() => RestoreAsync(version.Id)">
+                                        Restore into draft
+                                    </button>
+                                }
+                            </AuthorizeView>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 
     <button type="button" class="btn btn-primary" disabled="@(IsBusy || !CanCompare)"
             @onclick="CompareAsync">

@@ -26,56 +26,61 @@ else if (Roots.Count == 0)
 }
 else
 {
-    <table class="table">
-        <caption>The site tree, two levels deep.</caption>
-        <thead>
-            <tr>
-                <th scope="col">Title</th>
-                <th scope="col">Slug</th>
-                <th scope="col">Template</th>
-                <th scope="col">Draft</th>
-                <th scope="col">Published</th>
-                <th scope="col">State</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var node in Flatten(Roots))
-            {
+    @* A table of six columns cannot narrow to a 640-pixel viewport, which is what 200% zoom
+       reports on a 1280-pixel display. Scrolling it inside its own container is the difference
+       between one element scrolling and the whole page doing it (task P6-38). *@
+    <div class="table-responsive">
+        <table class="table">
+            <caption>The site tree, two levels deep.</caption>
+            <thead>
                 <tr>
-                    <th scope="row" style="@Indent(node.Page.Depth)">
-                        <a href="@($"/admin/pages/{node.Page.Id}")">@node.Page.Title</a>
-                    </th>
-                    <td><code>@node.Page.Slug</code></td>
-                    <td>@node.Page.TemplateKey</td>
-                    <td>v@node.Page.DraftVersionNumber</td>
-                    <td>
-                        @if (node.Page.PublishedVersionNumber is { } published)
-                        {
-                            @($"v{published}")
-                        }
-                        else
-                        {
-                            <span class="text-body-secondary">—</span>
-                        }
-                    </td>
-                    <td>
-                        @if (node.Page.PublishedVersionNumber is null)
-                        {
-                            <span class="badge text-bg-secondary">Never published</span>
-                        }
-                        else if (node.Page.HasUnpublishedChanges)
-                        {
-                            <span class="badge text-bg-warning">Unpublished changes</span>
-                        }
-                        else
-                        {
-                            <span class="badge text-bg-success">Live</span>
-                        }
-                    </td>
+                    <th scope="col">Title</th>
+                    <th scope="col">Slug</th>
+                    <th scope="col">Template</th>
+                    <th scope="col">Draft</th>
+                    <th scope="col">Published</th>
+                    <th scope="col">State</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var node in Flatten(Roots))
+                {
+                    <tr>
+                        <th scope="row" style="@Indent(node.Page.Depth)">
+                            <a href="@($"/admin/pages/{node.Page.Id}")">@node.Page.Title</a>
+                        </th>
+                        <td><code>@node.Page.Slug</code></td>
+                        <td>@node.Page.TemplateKey</td>
+                        <td>v@node.Page.DraftVersionNumber</td>
+                        <td>
+                            @if (node.Page.PublishedVersionNumber is { } published)
+                            {
+                                @($"v{published}")
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                        <td>
+                            @if (node.Page.PublishedVersionNumber is null)
+                            {
+                                <span class="badge text-bg-secondary">Never published</span>
+                            }
+                            else if (node.Page.HasUnpublishedChanges)
+                            {
+                                <span class="badge text-bg-warning">Unpublished changes</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-success">Live</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">

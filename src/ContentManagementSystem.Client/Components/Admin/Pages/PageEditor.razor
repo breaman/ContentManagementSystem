@@ -7,6 +7,7 @@
 @using ContentManagementSystem.Client.Components.Admin.Properties
 @using ContentManagementSystem.Client.Components.Admin.Publishing
 @using ContentManagementSystem.Client.Components.Admin.Saving
+@using ContentManagementSystem.Client.Components.Admin.Shortcuts
 @using ContentManagementSystem.Shared.Contracts.Content
 @using ContentManagementSystem.Shared.Contracts.Security
 
@@ -191,6 +192,14 @@ else
             the draft is untouched, so you can publish it again at any time.
         </p>
     </ModalDialog>
+
+    @* Accelerators for the buttons above, and the list that documents them — one table, read by
+       both, so a shortcut cannot work undocumented or be documented and do nothing (task P6-23). *@
+    <ShortcutListener Shortcuts="@EditorShortcuts.For(CanEdit)" OnShortcut="RunShortcutAsync" />
+
+    <ShortcutHelpDialog IsOpen="IsShortcutHelpOpen"
+                        Shortcuts="@EditorShortcuts.For(CanEdit)"
+                        OnClose="() => IsShortcutHelpOpen = false" />
 
     @* The check's own result, announced once when it finishes rather than derived from state that
        redraws on every keystroke (task P6-22). *@

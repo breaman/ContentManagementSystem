@@ -1,4 +1,5 @@
 @namespace ContentManagementSystem.Client.Components.Admin.Tree
+@using ContentManagementSystem.Client.Components.Admin.Bulk
 @using ContentManagementSystem.Client.Components.Admin.Common
 @using ContentManagementSystem.Shared.Contracts.Content
 
@@ -186,6 +187,17 @@
             </div>
         }
     </ModalDialog>
+
+    @* Publishing a branch is one operation over many pages, so it is confirmed, followed, and
+       reported by the bulk dialog rather than by a loop over the tree (tasks P6-04 and P6-29). *@
+    <BulkOperationDialog Impact="_branchImpact"
+                         Job="_branchJob"
+                         Title="@($"Publish everything under “{_branchSubject?.Title}”?")"
+                         Verb="Publish"
+                         PastTense="published"
+                         IsBusy="_working"
+                         OnConfirm="ConfirmPublishBranchAsync"
+                         OnClose="CloseBranchDialog" />
 
     <ModalDialog IsOpen="_deleting is not null"
                  Title="Move to the recycle bin?"

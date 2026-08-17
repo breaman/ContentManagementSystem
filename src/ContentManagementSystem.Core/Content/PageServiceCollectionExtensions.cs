@@ -41,6 +41,14 @@ public static class PageServiceCollectionExtensions
         services.TryAddScoped<IContentDiffService, ContentDiffService>();
         services.TryAddScoped<IContentReferenceProjector, ContentReferenceProjector>();
 
+        // Bulk operations (task P6-29). The service is scoped like the rest, because it resolves the
+        // selection against a request's context; the job registry is a singleton, because a batch that
+        // outlives its request has to be pollable from the next one. The scope factory is the
+        // identity-free implementation, which a web host replaces — see HttpBulkOperationScopeFactory.
+        services.TryAddScoped<IBulkOperationService, BulkOperationService>();
+        services.TryAddSingleton<BulkOperationJobs>();
+        services.TryAddScoped<IBulkOperationScopeFactory, ServiceScopeBulkOperationScopeFactory>();
+
         // Reusable content shares the pages' registration rather than getting a call of its own,
         // because it shares their dependencies exactly: the same validator, the same projector, the
         // same version numbering. A separate AddCmsReusableContent() would be a second door into the

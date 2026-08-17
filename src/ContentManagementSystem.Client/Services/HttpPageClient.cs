@@ -169,6 +169,57 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
             cancellationToken);
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(
+        CancellationToken cancellationToken = default) =>
+        await GetAsync<IReadOnlyList<RecycleBinEntry>>($"{Base}/pages/recycle-bin", cancellationToken) ?? [];
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<SubtreeResult>> RestoreAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<object, SubtreeResult>(
+            HttpMethod.Post,
+            $"{Base}/pages/{id}/restore",
+            body: null,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<PurgeResult>> PurgeAsync(
+        int id,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<object, PurgeResult>(
+            HttpMethod.Delete,
+            $"{Base}/pages/{id}/permanent",
+            body: null,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<BulkOperationRequest, BulkImpact>(
+            HttpMethod.Post,
+            $"{Base}/pages/bulk/preview",
+            request,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
+        BulkOperationRequest request,
+        CancellationToken cancellationToken = default) =>
+        SendAsync<BulkOperationRequest, BulkJobStatus>(
+            HttpMethod.Post,
+            $"{Base}/pages/bulk",
+            request,
+            cancellationToken);
+
+    /// <inheritdoc />
+    public Task<BulkJobStatus?> GetBulkAsync(
+        Guid jobId,
+        CancellationToken cancellationToken = default) =>
+        GetAsync<BulkJobStatus>($"{Base}/pages/bulk/{jobId}", cancellationToken);
+
+    /// <inheritdoc />
     public Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>

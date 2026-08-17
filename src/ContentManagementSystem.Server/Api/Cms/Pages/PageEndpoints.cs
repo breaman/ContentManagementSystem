@@ -15,11 +15,11 @@ namespace ContentManagementSystem.Server.Api.Cms.Pages;
 /// reason <c>CONTRIBUTING.md</c> gives: the endpoint policy is the door and the service check is the
 /// lock, and the same operation is reachable from a CLI verb with no HTTP request at all.
 /// <para>
-/// The split across four files follows the lifecycle rather than the route table.
+/// The split across five files follows the lifecycle rather than the route table.
 /// <see cref="PageLifecycleEndpoints"/> owns the verbs that change what the public site serves,
-/// <see cref="PageVersionEndpoints"/> owns history, and <see cref="PageLockEndpoints"/> owns the
-/// advisory lock. Reading a page and writing its draft — the two things an editor does all day —
-/// are here.
+/// <see cref="PageVersionEndpoints"/> owns history, <see cref="PageLockEndpoints"/> owns the
+/// advisory lock, and <see cref="PageBulkEndpoints"/> owns doing any of it to many pages at once.
+/// Reading a page and writing its draft — the two things an editor does all day — are here.
 /// </para>
 /// </remarks>
 public static class PageEndpoints

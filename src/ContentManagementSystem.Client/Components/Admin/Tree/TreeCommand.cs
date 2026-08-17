@@ -37,6 +37,10 @@ public sealed record TreeCommand(string Id, string Label, string Icon, bool IsDe
     /// <summary>Publish this page's draft.</summary>
     public static TreeCommand Publish { get; } = new("publish", "Publish", "bi-cloud-upload");
 
+    /// <summary>Publish this page's draft and every draft beneath it.</summary>
+    public static TreeCommand PublishBranch { get; } =
+        new("publish-branch", "Publish branch…", "bi-cloud-arrow-up");
+
     /// <summary>Take this page off the public site.</summary>
     public static TreeCommand Unpublish { get; } = new("unpublish", "Unpublish", "bi-cloud-slash");
 

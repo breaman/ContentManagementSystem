@@ -1,9 +1,12 @@
 using System.Security.Claims;
 
+using ContentManagementSystem.Client.Components.Admin.Dashboard;
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Components.Admin.Media;
 using ContentManagementSystem.Client.Components.Admin.Pages;
+using ContentManagementSystem.Client.Components.Admin.RecycleBin;
 using ContentManagementSystem.Client.Components.Admin.Reusable;
+using ContentManagementSystem.Client.Components.Admin.Tree;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Services;
 
@@ -89,6 +92,19 @@ public class PageScreenAccessibilityTests
             new() { ["Id"] = FakeMediaClient.PlacedId },
             "Team photograph"
         },
+
+        // The screens Phase 6 added (tasks P6-24 to P6-28). The dashboard is the one with the most
+        // for axe to judge — four cards of nested lists, each row a link with a second line — and the
+        // recycle bin is the one where getting it wrong matters most, since its buttons destroy
+        // things and are told apart only by the page name inside them.
+        { "dashboard", typeof(DashboardScreen), [], "Needs attention" },
+        {
+            "dashboard tile",
+            typeof(DashboardTileScreen),
+            new() { ["Tile"] = "NeedsAttention" },
+            "Past its review date"
+        },
+        { "recycle bin", typeof(RecycleBinScreen), [], "Autumn campaign" },
     };
 
     [Theory]
@@ -99,7 +115,7 @@ public class PageScreenAccessibilityTests
         Dictionary<string, object?> parameters,
         string expected)
     {
-        var html = await RenderAsync(component, parameters);
+        var html = await BackofficeScreens.RenderAsync(component, parameters);
 
         html.Should().Contain(
             expected,
@@ -133,10 +149,61 @@ public class PageScreenAccessibilityTests
         results.Passes.Should().NotBeEmpty("axe must actually have run against rendered markup");
     }
 
+    /// <summary>
+    /// The content tree, which is a pane rather than a page (tasks P6-02, P6-36).
+    /// </summary>
+    /// <remarks>
+    /// Given its own test because it is never rendered as a whole document: it is the shell's left
+    /// pane, and the screen around it owns the <c>h1</c>. Running it through the theory above would
+    /// report "page should contain a level-one heading" against a component that is not a page, and
+    /// the honest fix for that is to audit it in the shape it is actually used in.
+    /// <para>
+    /// It is worth auditing separately anyway. The tree carries more ARIA than anything else in the
+    /// backoffice — a roving tabindex, a <c>treeitem</c> per row, a status indicator per row — and
+    /// every one of those is the kind of thing that is right for the row the developer had on screen.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task TheContentTreePaneHasNoAccessibilityViolations()
+    {
+        var html = await BackofficeScreens.RenderAsync(typeof(ContentTree), []);
+
+        html.Should().Contain("Pricing", "the gate must inspect a loaded tree, not its placeholder");
+
+        PlaywrightBrowsers.EnsureInstalled();
+
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync();
+
+        var page = await browser.NewPageAsync();
+
+        // Wrapped as the shell wraps it: a screen with a heading, and the tree beside the canvas.
+        await page.SetContentAsync(Document(
+            "content tree",
+            $"<h1>Content</h1><div class=\"cms-shell\">{html}</div>"));
+
+        var results = await page.RunAxe(new AxeRunOptions
+        {
+            RunOnly = new RunOnlyOptions { Type = "tag", Values = [.. Tags] },
+        });
+
+        var failures = results.Violations
+            .Select(violation =>
+                $"{violation.Id} ({violation.Impact}): {violation.Help} — " +
+                string.Join("; ", violation.Nodes.Select(node => string.Join(",", node.Target))))
+            .ToList();
+
+        failures.Should().BeEmpty(
+            "the content tree must be usable without a mouse or a screen. axe reported: {0}",
+            string.Join(" | ", failures));
+
+        results.Passes.Should().NotBeEmpty("axe must actually have run against rendered markup");
+    }
+
     [Fact]
     public async Task TheDiffViewerDistinguishesAMovedBlockWithoutRelyingOnColour()
     {
-        var html = await RenderAsync(
+        var html = await BackofficeScreens.RenderAsync(
             typeof(PageVersions),
             new Dictionary<string, object?> { ["Id"] = FakePageClient.Id });
 
@@ -148,7 +215,7 @@ public class PageScreenAccessibilityTests
             FakePageClient.DraftVersionId,
             TestContext.Current.CancellationToken);
 
-        var rendered = await RenderAsync(
+        var rendered = await BackofficeScreens.RenderAsync(
             typeof(ContentDiffView),
             new Dictionary<string, object?> { ["Diff"] = diff });
 
@@ -160,53 +227,6 @@ public class PageScreenAccessibilityTests
         rendered.Should().Contain("<ins").And.Contain("<del");
     }
 
-    /// <summary>
-    /// Renders one component to HTML with the framework's static renderer.
-    /// </summary>
-    /// <remarks>
-    /// Signed in as an Administrator, which is deliberate: these screens hide the save, publish, and
-    /// restore controls behind <c>AuthorizeView</c>, and a gate run as a Viewer would inspect a page
-    /// with no buttons on it and find nothing to complain about.
-    /// </remarks>
-    private static async Task<string> RenderAsync(Type component, Dictionary<string, object?> parameters)
-    {
-        var services = new ServiceCollection();
-
-        services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
-        services.AddScoped<IPageClient, FakePageClient>();
-        services.AddScoped<IReusableClient, FakeReusableClient>();
-        services.AddScoped<IMediaClient, FakeMediaClient>();
-
-        // The field editor catalog and the preview pipeline the editors reach through
-        // (tasks P6-06 to P6-15). The catalog is the real one: which control an author meets for a
-        // field type is exactly what this gate should be auditing, and stubbing it would have the
-        // audit inspect a screen nobody uses.
-        services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
-        services.AddScoped<IMarkupPreviewClient, FakeMarkupPreviewClient>();
-        services.AddSingleton(TimeProvider.System);
-
-        // The two the page editor gained with autosave and the properties panel (tasks P6-17,
-        // P6-18, P6-21): who is signed in, and where a completed write says so.
-        services.AddScoped<ICurrentUserClient, FakeCurrentUserClient>();
-        services.AddScoped<IToastService, SilentToastService>();
-
-        // Two hosting services a real pre-render supplies and a bare collection does not: the
-        // uploader's <InputFile> resolves IJSRuntime on construction, and the media item screen
-        // navigates away after a permanent delete. Neither runs during a static render.
-        services.AddScoped<NavigationManager, StaticNavigationManager>();
-        services.AddScoped<IJSRuntime, UnavailableJSRuntime>();
-        services.AddAuthorizationCore();
-        services.AddCascadingAuthenticationState();
-        services.AddScoped<AuthenticationStateProvider, AdministratorStateProvider>();
-
-        await using var provider = services.BuildServiceProvider();
-        await using var renderer = new PrerenderingHtmlRenderer(
-            provider,
-            provider.GetRequiredService<ILoggerFactory>());
-
-        return await renderer.RenderAsync(component, ParameterView.FromDictionary(parameters));
-    }
-
     /// <summary>Wraps a screen's markup in the smallest document axe can judge fairly.</summary>
     private static string Document(string description, string html) =>
         $"""
@@ -216,24 +236,4 @@ public class PageScreenAccessibilityTests
          <body><main>{html}</main></body>
          </html>
          """;
-
-    /// <summary>Signs the render in as an Administrator, so every gated control is on the page.</summary>
-    private sealed class AdministratorStateProvider : AuthenticationStateProvider
-    {
-        /// <inheritdoc />
-        public override Task<AuthenticationState> GetAuthenticationStateAsync()
-        {
-            var identity = new ClaimsIdentity(
-                [
-                    new Claim(ClaimTypes.NameIdentifier, "1"),
-                    new Claim(ClaimTypes.Name, "test-editor"),
-                    new Claim(ClaimTypes.Role, CmsRoles.Administrator),
-                ],
-                authenticationType: "Test",
-                nameType: ClaimTypes.Name,
-                roleType: ClaimTypes.Role);
-
-            return Task.FromResult(new AuthenticationState(new ClaimsPrincipal(identity)));
-        }
-    }
 }

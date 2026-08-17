@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 
+using ContentManagementSystem.Server.Api.Cms.Dashboard;
 using ContentManagementSystem.Server.Api.Cms.Media;
 using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Preview;
@@ -62,8 +63,11 @@ public static class CmsApiEndpoints
         group.MapBlockTypeEndpoints();
         group.MapCompositionEndpoints();
 
+        group.MapDashboardEndpoints();
+
         group.MapPageEndpoints();
         group.MapPageLifecycleEndpoints();
+        group.MapPageBulkEndpoints();
         group.MapPageVersionEndpoints();
         group.MapPageLockEndpoints();
 
