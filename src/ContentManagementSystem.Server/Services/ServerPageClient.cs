@@ -26,6 +26,8 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="duplication">Shallow and deep copies, which the tree's paste is built on.</param>
 /// <param name="recycleBin">Soft delete, which the tree's delete is built on.</param>
 /// <param name="bulk">One operation over many pages, which "publish branch" is built on.</param>
+/// <param name="links">Resolves a page id to the URL an editor can follow.</param>
+/// <param name="gate">Keeps concurrently initializing components off each other's database work.</param>
 /// <remarks>
 /// Used during pre-rendering, so a page screen arrives with its content already in the HTML rather
 /// than showing a spinner until the WebAssembly runtime finishes downloading. It calls the services
@@ -47,24 +49,27 @@ public sealed class ServerPageClient(
     IDuplicationService duplication,
     IRecycleBinService recycleBin,
     IBulkOperationService bulk,
-    ILinkResolver links) : IPageClient
+    ILinkResolver links,
+    PrerenderGate gate) : IPageClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<PageTreeNode>> GetTreeAsync(
         int? parentId = null,
         int depth = 1,
         CancellationToken cancellationToken = default) =>
-        (await pages.TreeAsync(parentId, depth, cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => pages.TreeAsync(parentId, depth, token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<CursorPage<PageSummary>> ListAsync(
         PageQuery query,
         CancellationToken cancellationToken = default) =>
-        (await pages.ListAsync(query, cancellationToken)).Value ?? CursorPage<PageSummary>.Empty;
+        (await gate.RunAsync(
+            token => pages.ListAsync(query, token),
+            cancellationToken)).Value ?? CursorPage<PageSummary>.Empty;
 
     /// <inheritdoc />
     public async Task<PageDetail?> GetAsync(int id, CancellationToken cancellationToken = default) =>
-        (await pages.GetAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => pages.GetAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     /// <remarks>
@@ -73,7 +78,9 @@ public sealed class ServerPageClient(
     /// </remarks>
     public async Task<PageLink?> ResolveLinkAsync(int id, CancellationToken cancellationToken = default)
     {
-        var resolved = await links.ResolveAsync([id], includeUnpublished: true, cancellationToken);
+        var resolved = await gate.RunAsync(
+            token => links.ResolveAsync([id], includeUnpublished: true, token),
+            cancellationToken);
 
         return resolved.TryGetValue(id, out var link)
             ? new PageLink(link.PageId, link.Url, link.IsPublished, link.Title)
@@ -86,7 +93,9 @@ public sealed class ServerPageClient(
         int revision,
         CancellationToken cancellationToken = default)
     {
-        var detail = await templates.GetRevisionAsync(templateId, revision, cancellationToken);
+        var detail = await gate.RunAsync(
+            token => templates.GetRevisionAsync(templateId, revision, token),
+            cancellationToken);
 
         return detail.Value is null ? [] : CapturedSlot.Read(detail.Value.Zones);
     }
@@ -94,34 +103,36 @@ public sealed class ServerPageClient(
     /// <inheritdoc />
     public async Task<IReadOnlyList<TemplateSummary>> GetTemplatesAsync(
         CancellationToken cancellationToken = default) =>
-        (await templates.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => templates.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PageDetail>> CreateAsync(
         CreatePageRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await pages.CreateAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => pages.CreateAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<DraftSaveResult>> SaveDraftAsync(
         int id,
         SaveDraftRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await drafts.SaveAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => drafts.SaveAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PageDetail>> PatchMetadataAsync(
         int id,
         PatchPageMetadataRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await pages.PatchMetadataAsync(id, request, cancellationToken: cancellationToken));
+        Project(await gate.RunAsync(
+            token => pages.PatchMetadataAsync(id, request, cancellationToken: token),
+            cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PageMoveResult>> MoveAsync(
         int id,
         MovePageRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await pages.MoveAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => pages.MoveAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PageDetail>> DuplicateAsync(
@@ -129,37 +140,37 @@ public sealed class ServerPageClient(
         bool deep = false,
         int? parentId = null,
         CancellationToken cancellationToken = default) =>
-        Project(await duplication.DuplicateAsync(id, deep, parentId, cancellationToken));
+        Project(await gate.RunAsync(token => duplication.DuplicateAsync(id, deep, parentId, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<SubtreeImpact?> DescribeDeleteAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await recycleBin.DescribeAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => recycleBin.DescribeAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<StructureClientResult<SubtreeResult>> DeleteAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await recycleBin.DeleteAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => recycleBin.DeleteAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<RecycleBinEntry>> GetRecycleBinAsync(
         CancellationToken cancellationToken = default) =>
-        (await recycleBin.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => recycleBin.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<SubtreeResult>> RestoreAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await recycleBin.RestoreAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => recycleBin.RestoreAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PurgeResult>> PurgeAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
-        var purged = await recycleBin.PurgeAsync(id, cancellationToken);
+        var purged = await gate.RunAsync(token => recycleBin.PurgeAsync(id, token), cancellationToken);
 
         // The service answers with a row count and the API dresses it as a PurgeResult, so this does
         // the same rather than letting the pre-rendered screen see a different shape from the
@@ -175,13 +186,13 @@ public sealed class ServerPageClient(
     public async Task<StructureClientResult<BulkImpact>> PreviewBulkAsync(
         BulkOperationRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await bulk.DescribeAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => bulk.DescribeAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<BulkJobStatus>> StartBulkAsync(
         BulkOperationRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await bulk.StartAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => bulk.StartAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public Task<BulkJobStatus?> GetBulkAsync(
@@ -193,21 +204,23 @@ public sealed class ServerPageClient(
     public async Task<StructureClientResult<PublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await publishing.ValidateAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => publishing.ValidateAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PublishResult>> PublishAsync(
         int id,
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default) =>
-        Project(await publishing.PublishAsync(id, acknowledgeWarnings, cancellationToken));
+        Project(await gate.RunAsync(
+            token => publishing.PublishAsync(id, acknowledgeWarnings, token),
+            cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<UnpublishResult>> UnpublishAsync(
         int id,
         CancellationToken cancellationToken = default)
     {
-        var result = await publishing.UnpublishAsync(id, cancellationToken);
+        var result = await gate.RunAsync(token => publishing.UnpublishAsync(id, token), cancellationToken);
 
         return result.IsSuccess
             ? StructureClientResult<UnpublishResult>.Success(new UnpublishResult(id, result.Value))
@@ -220,7 +233,7 @@ public sealed class ServerPageClient(
     public async Task<IReadOnlyList<PageVersionSummary>> GetVersionsAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await versions.ListAsync(id, cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => versions.ListAsync(id, token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<ContentDiff?> GetDiffAsync(
@@ -228,45 +241,47 @@ public sealed class ServerPageClient(
         int fromVersionId,
         int toVersionId,
         CancellationToken cancellationToken = default) =>
-        (await diffs.CompareAsync(id, fromVersionId, toVersionId, cancellationToken)).Value;
+        (await gate.RunAsync(
+            token => diffs.CompareAsync(id, fromVersionId, toVersionId, token),
+            cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<ContentDiff?> DiffDraftAsync(
         int id,
         string? contentJson,
         CancellationToken cancellationToken = default) =>
-        (await diffs.CompareDraftAsync(id, contentJson, cancellationToken)).Value;
+        (await gate.RunAsync(token => diffs.CompareDraftAsync(id, contentJson, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,
         CancellationToken cancellationToken = default) =>
-        Project(await versions.RestoreAsync(id, versionId, cancellationToken));
+        Project(await gate.RunAsync(token => versions.RestoreAsync(id, versionId, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<PreviewTokenSummary>> GetPreviewTokensAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await previews.ListAsync(id, cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => previews.ListAsync(id, token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<IssuedPreviewToken>> IssuePreviewTokenAsync(
         CreatePreviewTokenRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await previews.IssueAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => previews.IssueAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PreviewTokenSummary>> RevokePreviewTokenAsync(
         int tokenId,
         CancellationToken cancellationToken = default) =>
-        Project(await previews.RevokeAsync(tokenId, cancellationToken));
+        Project(await gate.RunAsync(token => previews.RevokeAsync(tokenId, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<int>> RevokeAllPreviewTokensAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await previews.RevokeAllAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => previews.RevokeAllAsync(id, token), cancellationToken));
 
     /// <summary>
     /// Folds a service result into the shape the screens read.

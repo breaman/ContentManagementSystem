@@ -228,7 +228,10 @@ try
     builder.Services.AddScoped<IBulkOperationScopeFactory, HttpBulkOperationScopeFactory>();
 
     // Backs the structure admin screens while they pre-render, calling the services directly rather
-    // than looping back through the HTTP API (task P1-29).
+    // than looping back through the HTTP API (task P1-29). Scoped alongside them, the gate keeps the
+    // components Blazor initializes concurrently from using this request's one DbContext at once
+    // (ADR-0022).
+    builder.Services.AddScoped<PrerenderGate>();
     builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
     builder.Services.AddScoped<IPageClient, ServerPageClient>();
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();

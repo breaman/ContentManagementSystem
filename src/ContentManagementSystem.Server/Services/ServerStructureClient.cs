@@ -15,6 +15,7 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="zones">Zone reads and writes.</param>
 /// <param name="blockTypes">Block type reads and writes.</param>
 /// <param name="fieldTypes">The registered field types and their configuration schemas.</param>
+/// <param name="gate">Keeps concurrently initializing components off each other's database work.</param>
 /// <remarks>
 /// Used during pre-rendering, so a structure screen arrives with its content already in the HTML
 /// rather than showing a spinner until the WebAssembly runtime finishes downloading. It calls the
@@ -30,29 +31,30 @@ public sealed class ServerStructureClient(
     ITemplateService templates,
     IZoneService zones,
     IBlockTypeService blockTypes,
-    IFieldTypeCatalog fieldTypes) : IStructureClient
+    IFieldTypeCatalog fieldTypes,
+    PrerenderGate gate) : IStructureClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<TemplateSummary>> GetTemplatesAsync(
         CancellationToken cancellationToken = default) =>
-        (await templates.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => templates.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<TemplateDetail?> GetTemplateAsync(int id, CancellationToken cancellationToken = default) =>
-        (await templates.GetAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => templates.GetAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<StructureClientResult<TemplateDetail>> CreateTemplateAsync(
         CreateTemplateRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await templates.CreateAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => templates.CreateAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ZoneSaveResult>> CreateZoneAsync(
         int templateId,
         CreateZoneRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await zones.CreateAsync(templateId, request, cancellationToken));
+        Project(await gate.RunAsync(token => zones.CreateAsync(templateId, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ZoneSaveResult>> UpdateZoneAsync(
@@ -60,36 +62,38 @@ public sealed class ServerStructureClient(
         int zoneId,
         UpdateZoneRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await zones.UpdateAsync(templateId, zoneId, request, cancellationToken));
+        Project(await gate.RunAsync(token => zones.UpdateAsync(templateId, zoneId, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ZoneRemovalResult>> DeleteZoneAsync(
         int templateId,
         int zoneId,
         CancellationToken cancellationToken = default) =>
-        Project(await zones.DeleteAsync(templateId, zoneId, cancellationToken));
+        Project(await gate.RunAsync(token => zones.DeleteAsync(templateId, zoneId, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<BlockTypeSummary>> GetBlockTypesAsync(
         CancellationToken cancellationToken = default) =>
-        (await blockTypes.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => blockTypes.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<BlockTypeDetail?> GetBlockTypeAsync(int id, CancellationToken cancellationToken = default) =>
-        (await blockTypes.GetAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => blockTypes.GetAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<StructureClientResult<BlockTypeDetail>> CreateBlockTypeAsync(
         CreateBlockTypeRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await blockTypes.CreateAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => blockTypes.CreateAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PropertySaveResult>> CreatePropertyAsync(
         int blockTypeId,
         CreatePropertyRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await blockTypes.CreatePropertyAsync(blockTypeId, request, cancellationToken));
+        Project(await gate.RunAsync(
+            token => blockTypes.CreatePropertyAsync(blockTypeId, request, token),
+            cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PropertySaveResult>> UpdatePropertyAsync(
@@ -97,14 +101,18 @@ public sealed class ServerStructureClient(
         int propertyId,
         UpdatePropertyRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await blockTypes.UpdatePropertyAsync(blockTypeId, propertyId, request, cancellationToken));
+        Project(await gate.RunAsync(
+            token => blockTypes.UpdatePropertyAsync(blockTypeId, propertyId, request, token),
+            cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<PropertyRemovalResult>> DeletePropertyAsync(
         int blockTypeId,
         int propertyId,
         CancellationToken cancellationToken = default) =>
-        Project(await blockTypes.DeletePropertyAsync(blockTypeId, propertyId, cancellationToken));
+        Project(await gate.RunAsync(
+            token => blockTypes.DeletePropertyAsync(blockTypeId, propertyId, token),
+            cancellationToken));
 
     /// <inheritdoc />
     public Task<IReadOnlyList<FieldTypeDescriptor>> GetFieldTypesAsync(

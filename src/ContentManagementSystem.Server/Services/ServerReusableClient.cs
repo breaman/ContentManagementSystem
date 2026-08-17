@@ -14,6 +14,7 @@ namespace ContentManagementSystem.Server.Services;
 /// </summary>
 /// <param name="reusable">The whole reusable-content lifecycle.</param>
 /// <param name="blockTypes">Block types, and the revision snapshots the editor form is built from.</param>
+/// <param name="gate">Keeps concurrently initializing components off each other's database work.</param>
 /// <remarks>
 /// Used during pre-rendering, so a library or editor screen arrives with its content already in the
 /// HTML. It calls the services rather than looping back through the HTTP API — a request to itself
@@ -25,20 +26,21 @@ namespace ContentManagementSystem.Server.Services;
 /// </remarks>
 public sealed class ServerReusableClient(
     IReusableContentService reusable,
-    IBlockTypeService blockTypes) : IReusableClient
+    IBlockTypeService blockTypes,
+    PrerenderGate gate) : IReusableClient
 {
     /// <inheritdoc />
     public async Task<IReadOnlyList<ReusableContentSummary>> ListAsync(
         int? folderId = null,
         string? search = null,
         CancellationToken cancellationToken = default) =>
-        (await reusable.ListAsync(folderId, search, cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => reusable.ListAsync(folderId, search, token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<ReusableContentDetail?> GetAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await reusable.GetAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => reusable.GetAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<CapturedSlot>> GetPropertiesAsync(
@@ -46,7 +48,9 @@ public sealed class ServerReusableClient(
         int revision,
         CancellationToken cancellationToken = default)
     {
-        var detail = await blockTypes.GetRevisionAsync(blockTypeId, revision, cancellationToken);
+        var detail = await gate.RunAsync(
+            token => blockTypes.GetRevisionAsync(blockTypeId, revision, token),
+            cancellationToken);
 
         return detail.Value is null ? [] : CapturedSlot.Read(detail.Value.Properties);
     }
@@ -54,65 +58,69 @@ public sealed class ServerReusableClient(
     /// <inheritdoc />
     public async Task<IReadOnlyList<BlockTypeSummary>> GetBlockTypesAsync(
         CancellationToken cancellationToken = default) =>
-        (await blockTypes.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => blockTypes.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusableContentDetail>> CreateAsync(
         CreateReusableContentRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.CreateAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.CreateAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusableContentDetail>> PatchAsync(
         int id,
         PatchReusableContentRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.PatchAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.PatchAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusableDraftSaveResult>> SaveDraftAsync(
         int id,
         SaveDraftRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.SaveDraftAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.SaveDraftAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<ReusableVersionSummary>> GetVersionsAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await reusable.ListVersionsAsync(id, cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => reusable.ListVersionsAsync(id, token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusablePublishValidation>> ValidateAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.ValidateAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.ValidateAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusablePublishResult>> PublishAsync(
         int id,
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.PublishAsync(id, acknowledgeWarnings, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.PublishAsync(id, acknowledgeWarnings, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusableUnpublishResult>> UnpublishAsync(
         int id,
         bool acknowledgeWarnings = false,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.UnpublishAsync(id, acknowledgeWarnings, cancellationToken));
+        Project(await gate.RunAsync(
+            token => reusable.UnpublishAsync(id, acknowledgeWarnings, token),
+            cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<ReusableDeleteResult>> DeleteAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await reusable.DeleteAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => reusable.DeleteAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<ReferenceImpact> WhereUsedAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await reusable.WhereUsedAsync(id, cancellationToken)).Value ?? ReferenceImpact.None;
+        (await gate.RunAsync(
+            token => reusable.WhereUsedAsync(id, token),
+            cancellationToken)).Value ?? ReferenceImpact.None;
 
     /// <summary>
     /// Re-expresses a service result as the shape the screens read.

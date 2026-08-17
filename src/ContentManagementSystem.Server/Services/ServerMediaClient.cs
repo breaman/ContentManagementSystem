@@ -18,6 +18,7 @@ namespace ContentManagementSystem.Server.Services;
 /// <param name="folders">The organizing tree.</param>
 /// <param name="uploads">The pipeline every byte enters the library through.</param>
 /// <param name="signer">Signs the URLs a screen shows an item at.</param>
+/// <param name="gate">Keeps concurrently initializing components off each other's database work.</param>
 /// <remarks>
 /// Used during pre-rendering, so the media browser arrives with its first page of items already in
 /// the HTML. It calls the services rather than looping back through the HTTP API — a request to
@@ -36,7 +37,8 @@ public sealed class ServerMediaClient(
     IMediaLibraryService library,
     IMediaFolderService folders,
     IMediaUploadService uploads,
-    IMediaUrlSigner signer) : IMediaClient
+    IMediaUrlSigner signer,
+    PrerenderGate gate) : IMediaClient
 {
     /// <inheritdoc />
     public async Task<MediaListResult> ListAsync(
@@ -45,13 +47,13 @@ public sealed class ServerMediaClient(
     {
         ArgumentNullException.ThrowIfNull(query);
 
-        return (await library.ListAsync(query, cancellationToken)).Value
+        return (await gate.RunAsync(token => library.ListAsync(query, token), cancellationToken)).Value
             ?? new MediaListResult([], 0, query.Skip, query.Take);
     }
 
     /// <inheritdoc />
     public async Task<MediaDetail?> GetAsync(int id, CancellationToken cancellationToken = default) =>
-        (await library.GetAsync(id, cancellationToken)).Value;
+        (await gate.RunAsync(token => library.GetAsync(id, token), cancellationToken)).Value;
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<int, MediaLinks>> LinksAsync(
@@ -64,7 +66,7 @@ public sealed class ServerMediaClient(
 
         foreach (var id in ids.Distinct())
         {
-            var item = await library.GetAsync(id, cancellationToken);
+            var item = await gate.RunAsync(token => library.GetAsync(id, token), cancellationToken);
 
             if (item.Value is { } detail) links[id] = MediaLinkFactory.For(detail, signer);
         }
@@ -75,13 +77,13 @@ public sealed class ServerMediaClient(
     /// <inheritdoc />
     public async Task<IReadOnlyList<MediaFolderNode>> FoldersAsync(
         CancellationToken cancellationToken = default) =>
-        (await folders.ListAsync(cancellationToken)).Value ?? [];
+        (await gate.RunAsync(token => folders.ListAsync(token), cancellationToken)).Value ?? [];
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaFolderNode>> CreateFolderAsync(
         CreateMediaFolderRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await folders.CreateAsync(request, cancellationToken));
+        Project(await gate.RunAsync(token => folders.CreateAsync(request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaUploadResult>> UploadAsync(
@@ -91,7 +93,7 @@ public sealed class ServerMediaClient(
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        var result = await uploads.UploadAsync(ToRequest(content), cancellationToken);
+        var result = await gate.RunAsync(token => uploads.UploadAsync(ToRequest(content), token), cancellationToken);
 
         progress?.Report(1);
 
@@ -106,7 +108,9 @@ public sealed class ServerMediaClient(
     {
         ArgumentNullException.ThrowIfNull(content);
 
-        return Project(await uploads.ReplaceAsync(id, ToRequest(content), cancellationToken));
+        return Project(await gate.RunAsync(
+            token => uploads.ReplaceAsync(id, ToRequest(content), token),
+            cancellationToken));
     }
 
     /// <inheritdoc />
@@ -114,44 +118,46 @@ public sealed class ServerMediaClient(
         int id,
         PatchMediaRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await library.PatchAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => library.PatchAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaDetail>> SetEditsAsync(
         int id,
         SetMediaEditsRequest request,
         CancellationToken cancellationToken = default) =>
-        Project(await library.SetEditsAsync(id, request, cancellationToken));
+        Project(await gate.RunAsync(token => library.SetEditsAsync(id, request, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaDetail>> RevertEditsAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await library.RevertEditsAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => library.RevertEditsAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaDeleteResult>> DeleteAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await library.DeleteAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => library.DeleteAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaDetail>> RestoreAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await library.RestoreAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => library.RestoreAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<StructureClientResult<MediaDeleteResult>> PurgeAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        Project(await library.PurgeAsync(id, cancellationToken));
+        Project(await gate.RunAsync(token => library.PurgeAsync(id, token), cancellationToken));
 
     /// <inheritdoc />
     public async Task<ReferenceImpact> WhereUsedAsync(
         int id,
         CancellationToken cancellationToken = default) =>
-        (await library.WhereUsedAsync(id, cancellationToken)).Value ?? ReferenceImpact.None;
+        (await gate.RunAsync(
+            token => library.WhereUsedAsync(id, token),
+            cancellationToken)).Value ?? ReferenceImpact.None;
 
     private static MediaUploadRequest ToRequest(MediaUploadContent content) => new(
         content.Content,
