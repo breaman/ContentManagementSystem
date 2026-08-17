@@ -11,6 +11,14 @@
     never published on its own — it is published with whatever page hosts it.
 </p>
 
+@* The twin of the nav on Templates. Both screens carry it so the pair navigates between itself. *@
+<nav class="mb-3" aria-label="Structure sections">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/templates">Templates</NavLink></li>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/block-types">Block types</NavLink></li>
+    </ul>
+</nav>
+
 <DiagnosticList Diagnostics="Errors" Heading="The block type was not created" />
 
 @if (Items is null)

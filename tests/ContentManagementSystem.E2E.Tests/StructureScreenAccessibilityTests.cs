@@ -126,6 +126,12 @@ public class StructureScreenAccessibilityTests
         services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         services.AddScoped<IStructureClient, FakeStructureClient>();
 
+        // The sub-navigation between the two structure screens is built from <NavLink>, which
+        // resolves a NavigationManager when it is constructed in order to work out whether it is the
+        // active link. A static render has nowhere to navigate to, so the substitute records rather
+        // than moves — the same one the other backoffice gates use.
+        services.AddScoped<NavigationManager, StaticNavigationManager>();
+
         await using var provider = services.BuildServiceProvider();
         await using var renderer = new PrerenderingHtmlRenderer(
             provider,

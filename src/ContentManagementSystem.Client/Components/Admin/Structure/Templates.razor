@@ -12,6 +12,15 @@
     zones an editor fills in.
 </p>
 
+@* Structure is two screens, and the section bar on the dashboard links only to this one. Without
+   these, block types are reachable only by typing the address. *@
+<nav class="mb-3" aria-label="Structure sections">
+    <ul class="nav nav-pills">
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/templates">Templates</NavLink></li>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/block-types">Block types</NavLink></li>
+    </ul>
+</nav>
+
 <DiagnosticList Diagnostics="Errors" Heading="The template was not created" />
 <DiagnosticList Diagnostics="Warnings" IsError="false" Heading="Saved, with warnings" />
 
