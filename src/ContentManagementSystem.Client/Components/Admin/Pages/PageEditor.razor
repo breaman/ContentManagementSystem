@@ -2,7 +2,11 @@
 @rendermode InteractiveWebAssembly
 @attribute [Authorize(Roles = CmsRoles.ContentReaders)]
 @using ContentManagementSystem.Client.Components.Admin.Canvas
+@using ContentManagementSystem.Client.Components.Admin.Common
 @using ContentManagementSystem.Client.Components.Admin.Fields
+@using ContentManagementSystem.Client.Components.Admin.Properties
+@using ContentManagementSystem.Client.Components.Admin.Publishing
+@using ContentManagementSystem.Client.Components.Admin.Saving
 @using ContentManagementSystem.Shared.Contracts.Content
 @using ContentManagementSystem.Shared.Contracts.Security
 
@@ -36,9 +40,21 @@ else
         </p>
     }
 
-    @if (Notice is { Length: > 0 })
+    @* The undo affordance of task P6-21. An inline bar rather than a toast, because a toast times
+       out and this is the one action on the screen worth taking back after reading what it did. *@
+    @if (Unpublished is { } retired)
     {
-        <p class="alert alert-success" role="status">@Notice</p>
+        <div class="alert alert-secondary d-flex align-items-center gap-3" role="status">
+            <span>
+                v@retired is no longer on the public site. The draft is untouched.
+            </span>
+            <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="restorer">
+                <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@IsBusy"
+                        @onclick="BeginPublishAsync">
+                    Put it back
+                </button>
+            </AuthorizeView>
+        </div>
     }
 
     @* The pinned-version affordance of spec section 9.2, on the page rather than on the item —
@@ -52,60 +68,81 @@ else
     }
     else
     {
-        <EditingCanvas Zones="Slots"
-                       Diagnostics="Diagnostics"
-                       Disabled="@(IsBusy || !CanEdit)"
-                       PageErrorHeading="@ErrorHeading"
-                       Status="@StatusLine">
+        <div class="row g-3 cms-editor">
 
-            @* One line, and no switch on the field type: which control fills a zone is the editor
-               catalog's answer (ADR-0014), and the same host draws a block's properties inside a
-               block list, so the two surfaces cannot disagree. *@
-            <Editor Context="zone">
-                <FieldEditorHost Field="zone"
-                                 Value="@Values.GetValueOrDefault(zone.Slot.Key, string.Empty)"
-                                 ValueChanged="value => OnZoneChanged(zone.Slot.Key, value)" />
-            </Editor>
+            <div class="col-12 col-xl-8 cms-editor__canvas">
 
-            <EmptyState>
-                <p>
-                    This template's revision @Page.TemplateRevision captured no zones, so there is
-                    nothing to fill in.
-                    <a href="@($"/admin/structure/templates/{Page.Summary.TemplateId}")">Add some</a>,
-                    then republish the page to adopt them.
-                </p>
-            </EmptyState>
+                <EditingCanvas Zones="Slots"
+                               Diagnostics="Diagnostics"
+                               Disabled="@(IsBusy || !CanEdit)"
+                               PageErrorHeading="@ErrorHeading"
+                               Status="@StatusLine">
 
-            <Actions>
-                <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
-                    <button type="button" class="btn btn-primary" disabled="@IsBusy"
-                            @onclick="SaveAsync">
-                        Save draft
-                    </button>
-                </AuthorizeView>
+                    @* One line, and no switch on the field type: which control fills a zone is the
+                       editor catalog's answer (ADR-0014), and the same host draws a block's
+                       properties inside a block list, so the two surfaces cannot disagree. *@
+                    <Editor Context="zone">
+                        <FieldEditorHost Field="zone"
+                                         Value="@Values.GetValueOrDefault(zone.Slot.Key, string.Empty)"
+                                         ValueChanged="value => OnZoneChanged(zone.Slot.Key, value)" />
+                    </Editor>
 
-                <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
-                        @onclick="ValidateAsync">
-                    Check before publishing
-                </button>
+                    <EmptyState>
+                        <p>
+                            This template's revision @Page.TemplateRevision captured no zones, so
+                            there is nothing to fill in.
+                            <a href="@($"/admin/structure/templates/{Page.Summary.TemplateId}")">Add some</a>,
+                            then republish the page to adopt them.
+                        </p>
+                    </EmptyState>
 
-                <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
-                    <button type="button" class="btn btn-success" disabled="@IsBusy"
-                            @onclick="PublishAsync">
-                        @(AcknowledgeWarnings ? "Publish anyway" : "Publish")
-                    </button>
+                    <Actions>
+                        <SaveStateIndicator Status="SaveStatus" GuardUnload="@CanEdit" />
 
-                    @if (Page.Summary.PublishedVersionNumber is not null)
-                    {
-                        <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
-                                @onclick="UnpublishAsync">
-                            Unpublish
+                        <AuthorizeView Roles="@CmsRoles.ContentEditors" Context="editor">
+                            <button type="button" class="btn btn-primary" disabled="@IsBusy"
+                                    @onclick="SaveAsync">
+                                Save draft
+                            </button>
+                        </AuthorizeView>
+
+                        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
+                                @onclick="ValidateAsync">
+                            Check before publishing
                         </button>
-                    }
-                </AuthorizeView>
-            </Actions>
 
-        </EditingCanvas>
+                        <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="publisher">
+                            <button type="button" class="btn btn-success" disabled="@IsBusy"
+                                    @onclick="BeginPublishAsync">
+                                Publish
+                            </button>
+
+                            @if (Page.Summary.PublishedVersionNumber is not null)
+                            {
+                                <button type="button" class="btn btn-outline-danger" disabled="@IsBusy"
+                                        @onclick="() => IsUnpublishDialogOpen = true">
+                                    Unpublish
+                                </button>
+                            }
+                        </AuthorizeView>
+                    </Actions>
+
+                </EditingCanvas>
+
+            </div>
+
+            @* The right-hand pane of spec section 14.1, in the layout this screen has until the
+               three-pane shell is composed around it (task P6-01). The panel takes no position of
+               its own, so moving it there is a change to where it is rendered and to nothing else. *@
+            <aside class="col-12 col-xl-4 cms-editor__properties" aria-label="Page properties">
+                <PropertiesPanel Page="Page"
+                                 Model="Properties"
+                                 Disabled="@(IsBusy || !CanEdit)"
+                                 Diagnostics="MetadataErrors"
+                                 OnChanged="OnPropertiesChanged" />
+            </aside>
+
+        </div>
     }
 
     <div class="d-flex gap-2 mt-3">
@@ -116,4 +153,46 @@ else
         <a class="btn btn-outline-secondary" href="@($"/admin/pages/{Id}/preview-links")">Preview links</a>
         <a class="btn btn-outline-secondary" href="@($"/admin/pages/{Id}/versions")">Version history</a>
     </div>
+
+    <PublishDialog IsOpen="IsPublishDialogOpen"
+                   IsChecking="IsChecking"
+                   IsBusy="IsBusy"
+                   Errors="Validation?.Errors"
+                   Warnings="Validation?.Warnings"
+                   Zones="Slots"
+                   OnPublish="PublishAsync"
+                   OnGoToZone="GoToZoneAsync"
+                   OnCancel="() => IsPublishDialogOpen = false" />
+
+    @* "Mine" is built only while there is a conflict to compare. Folding the whole payload into
+       JSON on every render would do it on every keystroke, for a dialog that is almost never open. *@
+    <ConflictDialog IsOpen="@(Theirs is not null)"
+                    PageId="Id"
+                    Theirs="Theirs"
+                    Mine="@(Theirs is null ? null : BuildPayload())"
+                    IsBusy="IsBusy"
+                    OnKeepMine="KeepMineAsync"
+                    OnTakeTheirs="TakeTheirsAsync"
+                    OnCancel="() => Theirs = null" />
+
+    <ModalDialog IsOpen="IsUnpublishDialogOpen"
+                 Title="Take this page off the public site?"
+                 ConfirmLabel="Unpublish"
+                 ConfirmClass="btn-danger"
+                 IsBusy="IsBusy"
+                 OnConfirm="UnpublishAsync"
+                 OnCancel="() => IsUnpublishDialogOpen = false">
+        <p>
+            Visitors will get a "not found" for
+            <code>@Page.Summary.Slug</code> from the moment you confirm.
+        </p>
+        <p class="mb-0">
+            Nothing is deleted: v@Page.Summary.PublishedVersionNumber stays in the page's history and
+            the draft is untouched, so you can publish it again at any time.
+        </p>
+    </ModalDialog>
+
+    @* The check's own result, announced once when it finishes rather than derived from state that
+       redraws on every keystroke (task P6-22). *@
+    <LiveRegion Message="@ValidationAnnouncement" IsAssertive="true" />
 }

@@ -142,10 +142,21 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
             }
         }
 
-        // The token endpoint is the one exemption: it is how an authenticated caller obtains the
-        // antiforgery pair every write then needs, and gating it behind a content permission would
-        // mean a Viewer could never make a request that requires one.
-        unprotected.Should().BeEquivalentTo([$"{CmsApiEndpoints.BasePath}/antiforgery-token"]);
+        // Two exemptions, both of them about the caller rather than about content.
+        //
+        // The token endpoint is how an authenticated caller obtains the antiforgery pair every write
+        // then needs, and gating it behind a content permission would mean a Viewer could never make
+        // a request that requires one.
+        //
+        // "/me" reports the caller's own identity and nothing else. A content permission is the wrong
+        // gate for it — a media manager with no content rights still has a name and an id, and the
+        // answer discloses nothing the caller did not arrive holding. The floor the group applies,
+        // an authenticated user, is the whole requirement.
+        unprotected.Should().BeEquivalentTo(
+        [
+            $"{CmsApiEndpoints.BasePath}/antiforgery-token",
+            $"{CmsApiEndpoints.BasePath}/me",
+        ]);
     }
 
     [Fact]

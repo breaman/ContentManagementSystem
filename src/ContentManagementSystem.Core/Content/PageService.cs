@@ -507,7 +507,12 @@ public sealed class PageService(
         var locks = await LiveLocksAsync([page.Id], cancellationToken);
 
         return CmsResult<PageDetail>.Success(
-            ToDetail(page, draft, hasChildren, LockedBy(locks, page.Id)),
+            ToDetail(
+                page,
+                draft,
+                hasChildren,
+                LockedBy(locks, page.Id),
+                await OwnerNameAsync(page.OwnerUserId, cancellationToken)),
             checks);
     }
 
@@ -862,7 +867,12 @@ public sealed class PageService(
 
         var locks = await LiveLocksAsync([page.Id], cancellationToken);
 
-        return ToDetail(page, page.DraftVersion, hasChildren, LockedBy(locks, page.Id));
+        return ToDetail(
+            page,
+            page.DraftVersion,
+            hasChildren,
+            LockedBy(locks, page.Id),
+            await OwnerNameAsync(page.OwnerUserId, cancellationToken));
     }
 
     /// <summary>Places a new page after its existing siblings.</summary>
@@ -1183,6 +1193,30 @@ public sealed class PageService(
         return held.ToDictionary(row => row.PageId, row => row.UserName);
     }
 
+    /// <summary>
+    /// Resolves an owner's display name.
+    /// </summary>
+    /// <remarks>
+    /// A separate query rather than an <c>Include</c> on the owner navigation, for two reasons: it is
+    /// one small read on a single page rather than a join on every path that loads one, and it gets
+    /// the answer right in the patch path, where the owner has just been reassigned and the loaded
+    /// navigation would still be pointing at whoever held it before.
+    /// </remarks>
+    private async Task<string?> OwnerNameAsync(int? ownerId, CancellationToken cancellationToken)
+    {
+        if (ownerId is not { } id) return null;
+
+        var name = await context.Users
+            .AsNoTracking()
+            .Where(user => user.Id == id)
+            .Select(user => user.UserName)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // A page whose owner's account has since been removed still has an owner id. Saying so is
+        // better than saying nothing, which reads as "unassigned" and invites nobody to fix it.
+        return name ?? $"user {id}";
+    }
+
     /// <summary>Reads one page's holder out of a lock lookup.</summary>
     private static string? LockedBy(Dictionary<int, string?> locks, int pageId) =>
         locks.TryGetValue(pageId, out var holder) ? holder ?? "another editor" : null;
@@ -1227,7 +1261,8 @@ public sealed class PageService(
         Page page,
         PageVersion draft,
         bool hasChildren,
-        string? lockedBy = null) =>
+        string? lockedBy = null,
+        string? ownerName = null) =>
         new(
             ToSummary(page, draft, hasChildren, lockedBy),
             draft.ContentJson,
@@ -1238,7 +1273,8 @@ public sealed class PageService(
             page.ReviewByDate,
             page.InternalNotes,
             ReadSeo(draft),
-            Convert.ToBase64String(draft.RowVersion ?? []));
+            Convert.ToBase64String(draft.RowVersion ?? []),
+            ownerName);
 
     /// <summary>
     /// Whether the draft has moved on from what is published.

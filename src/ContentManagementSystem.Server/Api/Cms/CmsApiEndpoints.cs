@@ -1,3 +1,6 @@
+using System.Globalization;
+using System.Security.Claims;
+
 using ContentManagementSystem.Server.Api.Cms.Media;
 using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Preview;
@@ -5,6 +8,7 @@ using ContentManagementSystem.Server.Api.Cms.Reusable;
 using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Shared.Contracts.Api;
+using ContentManagementSystem.Shared.Contracts.Security;
 
 using Microsoft.AspNetCore.Antiforgery;
 
@@ -49,6 +53,10 @@ public static class CmsApiEndpoints
             .WithName("GetAntiforgeryToken")
             .WithSummary("Issues the antiforgery token pair the write endpoints require.");
 
+        group.MapGet("/me", GetCurrentUser)
+            .WithName("GetCurrentUser")
+            .WithSummary("Reports the signed-in editor's own identity.");
+
         group.MapTemplateEndpoints();
         group.MapZoneEndpoints();
         group.MapBlockTypeEndpoints();
@@ -70,6 +78,39 @@ public static class CmsApiEndpoints
         group.MapMarkupPreviewEndpoints();
 
         return group;
+    }
+
+    /// <summary>
+    /// Answers who is signed in, by id as well as by name.
+    /// </summary>
+    /// <remarks>
+    /// The backoffice runs in WebAssembly, where the serialized authentication state carries the name
+    /// and role claims and nothing else — so the editor's own database id, which every screen that
+    /// writes an <c>OwnerUserId</c> or filters "my work" needs, is not available there (task P6-17).
+    /// <para>
+    /// It reports the caller's own identity only, and needs no permission beyond the group's
+    /// authentication floor: nobody learns anything here they did not arrive holding. It is
+    /// deliberately not a user directory — listing other editors is Phase 7's, with Phase 7's rules.
+    /// </para>
+    /// </remarks>
+    private static IResult GetCurrentUser(HttpContext httpContext)
+    {
+        var principal = httpContext.User;
+
+        if (!int.TryParse(
+                principal.FindFirstValue(ClaimTypes.NameIdentifier),
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out var userId))
+        {
+            // Authenticated by a scheme that issued no numeric subject. There is nothing to report
+            // and nothing wrong, which is what 204 means.
+            return Results.NoContent();
+        }
+
+        return Results.Ok(new CurrentUser(
+            userId,
+            principal.Identity?.Name ?? principal.FindFirstValue(ClaimTypes.Email) ?? $"user {userId}"));
     }
 
     /// <summary>

@@ -1,0 +1,330 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Properties
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+@using ContentManagementSystem.Client.Components.Admin.Structure
+
+@if (Page is null || Model is null)
+{
+    <p class="cms-properties__loading" role="status">Loading properties…</p>
+
+    return;
+}
+
+<div class="cms-properties">
+
+    <DiagnosticList Diagnostics="Unplaced" Heading="These details were not saved" />
+
+    <fieldset disabled="@Disabled" class="cms-properties__fields">
+
+        <details class="cms-properties__section" open>
+            <summary class="cms-properties__section-name">Page</summary>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-title" class="form-control @Invalid(nameof(PageProperties.Title))"
+                       placeholder="Pricing" @bind="Model.Title" @bind:event="oninput"
+                       @bind:after="ChangedAsync" aria-describedby="page-title-help" />
+                <label for="page-title">Title</label>
+                <div class="form-text" id="page-title-help">
+                    What editors see in the tree, and the page's heading unless a zone overrides it.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.Title))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-slug" class="form-control @Invalid(nameof(PageProperties.Slug))"
+                       placeholder="pricing" @bind="Model.Slug" @bind:event="oninput"
+                       @bind:after="ChangedAsync" aria-describedby="page-slug-help" />
+                <label for="page-slug">URL segment</label>
+                <div class="form-text" id="page-slug-help">
+                    @if (Url is { Length: > 0 })
+                    {
+                        <text>This page is served at <code>@Url</code>.</text>
+                    }
+                    <text>
+                        Changing it moves this page and everything beneath it, and leaves redirects
+                        behind.
+                    </text>
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.Slug))" />
+            </div>
+
+            <div class="form-check mb-2">
+                <input type="checkbox" id="page-explicit-url" class="form-check-input"
+                       checked="@Model.UseExplicitUrl"
+                       @onchange="args => ToggleExplicitUrlAsync(args)" />
+                <label class="form-check-label" for="page-explicit-url">State the URL outright</label>
+            </div>
+
+            @if (Model.UseExplicitUrl)
+            {
+                <div class="form-floating mb-3">
+                    <input type="text" id="page-url" class="form-control @Invalid(nameof(PageProperties.ExplicitUrl))"
+                           placeholder="/pricing" @bind="Model.ExplicitUrl" @bind:event="oninput"
+                           @bind:after="ChangedAsync" aria-describedby="page-url-help" />
+                    <label for="page-url">Full URL</label>
+                    <div class="form-text" id="page-url-help">
+                        A page with its own URL stops moving when its ancestors do.
+                    </div>
+                    <FieldMessages Diagnostics="For(nameof(PageProperties.ExplicitUrl))" />
+                </div>
+            }
+
+            <div class="form-check mb-3">
+                <input type="checkbox" id="page-navigation" class="form-check-input"
+                       checked="@Model.ShowInNavigation"
+                       @onchange="args => SetAsync(value => Model.ShowInNavigation = value, args)" />
+                <label class="form-check-label" for="page-navigation">Show in navigation menus</label>
+            </div>
+
+            <p class="cms-properties__fact">
+                Template <code>@Page.Summary.TemplateKey</code>, revision @Page.TemplateRevision.
+                <span class="cms-properties__fact-note">
+                    Changing a page's template is a migration, not an edit.
+                </span>
+            </p>
+        </details>
+
+        <details class="cms-properties__section">
+            <summary class="cms-properties__section-name">Search and social</summary>
+
+            <SearchResultPreview Id="page-serp"
+                                 Url="@Url"
+                                 MetaTitle="@Model.MetaTitle"
+                                 PageTitle="@Model.Title"
+                                 Description="@Model.MetaDescription"
+                                 RobotsIndex="Model.RobotsIndex" />
+
+            <div class="form-floating mb-1 mt-3">
+                <input type="text" id="page-meta-title" class="form-control @Invalid(nameof(PageProperties.MetaTitle))"
+                       placeholder="Pricing" @bind="Model.MetaTitle" @bind:event="oninput"
+                       @bind:after="ChangedAsync" aria-describedby="page-meta-title-count" />
+                <label for="page-meta-title">Meta title</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.MetaTitle))" />
+            </div>
+            <FieldCounter Id="page-meta-title-count" Text="@Model.MetaTitle"
+                          SoftLimit="SearchResultPreview.TitleLimit" />
+
+            <div class="form-floating mb-1 mt-3">
+                <textarea id="page-meta-description" class="form-control cms-properties__prose @Invalid(nameof(PageProperties.MetaDescription))"
+                          placeholder="What this page is about." @bind="Model.MetaDescription"
+                          @bind:event="oninput" @bind:after="ChangedAsync"
+                          aria-describedby="page-meta-description-count"></textarea>
+                <label for="page-meta-description">Meta description</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.MetaDescription))" />
+            </div>
+            <FieldCounter Id="page-meta-description-count" Text="@Model.MetaDescription"
+                          SoftLimit="SearchResultPreview.DescriptionLimit" />
+
+            <div class="form-floating mb-3 mt-3">
+                <input type="text" id="page-canonical" class="form-control @Invalid(nameof(PageProperties.CanonicalUrl))"
+                       placeholder="https://example.com/pricing" @bind="Model.CanonicalUrl"
+                       @bind:event="oninput" @bind:after="ChangedAsync"
+                       aria-describedby="page-canonical-help" />
+                <label for="page-canonical">Canonical URL</label>
+                <div class="form-text" id="page-canonical-help">
+                    Leave empty unless this page is reachable at more than one address. It then
+                    defaults to its own.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.CanonicalUrl))" />
+            </div>
+
+            <div class="form-check mb-2">
+                <input type="checkbox" id="page-robots-index" class="form-check-input"
+                       checked="@Model.RobotsIndex"
+                       @onchange="args => SetAsync(value => Model.RobotsIndex = value, args)" />
+                <label class="form-check-label" for="page-robots-index">
+                    Allow search engines to index this page
+                </label>
+            </div>
+
+            <div class="form-check mb-3">
+                <input type="checkbox" id="page-robots-follow" class="form-check-input"
+                       checked="@Model.RobotsFollow"
+                       @onchange="args => SetAsync(value => Model.RobotsFollow = value, args)" />
+                <label class="form-check-label" for="page-robots-follow">
+                    Allow them to follow links out of it
+                </label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-og-title" class="form-control @Invalid(nameof(PageProperties.OgTitle))"
+                       placeholder="Pricing" @bind="Model.OgTitle" @bind:event="oninput"
+                       @bind:after="ChangedAsync" aria-describedby="page-og-title-help" />
+                <label for="page-og-title">Share title</label>
+                <div class="form-text" id="page-og-title-help">
+                    Used when the page is posted to a social network. Falls back to the meta title.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.OgTitle))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <textarea id="page-og-description" class="form-control cms-properties__prose @Invalid(nameof(PageProperties.OgDescription))"
+                          placeholder="What this page is about." @bind="Model.OgDescription"
+                          @bind:event="oninput" @bind:after="ChangedAsync"></textarea>
+                <label for="page-og-description">Share description</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.OgDescription))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-og-type" class="form-control @Invalid(nameof(PageProperties.OgType))"
+                       placeholder="article" @bind="Model.OgType" @bind:event="oninput"
+                       @bind:after="ChangedAsync" />
+                <label for="page-og-type">Share type</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.OgType))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-twitter-card" class="form-control @Invalid(nameof(PageProperties.TwitterCard))"
+                       placeholder="summary_large_image" @bind="Model.TwitterCard" @bind:event="oninput"
+                       @bind:after="ChangedAsync" />
+                <label for="page-twitter-card">Twitter card</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.TwitterCard))" />
+            </div>
+
+            <p class="cms-properties__fact">
+                The share image is set with the rest of the Open Graph output, which arrives with the
+                <code>1200×630</code> rendition it needs (task P8-02).
+            </p>
+
+            <div class="form-floating mb-3">
+                <input type="text" id="page-change-freq" class="form-control @Invalid(nameof(PageProperties.ChangeFreq))"
+                       placeholder="weekly" @bind="Model.ChangeFreq" @bind:event="oninput"
+                       @bind:after="ChangedAsync" aria-describedby="page-sitemap-help" />
+                <label for="page-change-freq">Sitemap change frequency</label>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.ChangeFreq))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="number" id="page-priority" class="form-control @Invalid(nameof(PageProperties.Priority))"
+                       min="0" max="1" step="0.1" placeholder="0.5" @bind="Model.Priority"
+                       @bind:after="ChangedAsync" aria-describedby="page-sitemap-help" />
+                <label for="page-priority">Sitemap priority</label>
+                <div class="form-text" id="page-sitemap-help">
+                    Hints for <code>sitemap.xml</code>. Both are advisory; search engines are free to
+                    ignore them.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.Priority))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <textarea id="page-structured-data" class="form-control cms-properties__code @Invalid(nameof(PageProperties.StructuredDataJson))"
+                          placeholder="{ }" @bind="Model.StructuredDataJson" @bind:event="oninput"
+                          @bind:after="ChangedAsync" aria-describedby="page-structured-data-help"></textarea>
+                <label for="page-structured-data">Structured data (JSON-LD)</label>
+                <div class="form-text" id="page-structured-data-help">
+                    Replaces what this page would otherwise emit. Checked for well-formedness on save,
+                    because it reaches every visitor.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.StructuredDataJson))" />
+            </div>
+        </details>
+
+        <details class="cms-properties__section" open>
+            <summary class="cms-properties__section-name">Publishing</summary>
+
+            <dl class="cms-properties__facts">
+                <dt>Status</dt>
+                <dd>
+                    @if (Page.Summary.PublishedVersionNumber is { } published)
+                    {
+                        <span class="badge text-bg-success">Published</span>
+                        <text> v@published</text>
+                    }
+                    else
+                    {
+                        <span class="badge text-bg-secondary">Not published</span>
+                    }
+                </dd>
+
+                <dt>Draft</dt>
+                <dd>
+                    v@Page.Summary.DraftVersionNumber
+                    @if (Page.Summary.HasUnpublishedChanges)
+                    {
+                        <text> — has changes the public site has not seen</text>
+                    }
+                </dd>
+
+                @if (Page.Summary.ScheduledPublishOn is { } scheduled)
+                {
+                    <dt>Scheduled</dt>
+                    <dd>@scheduled.ToLocalTime().ToString("f")</dd>
+                }
+
+                @if (Page.Summary.LockedBy is { Length: > 0 } holder)
+                {
+                    <dt>Open elsewhere</dt>
+                    <dd>@holder has this page open.</dd>
+                }
+            </dl>
+
+            <p class="cms-properties__fact">
+                Publishing on a schedule, and expiring on one, arrive with the scheduler (task P7-14).
+                Until then a page goes live when somebody publishes it.
+            </p>
+        </details>
+
+        <details class="cms-properties__section" open>
+            <summary class="cms-properties__section-name">Editorial</summary>
+
+            <div class="cms-properties__owner mb-3">
+                <span class="form-label d-block mb-1" id="page-owner-label">Owner</span>
+                <p class="cms-properties__owner-name mb-1" aria-labelledby="page-owner-label">
+                    @OwnerLabel
+                </p>
+                <div class="d-flex gap-2 flex-wrap">
+                    @if (Me is not null && Model.OwnerUserId != Me.UserId)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @onclick="TakeOwnershipAsync">
+                            Take ownership
+                        </button>
+                    }
+                    @if (Model.OwnerUserId is not null)
+                    {
+                        <button type="button" class="btn btn-sm btn-outline-secondary"
+                                @onclick="ClearOwnerAsync">
+                            Leave it unassigned
+                        </button>
+                    }
+                </div>
+                <div class="form-text">
+                    Whoever is accountable for keeping this page current. Handing it to somebody else
+                    needs the user directory that arrives with permissions (task P7-01).
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.OwnerUserId))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <input type="date" id="page-review-by" class="form-control @Invalid(nameof(PageProperties.ReviewByDate))"
+                       value="@Model.ReviewByDate?.ToString("yyyy-MM-dd")"
+                       @onchange="OnReviewByChangedAsync" aria-describedby="page-review-by-help" />
+                <label for="page-review-by">Review by</label>
+                <div class="form-text" id="page-review-by-help">
+                    Puts the page on the "needs attention" list once the date passes. The only
+                    practical defence against content quietly going stale.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.ReviewByDate))" />
+            </div>
+
+            <div class="form-floating mb-3">
+                <textarea id="page-internal-notes" class="form-control cms-properties__prose @Invalid(nameof(PageProperties.InternalNotes))"
+                          placeholder="Anything the next editor should know."
+                          @bind="Model.InternalNotes" @bind:event="oninput" @bind:after="ChangedAsync"
+                          aria-describedby="page-internal-notes-help"></textarea>
+                <label for="page-internal-notes">Internal notes</label>
+                <div class="form-text" id="page-internal-notes-help">
+                    Never rendered publicly.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.InternalNotes))" />
+            </div>
+
+            <p class="cms-properties__fact">
+                Tags arrive with the tag management the <code>tags</code> field type needs
+                (task P8-20); there is nowhere to store one yet.
+            </p>
+        </details>
+
+    </fieldset>
+
+</div>

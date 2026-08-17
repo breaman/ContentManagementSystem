@@ -176,11 +176,22 @@ public static class PageApiClient
         ClientAsync(factory, cancellationToken, CmsRoles.Administrator);
 
     /// <summary>The parts of an RFC 9457 body these suites assert on (spec section 22.2).</summary>
+    /// <param name="Type">Problem type URI.</param>
+    /// <param name="Title">Short, stable summary of the problem class.</param>
+    /// <param name="Status">The HTTP status.</param>
+    /// <param name="Detail">Human-readable explanation.</param>
+    /// <param name="Errors">Everything that blocked the request.</param>
+    /// <param name="Warnings">Anything non-blocking reported alongside.</param>
+    /// <param name="Conflict">
+    /// The state that beat the request, present only on a <c>409</c>. Left as a raw element because
+    /// its shape depends on what was being written — a draft save gets the winning draft.
+    /// </param>
     public sealed record ProblemBody(
         string? Type,
         string? Title,
         int Status,
         string? Detail,
         List<ApiDiagnostic> Errors,
-        List<ApiDiagnostic> Warnings);
+        List<ApiDiagnostic> Warnings,
+        JsonElement? Conflict = null);
 }

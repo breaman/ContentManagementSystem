@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
+using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -130,13 +131,125 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         // losing editor needs the winning draft in hand to be offered keep-mine or take-theirs, and
         // a 412 is conventionally bodiless.
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await CodesAsync(second, cancellationToken)).Should().Contain(PageCodes.ConcurrentChange);
+
+        // And "both payloads" is literal: the winning draft comes back inside the refusal, so the
+        // losing editor's dialog can offer keep-mine, take-theirs, or a diff without a second round
+        // trip that would race the same way (task P6-19).
+        var problem = await ProblemAsync(second, cancellationToken);
+
+        problem.Errors.Select(error => error.Code).Should().Contain(PageCodes.ConcurrentChange);
+        problem.Conflict.Should().NotBeNull();
+
+        var won = problem.Conflict!.Value.GetProperty("draft").Deserialize<DraftState>(
+            JsonSerializerOptions.Web)!;
+
+        won.ContentJson.Should().Contain("Mine").And.NotContain("Theirs");
+        won.RowVersion.Should().NotBe(opened, "the token in hand is the one that beat this save");
 
         var stored = await client.GetFromJsonAsync<DraftState>(
             $"{Pages}/{page.Summary.Id}/draft",
             cancellationToken);
 
         stored!.ContentJson.Should().Contain("Mine").And.NotContain("Theirs");
+        stored.RowVersion.Should().Be(won.RowVersion);
+    }
+
+    [Fact]
+    public async Task ARefusalThatNothingWonCarriesNoConflictAtAll()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = await AdministratorAsync(_factory, cancellationToken);
+        var template = await CreateTemplateAsync(client, "page-no-conflict-body", cancellationToken);
+        var page = await CreatePageAsync(client, template, "Malformed", cancellationToken);
+
+        var response = await SaveDraftAsync(
+            client,
+            page.Summary.Id,
+            "not a payload at all",
+            page.RowVersion,
+            cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+
+        // Absent rather than null: "the server told me what it holds" and "the server said nothing"
+        // are different answers, and a client that cannot tell them apart would open a conflict
+        // dialog over a typo.
+        (await ProblemAsync(response, cancellationToken)).Conflict.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AnUnsavedPayloadCanBeComparedAgainstTheStoredDraft()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = await AdministratorAsync(_factory, cancellationToken);
+        var template = await CreateTemplateAsync(client, "page-draft-diff", cancellationToken);
+        var page = await CreatePageAsync(client, template, "Contested", cancellationToken);
+
+        (await FillZoneAsync(client, page.Summary.Id, "body", "Theirs", cancellationToken))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Pages}/{page.Summary.Id}/draft/diff",
+            new DiffDraftRequest(Payload(template.Key, page.TemplateRevision, "body", "Mine")),
+            cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var diff = (await response.Content.ReadFromJsonAsync<ContentDiff>(cancellationToken))!;
+
+        // The stored draft is the earlier side, because the question a losing editor asks is "what
+        // would mine change" — reversing the sides answers the opposite question in the same words.
+        var zone = diff.Zones.Should().ContainSingle().Subject;
+
+        zone.ZoneKey.Should().Be("body");
+        zone.Kind.Should().Be(ContentChangeKind.Changed);
+        zone.Before.Should().Be("Theirs");
+        zone.After.Should().Be("Mine");
+
+        // Metadata is deliberately empty: a payload was sent, not a version, and reporting a title
+        // as unchanged would be a claim about a value this comparison never saw.
+        diff.Metadata.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ComparingAgainstAPageThatDoesNotExistIsANotFoundRatherThanAnEmptyDiff()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = await AdministratorAsync(_factory, cancellationToken);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Pages}/987654/draft/diff",
+            new DiffDraftRequest(Payload("whatever", 1, "body", "Mine")),
+            cancellationToken);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task TheSignedInEditorCanReadTheirOwnIdentity()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = await AdministratorAsync(_factory, cancellationToken);
+
+        var me = await client.GetFromJsonAsync<CurrentUser>(
+            $"{CmsApiEndpoints.BasePath}/me",
+            cancellationToken);
+
+        // The one fact the WebAssembly backoffice cannot get from its serialized authentication
+        // state, and the one the properties panel writes into OwnerUserId (task P6-17).
+        me!.UserId.Should().Be(1);
+        me.DisplayName.Should().Be("test-user-1");
+    }
+
+    [Fact]
+    public async Task NobodySignedInLearnsNothingAboutWhoIsSignedIn()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var client = _factory.CreateClient();
+
+        var response = await client.GetAsync($"{CmsApiEndpoints.BasePath}/me", cancellationToken);
+
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.NotFound);
     }
 
     [Fact]

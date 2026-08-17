@@ -183,6 +183,13 @@ public sealed class ServerPageClient(
         (await diffs.CompareAsync(id, fromVersionId, toVersionId, cancellationToken)).Value;
 
     /// <inheritdoc />
+    public async Task<ContentDiff?> DiffDraftAsync(
+        int id,
+        string? contentJson,
+        CancellationToken cancellationToken = default) =>
+        (await diffs.CompareDraftAsync(id, contentJson, cancellationToken)).Value;
+
+    /// <inheritdoc />
     public async Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,
@@ -227,7 +234,12 @@ public sealed class ServerPageClient(
             ? StructureClientResult<T>.Success(
                 result.Value!,
                 ApiDiagnostics.Project(result.Diagnostics, ValidationSeverity.Warning))
-            : StructureClientResult<T>.Failure(
+            // A conflict is the one refusal that carries state: the draft that won the race, which
+            // the losing editor needs to be offered keep-mine, take-theirs, or a diff (task P6-19).
+            // Dropping it here would make the pre-rendered screen behave differently from the
+            // hydrated one on the single case where the difference is a lost edit.
+            : StructureClientResult<T>.Refused(
+                result.Outcome is CmsOutcome.Conflict ? result.Value : default,
                 ApiDiagnostics.Project(result.Diagnostics, ValidationSeverity.Error),
                 ApiDiagnostics.Project(result.Diagnostics, ValidationSeverity.Warning));
 }

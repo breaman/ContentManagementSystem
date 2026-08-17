@@ -1,0 +1,27 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Saving
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Client.Services
+
+<span class="cms-save-state cms-save-state--@Status.Phase.ToString().ToLowerInvariant()">
+
+    @* An icon and a word, never a colour on its own (spec section 28, task P6-39). *@
+    <span class="bi @Icon" aria-hidden="true"></span>
+    <span class="cms-save-state__text">@Text</span>
+
+    @if (Status.Phase is AutosavePhase.Retrying && Status.Attempt > 1)
+    {
+        <span class="cms-save-state__attempt">attempt @Status.Attempt</span>
+    }
+
+    @if (Status.Message is { Length: > 0 } message && Status.Phase is not AutosavePhase.Saved)
+    {
+        <span class="cms-save-state__detail">@message</span>
+    }
+
+</span>
+
+@* Only what an editor needs told, and only when it changes: the crossings into saved, into
+   retrying, and into refused. "Saving…" is not announced at all — it is a state the screen passes
+   through twenty seconds after the typing stops, and announcing it would interrupt for news that
+   the next announcement supersedes. *@
+<LiveRegion Message="@Announcement" IsAssertive="@(Status.Phase is AutosavePhase.Refused)" />

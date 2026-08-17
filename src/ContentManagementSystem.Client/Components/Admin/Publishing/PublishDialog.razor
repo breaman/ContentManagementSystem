@@ -1,0 +1,92 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Publishing
+@using ContentManagementSystem.Client.Components.Admin.Common
+
+<ModalDialog IsOpen="IsOpen"
+             Title="Publish this page"
+             SizeClass="modal-lg"
+             ConfirmLabel="@ConfirmLabel"
+             ConfirmClass="btn-success"
+             CancelLabel="Not yet"
+             CanConfirm="@CanConfirm"
+             IsBusy="IsBusy"
+             OnConfirm="ConfirmAsync"
+             OnCancel="OnCancel">
+
+    @if (IsChecking)
+    {
+        <p role="status">Running the publish checks…</p>
+    }
+    else if (Groups.Count == 0)
+    {
+        <p class="cms-publish__clear">
+            <span class="bi bi-check-circle" aria-hidden="true"></span>
+            Nothing is blocking this. Publishing replaces what visitors see now with the current
+            draft.
+        </p>
+    }
+    else
+    {
+        <p class="cms-publish__summary">@Summary</p>
+
+        @* Grouped by zone rather than listed flat, and every entry is a link into the zone it is
+           about. A list of twelve messages an editor has to match to twelve cards by reading is a
+           list they will match wrongly (spec section 14.6). *@
+        @foreach (var group in Groups)
+        {
+            <section class="cms-publish__group" aria-labelledby="@($"cms-publish-{group.Key}")">
+
+                <h3 class="h6" id="@($"cms-publish-{group.Key}")">
+                    @if (group.ZoneKey is { Length: > 0 })
+                    {
+                        <button type="button" class="btn btn-link p-0 cms-publish__link"
+                                @onclick="() => GoToAsync(group.ZoneKey)">
+                            @group.Name
+                        </button>
+                    }
+                    else
+                    {
+                        @group.Name
+                    }
+                </h3>
+
+                <ul class="cms-publish__list">
+                    @foreach (var entry in group.Entries)
+                    {
+                        <li class="cms-publish__entry cms-publish__entry--@(entry.IsError ? "error" : "warning")">
+                            <span class="bi @(entry.IsError ? "bi-exclamation-octagon-fill" : "bi-exclamation-triangle-fill")"
+                                  aria-hidden="true"></span>
+                            <span class="visually-hidden">@(entry.IsError ? "Blocking:" : "Worth checking:")</span>
+                            @entry.Diagnostic.Message
+                        </li>
+                    }
+                </ul>
+
+            </section>
+        }
+
+        @if (HasWarnings && !HasErrors)
+        {
+            @* The acknowledgement of spec section 22.2, made once and explicitly. The publish
+               endpoint refuses the first attempt with the warnings in it and accepts the second one
+               with this set — which is only meaningful if a person has been shown what they are
+               publishing past. *@
+            <div class="form-check cms-publish__acknowledge">
+                <input type="checkbox" class="form-check-input" id="cms-publish-acknowledge"
+                       checked="@Acknowledged" @onchange="OnAcknowledgedChanged" />
+                <label class="form-check-label" for="cms-publish-acknowledge">
+                    I have read @(WarningCount == 1 ? "this warning" : "these warnings") and want to
+                    publish anyway.
+                </label>
+            </div>
+        }
+
+        @if (HasErrors)
+        {
+            <p class="cms-publish__blocked">
+                Publishing is refused until @(ErrorCount == 1 ? "this is" : "these are") fixed. Your
+                draft is saved either way — nothing here is lost by closing this.
+            </p>
+        }
+    }
+
+</ModalDialog>

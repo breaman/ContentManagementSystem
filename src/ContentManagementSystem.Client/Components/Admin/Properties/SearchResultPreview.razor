@@ -1,0 +1,46 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Properties
+
+<figure class="cms-serp" aria-labelledby="@($"{Id}-caption")">
+
+    <figcaption class="cms-serp__caption form-text" id="@($"{Id}-caption")">
+        How this page is likely to read in search results.
+    </figcaption>
+
+    @* Not a live region. It redraws on every keystroke in the two boxes above it, and announcing
+       each redraw would talk over the letters being typed — the counters beside the boxes are what
+       speak, and only when a limit is crossed (task P6-12). *@
+    <div class="cms-serp__card">
+
+        <p class="cms-serp__url">@Url</p>
+
+        <p class="cms-serp__title">
+            @Truncate(Title, TitleLimit)
+            @if (IsFallbackTitle)
+            {
+                <span class="cms-serp__inherited">(from the page title)</span>
+            }
+        </p>
+
+        @if (Description is { Length: > 0 })
+        {
+            <p class="cms-serp__description">@Truncate(Description, DescriptionLimit)</p>
+        }
+        else
+        {
+            <p class="cms-serp__description cms-serp__description--empty">
+                With no description, search engines write one from the page's own words — usually the
+                first sentence they find.
+            </p>
+        }
+
+    </div>
+
+    @if (!RobotsIndex)
+    {
+        <p class="cms-serp__noindex">
+            <span class="bi bi-eye-slash" aria-hidden="true"></span>
+            This page is set to <code>noindex</code>, so it should not appear in results at all.
+        </p>
+    }
+
+</figure>

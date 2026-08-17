@@ -42,7 +42,17 @@ fail it. CodeMirror and Quill are locally bundled and split per editor, behind t
 nonce `D13` calls load-bearing; the preview pane renders through the server's one Markdig-and-sanitize
 pipeline rather than a second copy in the browser, and reports what publishing will remove — which is
 also the HTML editor's live strip warning. Three acceptance criteria are met by this
-(`P6 #2`, `#3`, `#4`). **The `Content-Security-Policy` header itself is not switched on**: the nonce
+(`P6 #2`, `#3`, `#4`). **Properties, saving, and feedback are done too** (`P6-17` to `P6-22`): the
+right-hand pane edits everything about a page that is not its content and sends only the fields an
+editor touched, autosave writes the draft twenty seconds after the typing stops and on the way out,
+a lost race opens keep-mine / take-theirs / open-diff instead of being retried, and the publish
+dialog groups what is wrong by zone with a link into each card. Two server promises had to be made
+real for that: **the `409` now carries the draft that won** — `ETags` has claimed since `P2-20` that
+this is why a mismatch answers 409 rather than 412, but the problem mapper dropped it — and a new
+`POST /pages/{id}/draft/diff` compares an unsaved payload against the stored draft, which the version
+diff cannot do because both copies of a contested draft are the same version row. Two more criteria
+are met (`P6 #5`, `#6`), each with its browser half still open in `P6-33` and `P6-34`.
+**The `Content-Security-Policy` header itself is not switched on**: the nonce
 it needs exists and is wired, but turning the policy on today would break P5's media control and
 others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
 than left as a surprise.
@@ -99,11 +109,11 @@ and record the date in the progress table.
 | [3 — Delivery, routing, preview](#phase-3--delivery-routing-and-preview) | 31 | 28 | 22.5 | All three sections done; all 11 criteria met. `P3-27`, `P3-29`, `P3-30` remain | — |
 | [4 — Reusable content](#phase-4--reusable-content) | 19 | 19 | 12.0 | Complete — all 19 tasks and all 7 acceptance criteria | 2026-08-16 |
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
-| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 18 | 34.5 | In progress — shell, tree, canvas, and **all 11 field editors** done (`P6-01`…`P6-03`, `P6-05`…`P6-16`), with `P6-30`, `P6-31`, `P6-40`; 3 of 14 criteria met. `P6-04` is done bar "publish branch", which waits on `P6-29`. Next: properties panel, autosave, conflicts (`P6-17`…`P6-22`) | — |
+| [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 23 | 34.5 | In progress — shell, tree, canvas, **all 11 field editors**, and **properties, saving, and feedback** done (`P6-01`…`P6-03`, `P6-05`…`P6-22`), with `P6-30`, `P6-31`, `P6-40`; 5 of 14 criteria met. `P6-04` waits on `P6-29` for "publish branch" and `P6-17` on `P8-20`/`P8-02` for tags and the share image. Next: shortcuts, dashboard, recycle bin, bulk (`P6-23`…`P6-29`) | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 0 | 16.0 | Not started | — |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **178** | **203.5** | | |
+| **v1 total** | **281** | **183** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3248,18 +3258,103 @@ daily — including the edit/preview experience the requirements call out explic
 
 ### Properties, saving, and feedback — 5 ed
 
-- [ ] **P6-17** Properties panel in `Client/Components/Admin/Properties/`: page metadata, SEO section
+- [~] **P6-17** Properties panel in `Client/Components/Admin/Properties/`: page metadata, SEO section
   with a **search-result preview widget** and character-count guidance, publishing section, editorial
   fields (owner, review-by, internal notes, tags) [§14.7, §18.1]. — 2 ed
-- [ ] **P6-18** Autosave in `Client/Services/`: 20-second idle debounce, save on navigate-away,
+  *2026-08-16 — `PropertiesPanel` edits a `PageProperties` model beside the immutable `PageDetail` it
+  was handed and **sends the difference**, which is the whole reason the request contract is built out
+  of `Patch<T>`: a panel that patched all twenty fields on every save would reinstate its own copy of
+  the nineteen nobody touched over whatever a colleague changed in the meantime, silently, because
+  they look right on the screen that sent them. It owns no save button — an edit here is an edit, and
+  title and the SEO fields live on the draft version, so P6-18's autosave writes them. The
+  search-result widget is deliberately **not** a pixel-accurate forgery of any one engine: it exists to
+  show the two rules a counter cannot state — a blank meta title falls back to the page title, and both
+  fields are truncated rather than refused — and a convincing imitation would invite trust in details
+  no engine guarantees. Two facts had to be added to make the owner field real: `PageDetail` now
+  carries `OwnerName` (resolved server-side, as `LockedBy` already was, because "Owner: 42" is a field
+  nobody can read), and `GET /api/cms/v1/me` reports the signed-in editor's own id — which the
+  WebAssembly backoffice otherwise cannot know, since the serialized authentication state carries the
+  name and role claims only. That endpoint is `P6-24`'s "my work" tile as well.
+  ***The panel is rendered beside the canvas rather than inside `AdminShell`***, which is still
+  unmounted by any route. It takes no position of its own — it is a component with parameters, exactly
+  as `P6-01` built the shell to expect — so composing the three panes later moves where it is rendered
+  and changes nothing else.*
+  **Open: tags, and the share image.** Neither exists to write to. `Tag`/`PageTag` is `P8-20`'s, and
+  `OgImageMediaId` has no member on the metadata patch — the Open Graph output that needs it is
+  `P8-02`. Both are stated on the panel rather than drawn as dead controls.
+- [x] **P6-18** Autosave in `Client/Services/`: 20-second idle debounce, save on navigate-away,
   offline-safe queueing, clear save-state indication ("Saved 14:32") [§11.3]. — 1.25 ed
-- [ ] **P6-19** Conflict resolution UI on `409`: keep-mine / take-theirs / open-diff. **No path silently
+  *2026-08-16 — `AutosaveController` owns when a save is due and nothing about what is saved, which is
+  handed in as a delegate. **There is no queue of payloads, and that is the design rather than a
+  shortcut**: a queue would be a queue of stale ones. The delegate reads the editor's current state at
+  the moment it runs, so a failed attempt followed by more typing saves the later text once; what is
+  queued is the *intent*, held across a failure, a retry, and an editor going offline and coming back.
+  A transient failure retries with a doubling backoff capped at 30 s; **a refusal does not retry at
+  all**, because repeating a request the server has already reasoned about every twenty seconds buries
+  the message explaining it, and a conflict needs a decision from a person. Any unexpected exception is
+  treated as transient — an autosave that died on an unobserved exception would leave an editor typing
+  into a screen that has quietly stopped saving. The clock is a `TimeProvider`, so the twenty seconds
+  are advanced in a test rather than waited out. Navigating away flushes through
+  `RegisterLocationChangingHandler`, **registered in `OnAfterRender` rather than `OnInitialized`**: a
+  location-changing handler takes a navigation lock, which only an interactive renderer has, and
+  registering it during the server pre-render throws before a zone reaches the browser. Closing the tab
+  is outside .NET's reach entirely, so `SaveStateIndicator` arms the browser's own `beforeunload`
+  prompt while there is unsaved work.*
+- [x] **P6-19** Conflict resolution UI on `409`: keep-mine / take-theirs / open-diff. **No path silently
   discards work.** — 0.75 ed
-- [ ] **P6-20** Publish dialog: errors and warnings grouped by zone, each deep-linking to the offending
+  *2026-08-16 — **Two things the server promised and did not deliver had to be built first.** `ETags`
+  has said since `P2-20` that a mismatch answers 409 rather than 412 precisely so "the losing editor
+  needs the winning draft in its hands" — but `CmsProblems` dropped the result's value, so the body
+  carried diagnostics and nothing else. It now writes a `conflict` member, omitted rather than nulled
+  when nothing won, and `StructureClientResult.Refused` is the one failure shape that carries a value
+  (`IsSuccess` stays false, so nothing that only asks "did it work" is fooled). And **the version diff
+  cannot compare a conflict**: both copies are the same version row and the losing one was never
+  written, so there is no second id to name — hence `POST /pages/{id}/draft/diff`, which sends the
+  unsaved payload and reuses the same `PayloadDiff` the version history reads, with the stored draft as
+  the earlier side because the question being asked is "what would mine change". In the dialog, keeping
+  mine is one click (nothing it overwrites is lost — the history holds it), **taking theirs asks
+  twice** because what it replaces exists nowhere else, and closing decides nothing. The reassurance
+  that the editor's text is still here is stated *above* the buttons, not under the one they did not
+  choose.*
+- [x] **P6-20** Publish dialog: errors and warnings grouped by zone, each deep-linking to the offending
   field; warnings require acknowledgement and resubmit with `acknowledgedWarnings` [§14.6, §22.2]. — 0.5 ed
-- [ ] **P6-21** Toasts (reuse the existing `IToastService`), confirmation dialogs, undo affordances,
+  *2026-08-16 — The dialog opens on a **fresh check over a flushed draft**: the server checks what it
+  holds, so a dialog opened over unsaved edits would report on the paragraph before the one the editor
+  is looking at and then publish the one they are looking at. Groups are named as the canvas names them
+  and ordered as the canvas orders them, so the dialog reads down the page the way the page reads;
+  anything naming no zone — a URL collision, a missing meta description — is grouped under the page
+  rather than dropped, the same rule `CanvasDiagnostics` follows. Each group is a link that closes the
+  dialog and moves focus to `#zone-{key}`, which `P6-05` made addressable and `tabindex="-1"`; a link
+  that scrolled a card into view behind a modal would go somewhere the editor still cannot type into.
+  The acknowledgement is unticked on every opening — consent to a list nobody is looking at is not
+  consent — and it is what turns [§22.2]'s resubmit into one visible decision.
+  ***A defect this dialog could not have worked around was found underneath it.*** A publish stopped
+  by warnings alone answers `422` with an **empty** `errors` array and the warnings in it — and
+  `HttpPageClient` read the errors alone, so that body became a bare `http.422` with the warnings
+  discarded: a screen telling an editor their page was refused and refusing to say what for. Any
+  response carrying diagnostics of either severity is now read as one, and `HttpPageClientTests`
+  pins it along with the conflict body.*
+- [x] **P6-21** Toasts (reuse the existing `IToastService`), confirmation dialogs, undo affordances,
   empty and loading states. — 0.25 ed
-- [ ] **P6-22** ARIA live regions announcing autosave state and validation results [§28]. — 0.25 ed
+  *2026-08-16 — Toasts for what an editor has just done and is already looking at (an explicit save, a
+  publish); the state that outlives a toast lives in the status bar instead. Unpublishing is confirmed
+  through `ModalDialog` and says what visitors will see and what is **not** deleted. Its undo is an
+  inline bar rather than a toast — a toast times out on the one action on this screen worth taking back
+  after reading it — and "put it back" runs the ordinary publish path rather than a second one, so it
+  cannot go live past a check the button beside it would have stopped. `FieldMessages` is new and small:
+  `DiagnosticList` says how many problems a write had, and a form of twenty boxes also needs each
+  message beside the box it is about, or an editor matches them to fields by reading property names and
+  matches them wrongly.*
+- [x] **P6-22** ARIA live regions announcing autosave state and validation results [§28]. — 0.25 ed
+  *2026-08-16 — `LiveRegion` is in the document from the first render and empty when there is nothing to
+  say, because a region added at the moment it has something to announce announces nothing. Two
+  urgencies, and the difference is deliberate: **autosave is polite** — interrupting somebody mid-word
+  to say "saved" is worse than saying it a second later — while **a validation result is assertive**,
+  because a person pressed a button and is waiting to hear the answer. What neither does is announce on
+  every render: the message is set on a phase crossing or a check completing, never derived from state
+  that redraws on every keystroke, and `Pending` and `Saving` pass silently so the region does not
+  narrate the typing. Announcements are phrased as the outcome rather than the count — "3" is not an
+  answer to "can I publish this".*
 
 ### Dashboard, bin, and bulk — 5.5 ed
 
@@ -3338,10 +3433,22 @@ daily — including the edit/preview experience the requirements call out explic
   *2026-08-16 — `P6-06` and `P6-07`, pinned by `BlockListEditorTests`, which drives only buttons. The
   drag grip is `aria-hidden` and takes no Tab stop, so there is no control a keyboard user can reach
   and cannot use.*
-- [ ] **P6 #5** Autosave fires on a 20-second idle, shows its state, and survives a transient network
+- [x] **P6 #5** Autosave fires on a 20-second idle, shows its state, and survives a transient network
   failure by retrying without losing input.
-- [ ] **P6 #6** A save conflict presents keep-mine / take-theirs / open-diff, and no path silently
+  *2026-08-16 — `P6-18`, pinned by `AutosaveControllerTests` on a driven clock: nineteen seconds saves
+  nothing, a keystroke restarts the countdown rather than extending it, a screen nobody types into is
+  never written, and a transient failure retries and saves **the text as it stands at the retry**, not
+  the text that failed. `PageEditorSavingTests` asserts the same through the screen, including that the
+  state reads "Saved 14:30" rather than "Saved". **The browser half is still open**: doing this over a
+  genuinely flaky connection is `P6-33`, and only a real network can fail the way a real network does.*
+- [x] **P6 #6** A save conflict presents keep-mine / take-theirs / open-diff, and no path silently
   discards work.
+  *2026-08-16 — `P6-19`. `ConflictDialogTests` covers all three being offered and, more to the point,
+  the second half of the criterion: taking theirs asks twice, backing out disarms it, and closing
+  decides nothing. `PageEditorSavingTests` shows a losing save opening the dialog rather than being
+  retried, and keep-mine resending **the same text** with the winner's token. `PageApiTests` pins the
+  server end — the 409 body carries the draft that won, and a refusal nothing won carries no `conflict`
+  member at all. `P6-34` remains: the same three options in a browser.*
 - [ ] **P6 #7** The tree remains responsive at 5,000 pages with 500 siblings under one parent.
 - [ ] **P6 #8** The dashboard surfaces the signed-in user's drafts, review tasks, and overdue content,
   and every tile deep-links into a correctly filtered list.
@@ -3811,7 +3918,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #15 | Renditions, `srcset`, WebP | P5-13…P5-16, P5-20 | [x] 2026-08-16 — every descriptor is the width the browser will actually receive, because the pipeline never upscales |
 | #16 | Where-used / link integrity | P4-07, P4-08 | [x] 2026-08-16 — transitive, split by pinned, and the delete guard is built on it |
 | #17 | Output caching + invalidation | P8-06…P8-13 | [ ] |
-| #18 | Concurrency control | P2-03, P2-15, P6-19 | [ ] |
+| #18 | Concurrency control | P2-03, P2-15, P6-19 | [x] 2026-08-16 — both layers, and the UI that makes the authoritative one usable: the `rowversion` decides, the advisory lock warns, and a lost race now hands the losing editor the draft that won so keep-mine, take-theirs, and open-diff are real choices rather than a banner |
 | #19 | Backoffice search & content tree | P6-02…P6-04, P8-18, P8-19 | [ ] |
 | #20 | Audit trail surfaced in the UI | P7-20 | [ ] |
 | #21 | Template change / schema evolution safety | P1-25, P1-26, P1-32 | [ ] |
@@ -3822,7 +3929,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #26 | Headless read API + webhooks | **v2** | [-] |
 | #27 | Import/export & environment promotion | P1-26, P1-28 (structure, v1); content bundles **v2** | [ ] |
 | #28 | Rate limiting & brute-force protection | P9-03, P9-04 | [ ] |
-| #29 | Editorial metadata | P6-17 | [ ] |
+| #29 | Editorial metadata | P6-17 | [ ] 2026-08-16 — owner, review-by, and internal notes are stored, patchable, and editable in the properties panel. **Tags are not**: there is no `Tag`/`PageTag` to write to until `P8-20`, and the panel says so rather than drawing a control that discards what is typed into it |
 | #30 | Broken-link & orphaned-media reporting | **v2** — nightly jobs in P8/P9, UI deferred | [-] |
 
 ---

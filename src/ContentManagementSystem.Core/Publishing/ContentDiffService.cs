@@ -37,6 +37,28 @@ public interface IContentDiffService
         int fromVersionId,
         int toVersionId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Compares an unsaved payload against the page's stored draft (task P6-19).
+    /// </summary>
+    /// <param name="pageId">Identity of the page.</param>
+    /// <param name="contentJson">The payload the caller holds, which was never written.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>What the caller's copy would change, or a not-found result when the page has none.</returns>
+    /// <remarks>
+    /// The open-diff half of a save conflict, and the only comparison the version diff cannot make:
+    /// both copies of a contested draft belong to the same version row, so there is no second
+    /// version id to name and one of the two documents has to be sent in.
+    /// <para>
+    /// The stored draft is the <em>earlier</em> side, deliberately. The question a losing editor is
+    /// asking is "what would mine change", and reversing the sides answers the opposite question with
+    /// the same words.
+    /// </para>
+    /// </remarks>
+    Task<CmsResult<ContentDiff>> CompareDraftAsync(
+        int pageId,
+        string? contentJson,
+        CancellationToken cancellationToken = default);
 }
 
 /// <inheritdoc cref="IContentDiffService" />
@@ -89,6 +111,55 @@ public sealed class ContentDiffService(
             to.VersionNumber,
             CompareMetadata(from, to),
             CompareZones(from, to)));
+    }
+
+    /// <inheritdoc />
+    public async Task<CmsResult<ContentDiff>> CompareDraftAsync(
+        int pageId,
+        string? contentJson,
+        CancellationToken cancellationToken = default)
+    {
+        if (!authorization.HasPermission(CmsPermissions.ContentRead))
+        {
+            return CmsResult<ContentDiff>.Forbidden("Reading pages is not permitted.", PageCodes.Forbidden);
+        }
+
+        if (!ContentPayload.TryParse(contentJson, out var mine) || !mine.IsObject)
+        {
+            return CmsResult<ContentDiff>.Invalid(
+                PageCodes.MalformedPayload,
+                "The content sent is not a well-formed payload document.",
+                nameof(DiffDraftRequest.ContentJson));
+        }
+
+        var draft = await context.Pages
+            .AsNoTracking()
+            .Where(page => page.Id == pageId)
+            .Select(page => page.DraftVersion)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (draft is null)
+        {
+            return CmsResult<ContentDiff>.NotFound(
+                $"No page has id {pageId}.",
+                PageCodes.NotFound);
+        }
+
+        // Both sides name the same version row, which is not a mistake: a save conflict is two copies
+        // of one draft, and the losing one was never written anywhere that could give it an id.
+        return CmsResult<ContentDiff>.Success(new ContentDiff(
+            pageId,
+            draft.Id,
+            draft.Id,
+            draft.VersionNumber,
+            draft.VersionNumber,
+            // Nothing to compare: title and the SEO fields are on the version row, and the caller
+            // sent a payload rather than a version. Reporting them as unchanged would be a claim
+            // about values this comparison never saw.
+            [],
+            _payloads.Compare(
+                ContentPayload.TryParse(draft.ContentJson, out var stored) ? stored : null,
+                mine)));
     }
 
     /// <summary>

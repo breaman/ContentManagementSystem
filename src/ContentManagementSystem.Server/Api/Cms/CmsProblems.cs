@@ -44,8 +44,11 @@ public static class CmsProblems
                 HttpStatusCode.NotFound, "not-found", "Not found", result.Diagnostics),
             CmsOutcome.Forbidden => Problem(
                 HttpStatusCode.Forbidden, "forbidden", "Forbidden", result.Diagnostics),
+            // The one refusal that answers with a body of its own. A losing draft save has to hand
+            // back the copy that won, or the editor cannot be offered keep-mine, take-theirs, or a
+            // diff — and re-reading it would race exactly as the save just did (spec section 11.8).
             CmsOutcome.Conflict => Problem(
-                HttpStatusCode.Conflict, "conflict", "Conflict", result.Diagnostics),
+                HttpStatusCode.Conflict, "conflict", "Conflict", result.Diagnostics, result.Value),
             // 422 rather than 400: the request parsed and bound, and what it asked for is
             // understood — it simply breaks a rule of the content model.
             CmsOutcome.Invalid => Problem(
@@ -61,12 +64,18 @@ public static class CmsProblems
     /// <param name="type">Last segment of the problem type URI.</param>
     /// <param name="title">Short, stable summary of the problem class.</param>
     /// <param name="diagnostics">What went wrong.</param>
+    /// <param name="conflict">
+    /// The state that beat the request, for a conflict that has one. Written as a <c>conflict</c>
+    /// member rather than as the whole body, so that a refusal is a problem document whatever it
+    /// carries and a client reads its diagnostics the same way every time.
+    /// </param>
     /// <returns>The response.</returns>
     public static IResult Problem(
         HttpStatusCode status,
         string type,
         string title,
-        ValidationResult diagnostics)
+        ValidationResult diagnostics,
+        object? conflict = null)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
 
@@ -90,6 +99,10 @@ public static class CmsProblems
         // checking whether the member exists.
         problem.Extensions["errors"] = errors;
         problem.Extensions["warnings"] = warnings;
+
+        // Omitted rather than sent as null when there is nothing that won, so "the server told me
+        // what it holds" and "the server said nothing" stay distinguishable.
+        if (conflict is not null) problem.Extensions["conflict"] = conflict;
 
         return Results.Problem(problem);
     }

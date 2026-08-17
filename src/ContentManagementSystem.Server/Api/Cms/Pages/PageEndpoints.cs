@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
@@ -81,6 +82,16 @@ public static class PageEndpoints
             .WithName("DiscardPageDraft")
             .WithSummary("Resets the draft to a copy of what is published.")
             .RequireAuthorization(CmsPermissions.ContentEdit)
+            .RequireCmsAntiforgery();
+
+        // POST for a read, as the markup preview is, and for the same reason: the thing being asked
+        // about is a whole page's payload, which has no business in a query string. Content.Read
+        // rather than Content.Edit — comparing a document the caller is holding against one they may
+        // already read grants them nothing new (task P6-19).
+        pages.MapPost("/{id:int}/draft/diff", DiffDraftAsync)
+            .WithName("DiffPageDraft")
+            .WithSummary("Compares an unsaved payload against the stored draft, for a save conflict.")
+            .RequireAuthorization(CmsPermissions.ContentRead)
             .RequireCmsAntiforgery();
 
         pages.MapPost("/{id:int}/draft/checkpoint", CheckpointDraftAsync)
@@ -243,6 +254,22 @@ public static class PageEndpoints
 
             return Results.Ok(draft);
         });
+
+    /// <remarks>
+    /// Answers the question a save conflict raises and the version diff cannot: both copies of a
+    /// contested draft are the same version row, and the one that lost was never written.
+    /// </remarks>
+    private static async Task<IResult> DiffDraftAsync(
+        int id,
+        DiffDraftRequest request,
+        IContentDiffService diffs,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        return (await diffs.CompareDraftAsync(id, request.ContentJson, cancellationToken))
+            .ToHttpResult(value => Results.Ok(value));
+    }
 
     private static async Task<IResult> CheckpointDraftAsync(
         int id,

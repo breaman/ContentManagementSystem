@@ -224,6 +224,7 @@ try
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();
     builder.Services.AddScoped<IMarkupPreviewClient, ServerMarkupPreviewClient>();
+    builder.Services.AddScoped<ICurrentUserClient, ServerCurrentUserClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
     // One nonce per request, read by the host page and handed to CodeMirror through a meta tag

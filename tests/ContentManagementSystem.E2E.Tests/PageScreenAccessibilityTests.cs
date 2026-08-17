@@ -185,6 +185,11 @@ public class PageScreenAccessibilityTests
         services.AddScoped<IMarkupPreviewClient, FakeMarkupPreviewClient>();
         services.AddSingleton(TimeProvider.System);
 
+        // The two the page editor gained with autosave and the properties panel (tasks P6-17,
+        // P6-18, P6-21): who is signed in, and where a completed write says so.
+        services.AddScoped<ICurrentUserClient, FakeCurrentUserClient>();
+        services.AddScoped<IToastService, SilentToastService>();
+
         // Two hosting services a real pre-render supplies and a bare collection does not: the
         // uploader's <InputFile> resolves IJSRuntime on construction, and the media item screen
         // navigates away after a permanent delete. Neither runs during a static render.

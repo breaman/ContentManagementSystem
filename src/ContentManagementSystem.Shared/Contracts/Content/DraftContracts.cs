@@ -18,6 +18,22 @@ namespace ContentManagementSystem.Shared.Contracts.Content;
 public sealed record SaveDraftRequest(string? ContentJson, string? ExpectedRowVersion);
 
 /// <summary>
+/// Body of <c>POST /api/cms/v1/pages/{id}/draft/diff</c> — what the caller holds, to be compared
+/// against what is stored (task P6-19).
+/// </summary>
+/// <param name="ContentJson">
+/// The payload as the caller holds it, unsaved. The comparison reads the stored draft as the earlier
+/// side and this as the later one, so it answers "what would my copy change" rather than the other
+/// way round.
+/// </param>
+/// <remarks>
+/// The version diff cannot answer this. Both copies of a contested draft are the <em>same</em>
+/// version row — the losing editor's is in a browser and was never written — so there is no second
+/// version id to name, and the only way to compare them structurally is to send one of them.
+/// </remarks>
+public sealed record DiffDraftRequest(string? ContentJson);
+
+/// <summary>
 /// Body of <c>POST /api/cms/v1/pages/{id}/draft/checkpoint</c>.
 /// </summary>
 /// <param name="Label">

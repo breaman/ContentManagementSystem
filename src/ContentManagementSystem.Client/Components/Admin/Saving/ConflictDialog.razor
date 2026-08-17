@@ -1,0 +1,107 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Saving
+@using ContentManagementSystem.Client.Components.Admin.Common
+@using ContentManagementSystem.Client.Components.Admin.Pages
+
+@if (!IsOpen)
+{
+    return;
+}
+
+<div class="modal-backdrop fade show"></div>
+
+<div class="modal d-block cms-conflict"
+     role="dialog"
+     aria-modal="true"
+     aria-labelledby="cms-conflict-title"
+     tabindex="-1"
+     @ref="Dialog"
+     @onkeydown="OnKeyDownAsync">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h2 class="modal-title h5" id="cms-conflict-title">Somebody else saved this page first</h2>
+                @* Closing decides nothing: the editor keeps their unsaved work and the screen keeps
+                   saying the save was refused. It is here because a dialog with no way out is a
+                   dialog a keyboard user is trapped in. *@
+                <button type="button" class="btn-close" aria-label="Decide later"
+                        disabled="@IsBusy" @onclick="CancelAsync"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <p>
+                    @Explanation
+                </p>
+
+                @* Stated before the buttons, not after them. The one thing an editor in this dialog
+                   needs to know is that the text they just wrote is not gone, and reading it under
+                   the option they did not choose is reading it too late. *@
+                <p class="cms-conflict__reassurance">
+                    <span class="bi bi-shield-check" aria-hidden="true"></span>
+                    Your version is still here, in this browser. Nothing is discarded until you say
+                    which one to keep.
+                </p>
+
+                @if (ShowDiff)
+                {
+                    <section class="cms-conflict__diff" aria-labelledby="cms-conflict-diff-title">
+                        <h3 class="h6" id="cms-conflict-diff-title">
+                            What your version would change
+                        </h3>
+
+                        @if (Diff is null)
+                        {
+                            <p role="status">Comparing the two versions…</p>
+                        }
+                        else
+                        {
+                            <ContentDiffView Diff="Diff" />
+                        }
+                    </section>
+                }
+
+            </div>
+
+            <div class="modal-footer cms-conflict__actions">
+
+                @* aria-expanded without aria-controls, deliberately: the comparison is not in the
+                   document while it is hidden, and pointing at an id that is not there is worse
+                   than pointing at nothing. *@
+                <button type="button" class="btn btn-outline-secondary"
+                        disabled="@IsBusy"
+                        aria-expanded="@(ShowDiff ? "true" : "false")"
+                        @onclick="ToggleDiffAsync">
+                    @(ShowDiff ? "Hide the comparison" : "Compare the two versions")
+                </button>
+
+                <button type="button" class="btn btn-outline-danger"
+                        disabled="@IsBusy"
+                        @onclick="TakeTheirsAsync">
+                    @(IsConfirmingTheirs ? "Yes — discard mine and load theirs" : "Use theirs")
+                </button>
+
+                <button type="button" class="btn btn-primary"
+                        disabled="@IsBusy"
+                        @ref="KeepMine"
+                        @onclick="KeepMineAsync">
+                    @if (IsBusy)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+                    }
+                    Keep mine
+                </button>
+
+            </div>
+
+            @if (IsConfirmingTheirs)
+            {
+                <p class="cms-conflict__warning" role="alert">
+                    Loading their version replaces what you have written on this screen, and there is
+                    no undo for it. Compare them first if you are not sure.
+                </p>
+            }
+
+        </div>
+    </div>
+</div>

@@ -252,6 +252,31 @@ public sealed class FakePageClient : IPageClient
             ]));
 
     /// <inheritdoc />
+    /// <remarks>
+    /// One changed zone, which is the shape a save conflict actually has: two editors who both
+    /// touched the hero, not two unrelated documents.
+    /// </remarks>
+    public Task<ContentDiff?> DiffDraftAsync(
+        int id,
+        string? contentJson,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<ContentDiff?>(new ContentDiff(
+            id,
+            DraftVersionId,
+            DraftVersionId,
+            5,
+            5,
+            [],
+            [
+                new ZoneChange("heroTitle", "plainText", ContentChangeKind.Changed, "Theirs", "Mine",
+                    [
+                        new TextSegment("Theirs", ContentChangeKind.Removed),
+                        new TextSegment("Mine", ContentChangeKind.Added),
+                    ],
+                    []),
+            ]));
+
+    /// <inheritdoc />
     public Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,

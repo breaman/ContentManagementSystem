@@ -1,0 +1,12 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Common
+
+@* Present from the first render and left in the document, empty, when there is nothing to say.
+   A live region added to the page at the moment it has something to announce is a live region that
+   announces nothing: assistive technology subscribes when the element appears, and by then the text
+   is already there. *@
+<div class="visually-hidden"
+     role="@(IsAssertive ? "alert" : "status")"
+     aria-live="@(IsAssertive ? "assertive" : "polite")"
+     aria-atomic="true">
+    @Message
+</div>

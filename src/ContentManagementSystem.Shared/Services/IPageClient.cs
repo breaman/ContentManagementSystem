@@ -189,6 +189,23 @@ public interface IPageClient
         int toVersionId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Compares an unsaved payload against the stored draft (task P6-19).
+    /// </summary>
+    /// <param name="id">Identity of the page.</param>
+    /// <param name="contentJson">The payload the caller holds and has not managed to save.</param>
+    /// <param name="cancellationToken">Token observed while loading.</param>
+    /// <returns>What the caller's copy would change, or null when there is no such page.</returns>
+    /// <remarks>
+    /// The open-diff half of a save conflict. <see cref="GetDiffAsync"/> cannot serve it: the two
+    /// copies in a conflict are the same version row, one of them only in a browser, so there is no
+    /// second version id to name.
+    /// </remarks>
+    Task<ContentDiff?> DiffDraftAsync(
+        int id,
+        string? contentJson,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Copies a version into the draft.</summary>
     /// <param name="id">Identity of the page.</param>
     /// <param name="versionId">Identity of the version to restore.</param>

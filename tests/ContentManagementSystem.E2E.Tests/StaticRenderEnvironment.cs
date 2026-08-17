@@ -1,3 +1,6 @@
+using ContentManagementSystem.Shared.Contracts.Security;
+using ContentManagementSystem.Shared.Services;
+
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -44,6 +47,49 @@ internal sealed class StaticNavigationManager : NavigationManager
 
     /// <inheritdoc />
     protected override void NavigateToCore(string uri, bool forceLoad) => RequestedUri = uri;
+}
+
+/// <summary>
+/// A signed-in editor, as <c>GET /api/cms/v1/me</c> reports one (task P6-17).
+/// </summary>
+/// <remarks>
+/// The same id the render's principal carries, so the properties panel draws the owner controls an
+/// editor actually meets — "take ownership" is absent for somebody who already owns the page, and a
+/// gate that inspected the wrong branch would be auditing a screen nobody sees.
+/// </remarks>
+internal sealed class FakeCurrentUserClient : ICurrentUserClient
+{
+    /// <inheritdoc />
+    public Task<CurrentUser?> GetAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<CurrentUser?>(new CurrentUser(1, "test-editor"));
+}
+
+/// <summary>
+/// A toast service nothing subscribes to.
+/// </summary>
+/// <remarks>
+/// Toasts are raised by writes, and a static render performs none. Registered because the page
+/// editor resolves it on construction, not because anything here can produce one.
+/// </remarks>
+internal sealed class SilentToastService : IToastService
+{
+    /// <inheritdoc />
+    public event Action<ToastMessage>? OnToastAdded;
+
+    /// <inheritdoc />
+    public void ShowSuccess(string message, string? heading = null) => Ignore(message, heading);
+
+    /// <inheritdoc />
+    public void ShowError(string message, string? heading = null) => Ignore(message, heading);
+
+    /// <inheritdoc />
+    public void ShowWarning(string message, string? heading = null) => Ignore(message, heading);
+
+    /// <inheritdoc />
+    public void ShowInfo(string message, string? heading = null) => Ignore(message, heading);
+
+    private void Ignore(string message, string? heading) =>
+        OnToastAdded?.Invoke(new ToastMessage(Guid.NewGuid(), message, ToastType.Info, heading));
 }
 
 /// <summary>

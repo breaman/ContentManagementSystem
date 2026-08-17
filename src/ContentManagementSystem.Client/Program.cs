@@ -45,6 +45,11 @@ builder.Services.AddScoped<IMediaClient, HttpMediaClient>();
 // by a second copy of it in the browser (task P6-09). ServerMarkupPreviewClient is its twin.
 builder.Services.AddScoped<IMarkupPreviewClient, HttpMarkupPreviewClient>();
 
+// Who is signed in, by id as well as by name (task P6-17). The serialized authentication state
+// carries name and role claims only, so this is the only way a screen in the browser learns the
+// editor's own database id — which the properties panel writes into OwnerUserId.
+builder.Services.AddScoped<ICurrentUserClient, HttpCurrentUserClient>();
+
 // Which component fills in each field type (ADR-0014, tasks P6-06 to P6-15). A singleton: the
 // mapping is a static table and cannot change without a new build. The server registers the same
 // interface, and additionally checks it against the registered field types at startup — the browser

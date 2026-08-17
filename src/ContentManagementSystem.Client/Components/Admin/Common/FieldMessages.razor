@@ -1,0 +1,13 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Common
+
+@if (Diagnostics is { Count: > 0 })
+{
+    @* An alert rather than plain text: a refusal that appears next to a box a screen reader has
+       already read past is a refusal nobody hears. *@
+    <ul class="cms-field-messages invalid-feedback d-block" role="alert">
+        @foreach (var diagnostic in Diagnostics)
+        {
+            <li>@diagnostic.Message</li>
+        }
+    </ul>
+}

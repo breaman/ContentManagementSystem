@@ -117,6 +117,12 @@ public abstract class StubPageClient : IPageClient
         CancellationToken cancellationToken = default) => throw Unexpected();
 
     /// <inheritdoc />
+    public virtual Task<ContentDiff?> DiffDraftAsync(
+        int id,
+        string? contentJson,
+        CancellationToken cancellationToken = default) => throw Unexpected();
+
+    /// <inheritdoc />
     public virtual Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,

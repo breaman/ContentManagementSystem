@@ -78,6 +78,12 @@ public sealed record PageSummary(
 /// The draft version's concurrency token, Base64-encoded. The value a client echoes back as
 /// <c>If-Match</c> on a draft save (spec section 11.8).
 /// </param>
+/// <param name="OwnerName">
+/// Display name of the owner, or null when nobody owns the page. Resolved here rather than left to
+/// the client for the reason <c>PageSummary.LockedBy</c> is: a properties panel showing "Owner: 42"
+/// is a field an editor cannot read, and the backoffice has no user directory to look the number up
+/// in until Phase 7 builds one.
+/// </param>
 /// <remarks>
 /// The payload is handed over as stored rather than deserialized into a model, for the reason
 /// <c>ContentPayload</c> gives: zones are user-defined data with no CLR type to bind to, and binding
@@ -93,7 +99,8 @@ public sealed record PageDetail(
     DateOnly? ReviewByDate,
     string? InternalNotes,
     PageSeo Seo,
-    string RowVersion);
+    string RowVersion,
+    string? OwnerName = null);
 
 /// <summary>
 /// The search and social metadata one page version carries (spec section 18.1).

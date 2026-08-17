@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
@@ -215,6 +216,24 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
             cancellationToken);
 
     /// <inheritdoc />
+    public async Task<ContentDiff?> DiffDraftAsync(
+        int id,
+        string? contentJson,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await SendAsync<DiffDraftRequest, ContentDiff>(
+            HttpMethod.Post,
+            $"{Base}/pages/{id}/draft/diff",
+            new DiffDraftRequest(contentJson),
+            cancellationToken);
+
+        // A read wearing a POST, so it answers like the other reads on this client: no diff rather
+        // than a diagnostic nobody would show. What went wrong is already on screen — the conflict
+        // that made somebody ask for the diff in the first place.
+        return result.Value;
+    }
+
+    /// <inheritdoc />
     public Task<StructureClientResult<DraftState>> RestoreVersionAsync(
         int id,
         int versionId,
@@ -348,9 +367,17 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
         {
             var problem = await response.Content.ReadFromJsonAsync<ProblemResponse>(cancellationToken);
 
-            if (problem?.Errors is { Count: > 0 })
+            // Warnings on their own are a refusal too, and the one that matters most: a publish
+            // stopped only by warnings comes back with an empty errors array and the warnings in it,
+            // waiting to be acknowledged (spec section 22.2). Reading the errors alone turned that
+            // into a bare "http.422" with the warnings discarded — which is a screen telling an
+            // editor their page was refused and refusing to say what for.
+            if (problem?.Errors is { Count: > 0 } || problem?.Warnings is { Count: > 0 })
             {
-                return StructureClientResult<T>.Failure(problem.Errors, problem.Warnings);
+                return StructureClientResult<T>.Refused(
+                    Conflicting<T>(problem),
+                    problem.Errors ?? [],
+                    problem.Warnings);
             }
 
             return StructureClientResult<T>.Failure(
@@ -358,11 +385,38 @@ public sealed class HttpPageClient(HttpClient http) : IPageClient
                 problem?.Detail ?? response.ReasonPhrase ?? "The request was refused.");
         }
         catch (Exception exception) when (exception is HttpRequestException or NotSupportedException
-            or System.Text.Json.JsonException)
+            or JsonException)
         {
             return StructureClientResult<T>.Failure(
                 $"http.{(int)response.StatusCode}",
                 response.ReasonPhrase ?? "The request was refused.");
+        }
+    }
+
+    /// <summary>
+    /// Reads the state that beat a refused write out of the problem body.
+    /// </summary>
+    /// <typeparam name="T">What the write would have produced.</typeparam>
+    /// <param name="problem">The refusal.</param>
+    /// <returns>The winning state, or default when the refusal carried none.</returns>
+    /// <remarks>
+    /// Only a <c>409</c> carries one, and only the draft save has anything to put in it: the copy
+    /// that won the race, which the editor needs in hand to be offered keep-mine, take-theirs, or a
+    /// diff (task P6-19). A body that will not deserialize is treated as absent — the refusal itself
+    /// is still worth showing, and a screen that threw here would replace "somebody else saved first"
+    /// with a stack trace.
+    /// </remarks>
+    private static T? Conflicting<T>(ProblemResponse problem)
+    {
+        if (problem.Conflict is not { } element) return default;
+
+        try
+        {
+            return element.Deserialize<T>(JsonSerializerOptions.Web);
+        }
+        catch (JsonException)
+        {
+            return default;
         }
     }
 

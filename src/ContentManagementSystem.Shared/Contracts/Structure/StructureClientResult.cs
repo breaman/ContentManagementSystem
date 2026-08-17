@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 using ContentManagementSystem.Shared.Contracts.Api;
 
 namespace ContentManagementSystem.Shared.Contracts.Structure;
@@ -45,6 +47,34 @@ public sealed record StructureClientResult<T>(
     /// <param name="message">What went wrong.</param>
     public static StructureClientResult<T> Failure(string code, string message) =>
         new(default, [new ApiDiagnostic(code, message)], []);
+
+    /// <summary>
+    /// A write that did not happen, but which handed back the state that beat it.
+    /// </summary>
+    /// <param name="value">What the server holds — on a conflict, the copy that won.</param>
+    /// <param name="errors">Everything that blocked the write.</param>
+    /// <param name="warnings">Anything non-blocking reported alongside.</param>
+    /// <remarks>
+    /// The one failure shape that carries a value. A losing draft save needs the winning draft in
+    /// hand to offer keep-mine, take-theirs, or a diff (spec section 11.8, task P6-19), and fetching
+    /// it in a second round trip would race exactly the same way the save just did.
+    /// <para>
+    /// A value with no errors beside it is dropped rather than kept, because
+    /// <see cref="IsSuccess"/> turns on both: the pair would describe a write that did not happen and
+    /// report itself as one that did. The case it protects is a refusal carrying only warnings —
+    /// a publish waiting to have them acknowledged (spec section 22.2) — which has nothing to resolve
+    /// against and must still read as a failure.
+    /// </para>
+    /// </remarks>
+    public static StructureClientResult<T> Refused(
+        T? value,
+        IReadOnlyList<ApiDiagnostic> errors,
+        IReadOnlyList<ApiDiagnostic>? warnings = null)
+    {
+        ArgumentNullException.ThrowIfNull(errors);
+
+        return new(errors.Count == 0 ? default : value, errors, warnings ?? []);
+    }
 }
 
 /// <summary>
@@ -55,9 +85,15 @@ public sealed record StructureClientResult<T>(
 /// <param name="Status">The HTTP status.</param>
 /// <param name="Errors">Everything that blocked the request.</param>
 /// <param name="Warnings">Anything non-blocking reported alongside.</param>
+/// <param name="Conflict">
+/// The state that beat this request, present only on a <c>409</c>. Left as a
+/// <see cref="JsonElement"/> because the shape depends on what was being written — a draft save gets
+/// the winning draft — and this record is shared by every caller of the API.
+/// </param>
 public sealed record ProblemResponse(
     string? Title,
     string? Detail,
     int? Status,
     IReadOnlyList<ApiDiagnostic>? Errors,
-    IReadOnlyList<ApiDiagnostic>? Warnings);
+    IReadOnlyList<ApiDiagnostic>? Warnings,
+    JsonElement? Conflict = null);
