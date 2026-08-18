@@ -1,9 +1,10 @@
-# 0022 — Pre-render shims serialize their service calls; one request's `DbContext` is used once at a time
+# 0022 — One request's `DbContext` is used once at a time: the pre-render shims serialize, the delivery readers open their own
 
 - **Identifier:** D22
 - **Status:** Accepted
-- **Source:** the `/admin/pages/{id}` pre-render failure; governs the shims of tasks `P1-29`, `P2-23`,
-  `P4-11`, `P5-22`, `P6-24`
+- **Source:** the `/admin/pages/{id}` pre-render failure and the reusable-footer delivery failure;
+  governs the shims of tasks `P1-29`, `P2-23`, `P4-11`, `P5-22`, `P6-24` and the delivery readers of
+  `P3-13`, `P4-06`
 
 ## Context
 
@@ -41,6 +42,39 @@ editor loses the race is the one that appears in the stack trace, which is what 
 block-list defect. It is also load-independent — one editor, one request, one browser tab reproduces
 it — so it is not something a quiet deployment escapes.
 
+### The same bug on the public site
+
+The first version of this ADR fixed the backoffice and stopped there, on the reading that the
+collision belonged to pre-rendering. It does not. It belongs to *rendering*, and the public delivery
+path renders the same way.
+
+`CmsPageRenderer` builds its `HtmlRenderer` over the request's service provider, so every field
+renderer in a page resolves the one scoped `ApplicationDbContext` — and five of them read the
+database: `ReusableRenderer` through `ReusableContentResolver`, `MediaRenderer` and
+`MediaListRenderer` through `MediaResolver`, `LinkRenderer` and `PageReferenceRenderer` through
+`LinkResolver`. A template with a media zone and a reusable footer — `marketing-landing`, which is
+the one the demo uses — has two of those in flight at once, and the footer is the one that loses:
+
+```
+System.InvalidOperationException: A second operation was started on this context instance before a
+previous operation completed.
+   at ContentManagementSystem.Core.Delivery.ReusableContentResolver.ResolveAsync(...)
+   at ContentManagementSystem.Rendering.Fields.ReusableRenderer.OnParametersSetAsync()
+
+CMS render failure in Zone 'footer' on page 1, version 1. The rest of the page still renders.
+```
+
+Delivery's degradation rule (spec section 15.3) is what made it survivable and what made it easy to
+miss: the zone rendered nothing, the page around it was fine, and the only symptom was a footer
+missing from every page on the site.
+
+`DatabaseContentSchemaCatalog` is the sharper edge of the same problem. Its interface is synchronous
+by design, so on a cache miss it issues a *blocking* query — and a synchronous query is the one thing
+that can land in the middle of an in-flight asynchronous one, because `BlocksRenderer.OnParametersSet`
+runs while a sibling renderer is still awaiting. A gate cannot cover that without being reentrant:
+`ReusableContentResolver` asks the catalog from inside its own resolve, so one non-reentrant
+semaphore around both would deadlock instead of colliding.
+
 ## Decision
 
 **1. Every pre-render shim call that reaches a service runs through `PrerenderGate`.** The gate is a
@@ -67,6 +101,39 @@ documentation so that a future shim-to-shim convenience method is recognised as 
 singletons and `ServerCurrentUserClient` reads the request principal. Gating them would add a queue
 around work that was never in the collision.
 
+**5. The delivery readers take `IDbContextFactory<ApplicationDbContext>` and open a context per
+call.** `ReusableContentResolver`, `MediaResolver`, `LinkResolver`, and
+`DatabaseContentSchemaCatalog` — the four types a renderer can reach the database through, and the
+only four.
+
+```csharp
+public sealed class MediaResolver(IDbContextFactory<ApplicationDbContext> contexts) : IMediaResolver
+{
+    await using var context = await contexts.CreateDbContextAsync(cancellationToken);
+```
+
+A gate is the wrong instrument here for the reason the context section gives — the synchronous
+catalog would have to be inside the same critical section as the asynchronous resolver that calls
+it, and the semaphore is not reentrant. A context per call also fits what these four actually are:
+every query is `AsNoTracking`, none of them writes, and so there is no unit of work that sharing one
+context preserves. This is the narrow version of the alternative rejected below, and it is narrow on
+purpose: it applies to reads on the render path, not to the service layer.
+
+**6. `Program.cs` registers `AddDbContextFactory<ApplicationDbContext>(…, ServiceLifetime.Scoped)`
+in place of `AddDbContext`.** Since EF Core 6 the factory registration also registers the context
+itself as a scoped service, so every service that takes an `ApplicationDbContext` is unaffected.
+`ServiceLifetime.Scoped` rather than the default singleton is load-bearing twice: it keeps
+`DbContextOptions` scoped, which is the lifetime `EnrichSqlServerDbContext` preserves when it patches
+that descriptor, and it gives the factory a scoped provider to build from — a singleton factory
+cannot resolve the scoped `IUserService` the context's constructor takes.
+
+That constructor now carries `[ActivatorUtilitiesConstructor]`. `DbContextFactory` builds contexts
+through `ActivatorUtilities`, which — unlike the service provider's greedy rule — refuses to choose
+between constructors that all accept the arguments it was given, and `ApplicationDbContext` has
+three. Without the attribute the host fails at startup with "multiple constructors accepting all
+given argument types", which is worth stating because `WebApplicationFactory` reports it as an
+unrelated `ObjectDisposedException` on a disposed `IServiceProvider`.
+
 ## Consequences
 
 **Pre-render is serial, and its wall-clock cost is the sum of its queries rather than the longest of
@@ -86,19 +153,43 @@ there.
 everything reaching a service is gated — is easier to hold than an exception list, and the write
 methods on these shims cost nothing to include because nothing calls them during a pre-render.
 
-**The regression is pinned without a database.** `PrerenderGateTests` drives the shim with a
+**The two halves are fixed differently, and the difference is not arbitrary.** The shims serialize
+because they front the whole service layer, writes included, where one change tracker per request is
+the contract. The delivery readers open their own contexts because they are four read-only queries
+with no contract to keep. Stated the other way round: the gate is for code that must keep sharing a
+context, the factory is for code that never needed to.
+
+**Delivery renders its reads in parallel now, rather than merely without colliding.** A page with a
+hero image and a reusable footer issues both queries at once on separate connections. That is a small
+win and not the reason for the change — the reason is that they stop being refused — but it is the
+one respect in which delivery came out ahead of where it was before the bug existed.
+
+**A new delivery-path read that takes an `ApplicationDbContext` is a latent version of this bug.**
+The reviewable shape is narrow: a type a field renderer can reach that names `ApplicationDbContext`
+in its constructor rather than `IDbContextFactory<ApplicationDbContext>`.
+
+**The regressions are pinned at both levels.** `PrerenderGateTests` drives the shim with a
 substituted service that counts its own overlaps, which states the property under test — two callers
 were inside at once — far more precisely than waiting for EF Core to throw, and runs in
-milliseconds.
+milliseconds. `ConcurrentRenderReadTests` publishes a page with a media zone and a reusable footer
+and fetches it anonymously, which is the delivery failure exactly as it was reported; before the fix
+it fails with the footer missing and the render-failure log line above.
 
 ## Alternatives considered
 
 **Take an `IDbContextFactory<ApplicationDbContext>` through the Core service layer.** The canonical
 answer to this exception, and much the larger change: every Core service takes an
 `ApplicationDbContext` by construction and several deliberately share one within a request, so a write
-that spans services depends on a single change tracker. Rejected as the wrong size of change for the
-problem, and recorded here as the move to make if the services ever need genuine parallelism rather
-than merely non-collision.
+that spans services depends on a single change tracker. Rejected for the service layer as the wrong
+size of change for the problem. Decision 5 takes it for the four delivery readers, where the
+objection does not apply: those are read-only, `AsNoTracking`, and share a context with nothing.
+
+**Extend `PrerenderGate` to the delivery path.** The consistent-looking answer, and wrong here. The
+semaphore is not reentrant and `ReusableContentResolver` calls `DatabaseContentSchemaCatalog` from
+inside a resolve, so gating both deadlocks; gating only the asynchronous resolvers leaves the
+catalog's synchronous query free to land in the middle of an in-flight one, which is the same bug
+with a smaller window. Making the gate reentrant with an `AsyncLocal` depth counter would work and is
+more subtle than the factory, for a path that wanted no serialization in the first place. Rejected.
 
 **Register `ApplicationDbContext` as transient.** Does not fix it. Two components calling one scoped
 service still reach one context, which is exactly the reported crash, and it quietly breaks the

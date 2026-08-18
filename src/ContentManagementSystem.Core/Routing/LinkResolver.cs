@@ -5,8 +5,14 @@ using Microsoft.EntityFrameworkCore;
 namespace ContentManagementSystem.Core.Routing;
 
 /// <inheritdoc cref="ILinkResolver" />
-/// <param name="context">The application database context.</param>
-public sealed class LinkResolver(ApplicationDbContext context) : ILinkResolver
+/// <param name="contexts">Makes a context of its own for each resolve (ADR-0022).</param>
+/// <remarks>
+/// A context per resolve rather than the request's, because this runs from a field renderer's
+/// <c>OnParametersSetAsync</c> and Blazor overlaps sibling renderers' asynchronous lifecycle
+/// methods. The read is <c>AsNoTracking</c> and writes nothing, so there is no unit of work that
+/// sharing one context would preserve.
+/// </remarks>
+public sealed class LinkResolver(IDbContextFactory<ApplicationDbContext> contexts) : ILinkResolver
 {
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<int, ResolvedLink>> ResolveAsync(
@@ -19,6 +25,8 @@ public sealed class LinkResolver(ApplicationDbContext context) : ILinkResolver
         var ids = pageIds.Distinct().ToList();
 
         if (ids.Count == 0) return new Dictionary<int, ResolvedLink>();
+
+        await using var context = await contexts.CreateDbContextAsync(cancellationToken);
 
         // The query filter is left in place, so a recycled page resolves to nothing and its link
         // degrades to text — which is correct on both surfaces, since neither an editor previewing

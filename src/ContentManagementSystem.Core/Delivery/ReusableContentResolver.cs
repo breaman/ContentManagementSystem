@@ -58,10 +58,18 @@ public interface IReusableContentResolver
 }
 
 /// <inheritdoc cref="IReusableContentResolver" />
-/// <param name="context">The application database context.</param>
+/// <param name="contexts">Makes a context of its own for each resolve (ADR-0022).</param>
 /// <param name="schemas">Resolves the block type revision the payload names.</param>
+/// <remarks>
+/// <strong>A context per resolve, not the request's.</strong> This runs from a field renderer's
+/// <c>OnParametersSetAsync</c>, and Blazor starts sibling renderers' asynchronous lifecycle methods
+/// concurrently — a page with a media placement and a reusable footer has two of them in flight at
+/// once. Sharing the request's scoped context is what EF Core reports as "a second operation was
+/// started on this context instance". Everything read here is <c>AsNoTracking</c> and nothing is
+/// written, so there is no unit of work to preserve by sharing one.
+/// </remarks>
 public sealed class ReusableContentResolver(
-    ApplicationDbContext context,
+    IDbContextFactory<ApplicationDbContext> contexts,
     IContentSchemaCatalog schemas) : IReusableContentResolver
 {
     /// <inheritdoc />
@@ -91,6 +99,8 @@ public sealed class ReusableContentResolver(
         {
             return ResolvedReusableContent.Unresolved(ReusableResolutionStatus.TooDeep, reusableContentId);
         }
+
+        await using var context = await contexts.CreateDbContextAsync(cancellationToken);
 
         // The soft-delete query filter stays in place, which is what makes "deleting an item stops it
         // rendering" true without this method having to remember to ask.

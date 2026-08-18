@@ -13,7 +13,7 @@ namespace ContentManagementSystem.Core.Content.Schema;
 /// The <see cref="IContentSchemaCatalog"/> a deployment actually runs on: revision snapshots read
 /// from the database and cached for the life of the process.
 /// </summary>
-/// <param name="context">The application database context.</param>
+/// <param name="contexts">Makes a context of its own for each query it has to run (ADR-0022).</param>
 /// <param name="cache">Process-wide cache of the revisions already read.</param>
 /// <param name="logger">Log for revisions that cannot be found or cannot be parsed.</param>
 /// <remarks>
@@ -29,6 +29,13 @@ namespace ContentManagementSystem.Core.Content.Schema;
 /// inner loop of every payload validation to serve a cache that hits essentially always.
 /// </para>
 /// <para>
+/// <strong>Each cache miss opens its own context</strong> rather than using the request's
+/// (ADR-0022). A synchronous query is the one thing that can land in the middle of an in-flight
+/// asynchronous one: a renderer's <c>OnParametersSet</c> runs while a sibling renderer's
+/// <c>OnParametersSetAsync</c> is still awaiting a query, and on a shared context EF Core refuses
+/// the second operation. The cost is a context per <em>miss</em>, which after warm-up is nothing.
+/// </para>
+/// <para>
 /// Nothing here throws. A revision that cannot be found or cannot be parsed is reported as unknown,
 /// which the walk turns into a diagnostic (an error for a template, a warning for a block type) and
 /// delivery turns into a degraded render (spec section 15.3). A page whose structure has gone
@@ -36,7 +43,7 @@ namespace ContentManagementSystem.Core.Content.Schema;
 /// </para>
 /// </remarks>
 public sealed class DatabaseContentSchemaCatalog(
-    ApplicationDbContext context,
+    IDbContextFactory<ApplicationDbContext> contexts,
     ContentSchemaCache cache,
     ILogger<DatabaseContentSchemaCatalog> logger) : IContentSchemaCatalog
 {
@@ -52,12 +59,7 @@ public sealed class DatabaseContentSchemaCatalog(
 
         if (schema is not null) return true;
 
-        var snapshot = context.TemplateRevisions
-            .AsNoTracking()
-            .Where(revision => revision.Template.Key == templateKey &&
-                revision.RevisionNumber == revisionNumber)
-            .Select(revision => revision.ZoneSnapshotJson)
-            .FirstOrDefault();
+        var snapshot = ZoneSnapshot(templateKey, revisionNumber);
 
         if (snapshot is null)
         {
@@ -102,11 +104,7 @@ public sealed class DatabaseContentSchemaCatalog(
         // A block carrying no revision was written before revisions were captured, and falls back to
         // whatever the block type looks like now rather than being treated as unknown — the same
         // rule the in-memory catalog follows, asked of the current row instead of the loaded set.
-        var revision = revisionNumber ?? context.BlockTypes
-            .AsNoTracking()
-            .Where(blockType => blockType.Key == blockTypeKey)
-            .Select(blockType => (int?)blockType.CurrentRevision)
-            .FirstOrDefault();
+        var revision = revisionNumber ?? CurrentRevision(blockTypeKey);
 
         if (revision is null) return false;
 
@@ -114,12 +112,7 @@ public sealed class DatabaseContentSchemaCatalog(
 
         if (schema is not null) return true;
 
-        var snapshot = context.BlockTypeRevisions
-            .AsNoTracking()
-            .Where(candidate => candidate.BlockType.Key == blockTypeKey &&
-                candidate.RevisionNumber == revision.Value)
-            .Select(candidate => candidate.PropertySnapshotJson)
-            .FirstOrDefault();
+        var snapshot = PropertySnapshot(blockTypeKey, revision.Value);
 
         if (snapshot is null)
         {
@@ -165,6 +158,8 @@ public sealed class DatabaseContentSchemaCatalog(
     /// </remarks>
     public async Task<ContentSchema?> GetCurrentAsync(int templateId, CancellationToken cancellationToken)
     {
+        await using var context = await contexts.CreateDbContextAsync(cancellationToken);
+
         var current = await context.Templates
             .AsNoTracking()
             .Where(template => template.Id == templateId)
@@ -174,5 +169,43 @@ public sealed class DatabaseContentSchemaCatalog(
         if (current is null) return null;
 
         return TryGetTemplate(current.Key, current.CurrentRevision, out var schema) ? schema : null;
+    }
+
+    /// <summary>The zone snapshot of one template revision, or null when there is no such revision.</summary>
+    private string? ZoneSnapshot(string templateKey, int revisionNumber)
+    {
+        using var context = contexts.CreateDbContext();
+
+        return context.TemplateRevisions
+            .AsNoTracking()
+            .Where(revision => revision.Template.Key == templateKey &&
+                revision.RevisionNumber == revisionNumber)
+            .Select(revision => revision.ZoneSnapshotJson)
+            .FirstOrDefault();
+    }
+
+    /// <summary>The revision a block type is currently on, or null when this deployment has no such type.</summary>
+    private int? CurrentRevision(string blockTypeKey)
+    {
+        using var context = contexts.CreateDbContext();
+
+        return context.BlockTypes
+            .AsNoTracking()
+            .Where(blockType => blockType.Key == blockTypeKey)
+            .Select(blockType => (int?)blockType.CurrentRevision)
+            .FirstOrDefault();
+    }
+
+    /// <summary>The property snapshot of one block type revision, or null when there is no such revision.</summary>
+    private string? PropertySnapshot(string blockTypeKey, int revisionNumber)
+    {
+        using var context = contexts.CreateDbContext();
+
+        return context.BlockTypeRevisions
+            .AsNoTracking()
+            .Where(candidate => candidate.BlockType.Key == blockTypeKey &&
+                candidate.RevisionNumber == revisionNumber)
+            .Select(candidate => candidate.PropertySnapshotJson)
+            .FirstOrDefault();
     }
 }

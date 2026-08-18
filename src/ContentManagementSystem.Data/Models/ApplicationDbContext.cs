@@ -3,6 +3,7 @@ using ContentManagementSystem.Data.Models.Cms;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ContentManagementSystem.Data.Models;
 
@@ -28,6 +29,14 @@ public class ApplicationDbContext : AuthDbContext
     /// always — see <c>AuthDbContext</c>'s clock field for why the stamp must not read the wall
     /// clock directly.
     /// </param>
+    /// <remarks>
+    /// The attribute says out loud what "the constructor the container uses" already meant, because
+    /// one activator cannot work it out on its own. <c>IDbContextFactory</c> builds contexts through
+    /// <c>ActivatorUtilities</c> (ADR-0022), which — unlike the service provider's greedy rule —
+    /// refuses to choose between constructors that all accept the arguments it was given, and fails
+    /// at startup with "multiple constructors accepting all given argument types".
+    /// </remarks>
+    [ActivatorUtilitiesConstructor]
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
         IUserService userService,

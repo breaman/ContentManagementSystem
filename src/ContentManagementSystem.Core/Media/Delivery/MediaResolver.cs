@@ -6,8 +6,14 @@ using Microsoft.EntityFrameworkCore;
 namespace ContentManagementSystem.Core.Media.Delivery;
 
 /// <inheritdoc cref="IMediaResolver" />
-/// <param name="context">The application database context.</param>
-public sealed class MediaResolver(ApplicationDbContext context) : IMediaResolver
+/// <param name="contexts">Makes a context of its own for each resolve (ADR-0022).</param>
+/// <remarks>
+/// A context per resolve rather than the request's, because this runs from a field renderer's
+/// <c>OnParametersSetAsync</c> and Blazor overlaps sibling renderers' asynchronous lifecycle
+/// methods. The read is <c>AsNoTracking</c> and writes nothing, so there is no unit of work that
+/// sharing one context would preserve.
+/// </remarks>
+public sealed class MediaResolver(IDbContextFactory<ApplicationDbContext> contexts) : IMediaResolver
 {
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<int, ResolvedMedia>> ResolveAsync(
@@ -19,6 +25,8 @@ public sealed class MediaResolver(ApplicationDbContext context) : IMediaResolver
         var ids = mediaIds.Distinct().ToList();
 
         if (ids.Count == 0) return new Dictionary<int, ResolvedMedia>();
+
+        await using var context = await contexts.CreateDbContextAsync(cancellationToken);
 
         // Only the columns a render reads. The storage key is deliberately not among them: a
         // renderer addresses an item through signed URLs, and a key in reach is a key something

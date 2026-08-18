@@ -76,9 +76,19 @@ try
         .AddIdentityCookies();
     builder.Services.AddAuthorization();
 
-    builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString(Constants.DatabaseConnectionString))
-            .EnableSensitiveDataLogging());
+    // AddDbContextFactory rather than AddDbContext, and scoped rather than the default singleton
+    // (ADR-0022). Since EF Core 6 the factory registration also registers the context itself as a
+    // scoped service, so every service taking an ApplicationDbContext is unaffected; what it adds is
+    // an IDbContextFactory for the delivery readers, which run inside one render and cannot share a
+    // context. Scoped is load-bearing twice over: it keeps DbContextOptions scoped, which is the
+    // lifetime EnrichSqlServerDbContext preserves when it patches the descriptor, and it gives the
+    // factory a scoped provider to build contexts from — a singleton factory could not resolve the
+    // scoped IUserService the context's constructor takes.
+    builder.Services.AddDbContextFactory<ApplicationDbContext>(
+        options => options
+            .UseSqlServer(builder.Configuration.GetConnectionString(Constants.DatabaseConnectionString))
+            .EnableSensitiveDataLogging(),
+        ServiceLifetime.Scoped);
     builder.EnrichSqlServerDbContext<ApplicationDbContext>();
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
