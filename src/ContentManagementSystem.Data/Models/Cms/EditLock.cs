@@ -15,7 +15,7 @@ namespace ContentManagementSystem.Data.Models.Cms;
 /// </para>
 /// <para>
 /// Written every 30 seconds per open editor, which is why it is exempt from audit capture — see
-/// <c>AuthDbContext</c>.
+/// <c>AuditLogInterceptor</c>.
 /// </para>
 /// </remarks>
 public class EditLock

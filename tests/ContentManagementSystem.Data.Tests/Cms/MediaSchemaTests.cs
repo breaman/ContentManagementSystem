@@ -133,7 +133,7 @@ public class MediaSchemaTests(SqlServerFixture fixture)
         await context.SaveChangesAsync(cancellationToken);
 
         // Deleted with SQL rather than with Remove(), because Remove() on a soft-deletable entity is
-        // rewritten into a flag update by ApplySoftDeletes — which is the safety net working, and
+        // rewritten into a flag update by SoftDeleteInterceptor — which is the safety net working, and
         // which means the cascade this test is about would never fire through the tracker. Permanent
         // deletion is its own operation, and it is the one this constraint backs (spec section 13.8).
         await context.Database.ExecuteSqlAsync(

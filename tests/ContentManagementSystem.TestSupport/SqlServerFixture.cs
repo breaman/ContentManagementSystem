@@ -1,4 +1,5 @@
 using ContentManagementSystem.Data.Common;
+using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Models;
 
 using DotNet.Testcontainers.Builders;
@@ -115,6 +116,11 @@ public sealed class SqlServerFixture : IAsyncLifetime
             // schema than the migrations were generated from, and EF then reports the model as
             // having pending changes.
             .UseApplicationServiceProvider(IdentityModelServices)
+            // Soft-delete rewriting, fingerprint stamping, and audit capture. They are options-level
+            // behaviour rather than part of the context type, so a fixture that skipped them would
+            // hand tests a context that saves without any of it — and the suites here assert on all
+            // three. There is nobody signed in, which is what a fixture writing rows directly is.
+            .AddInterceptors(CmsSaveInterceptors.Create(users: null, TimeProvider.System))
             .Options;
 
         return new ApplicationDbContext(options);

@@ -4,6 +4,7 @@ using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Media.Upload;
+using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
@@ -155,11 +156,15 @@ public sealed class PageWorkbench : IAsyncDisposable
             {
                 // Re-registered rather than added to DI: EF resolves interceptors from the options
                 // it was built with, and the application's registration was already made without
-                // this one.
+                // this one. Re-adding the application's own save interceptors is not optional —
+                // rebuilding the options is what drops them, and a context that saves without them
+                // stamps no fingerprints and writes no audit rows. The injected failure goes last,
+                // so it fails the save after they have done their work, as a database error would.
                 services.RemoveAll<DbContextOptions<ApplicationDbContext>>();
                 services.RemoveAll<DbContextOptions>();
-                services.AddDbContext<ApplicationDbContext>(options => options
+                services.AddDbContext<ApplicationDbContext>((provider, options) => options
                     .UseSqlServer(connectionString)
+                    .AddInterceptors(CmsSaveInterceptors.Resolve(provider))
                     .AddInterceptors(interceptor));
             }
         });

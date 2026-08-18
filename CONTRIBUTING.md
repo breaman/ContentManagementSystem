@@ -37,8 +37,9 @@ render the same components — see [ADR 0010](docs/adr/0010-shared-rendering-rcl
 
 ## Entities
 
-- Derive from **`FingerPrintEntityBase`** for anything an editor mutates. `AuthDbContext` stamps
-  `CreatedOn/By` and `ModifiedOn/By` automatically, so attribution never needs to be written by hand.
+- Derive from **`FingerPrintEntityBase`** for anything an editor mutates. `FingerPrintInterceptor`
+  stamps `CreatedOn/By` and `ModifiedOn/By` automatically, so attribution never needs to be written
+  by hand.
   Use plain `EntityBase` only for derived or machine-written rows where authorship is meaningless.
 - Every entity gets an explicit `IEntityTypeConfiguration<>` in `Data/Configurations/`. Do not
   configure entities inline in `OnModelCreating` — one file per entity keeps keys, indexes, and
@@ -50,7 +51,7 @@ render the same components — see [ADR 0010](docs/adr/0010-shared-rendering-rcl
 - Instants are `DateTimeOffset` and are stored UTC. `ConfigureConventions` already maps every
   `DateTimeOffset` to `ColumnTypes.Timestamp`; do not override it per property.
 - Soft-deletable entities carry `IsDeleted` with a global query filter. Recycle-bin queries call
-  `IgnoreQueryFilters()` explicitly. Never rely on `Remove()` — `ApplySoftDeletes()` is a safety
+  `IgnoreQueryFilters()` explicitly. Never rely on `Remove()` — `SoftDeleteInterceptor` is a safety
   net, not the intended path.
 
 ### Identity schema version
@@ -84,13 +85,32 @@ dotnet ef migrations add <Name> -p ../ContentManagementSystem.Data
 After launch the policy switches to roll-forward-only and `Down` methods become documentation
 (task P9-23). Until then they are tested.
 
-## The audit interceptor
+## The save interceptors
 
-`AuthDbContext.AddLogging()` writes an `AuditLog` row for every tracked change. High-churn derived
-tables must be **excluded** from it — `SearchDocument`, `OutboxMessage`, `MediaRendition`,
-`EditLock`, `NotFoundLog`. Including them grows the audit table without bound and slows every
-`SaveChanges`. If you add a table that is written by a background service rather than by a person,
-it almost certainly belongs on that list.
+Three `SaveChangesInterceptor`s in `Data/Interceptors/` carry everything that happens to an entity on
+its way to the database. They run in this order, and the order is the behaviour:
+
+1. **`SoftDeleteInterceptor`** rewrites a `Remove()` of an `ISoftDeletable` into a flag update.
+2. **`FingerPrintInterceptor`** stamps `CreatedOn/By` and `ModifiedOn/By`.
+3. **`AuditLogInterceptor`** writes an `AuditLog` row for every tracked change — so a soft delete is
+   audited as the update it became, carrying the fingerprints stamped a step earlier.
+
+`CmsSaveInterceptors` owns that order and the registration. **Anything that builds
+`DbContextOptions` by hand must add them**: unlike a `SaveChanges` override they are not part of the
+context type, so a context built without them saves happily and records nothing. The places that do
+are the host, `SqlServerFixture`, and the two suites that re-register the context to inject a failing
+interceptor — `CmsSaveInterceptors.Resolve(provider)` from a scope, `Create(users, clock)` without
+one.
+
+High-churn derived tables must be **excluded** from audit capture — `SearchDocument`,
+`OutboxMessage`, `MediaRendition`, `EditLock`, `NotFoundLog`, `ContentReference`. Including them
+grows the audit table without bound and slows every `SaveChanges`. If you add a table that is written
+by a background service rather than by a person, it almost certainly belongs on that list in
+`AuditLogInterceptor`.
+
+The interceptors mutate the change tracker only, with no SQL of their own, so
+`SaveInterceptorTests` drives them directly against a context that never opens a connection. Test
+new behaviour there rather than through a container.
 
 ## Tests
 

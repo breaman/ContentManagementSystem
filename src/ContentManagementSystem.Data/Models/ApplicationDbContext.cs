@@ -1,47 +1,31 @@
-using ContentManagementSystem.Data.Interfaces;
+using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Models.Cms;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ContentManagementSystem.Data.Models;
 
 public class ApplicationDbContext : AuthDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
-    {
-    }
-
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IUserService userService) :
-        base(options, userService)
-    {
-    }
-
     /// <summary>
-    /// The constructor the container uses, carrying the clock every stamped timestamp is read from.
+    /// The only constructor, which is what lets the factory's activator build one.
     /// </summary>
-    /// <param name="options">Context options.</param>
-    /// <param name="userService">Who the caller is, for fingerprints and audit rows.</param>
-    /// <param name="clock">
-    /// The registered <see cref="TimeProvider"/>. Greedily preferred over the two-parameter
-    /// constructor whenever one is registered, which in the application and in the test host is
-    /// always — see <c>AuthDbContext</c>'s clock field for why the stamp must not read the wall
-    /// clock directly.
+    /// <param name="options">
+    /// Context options. In the application these carry the save-time interceptors — see
+    /// <see cref="CmsSaveInterceptors"/>; a context built from options that omit them saves without
+    /// stamping fingerprints or writing audit rows.
     /// </param>
     /// <remarks>
-    /// The attribute says out loud what "the constructor the container uses" already meant, because
-    /// one activator cannot work it out on its own. <c>IDbContextFactory</c> builds contexts through
+    /// It used to be three, one of them marked <c>[ActivatorUtilitiesConstructor]</c>, because the
+    /// context took <c>IUserService</c> and <c>TimeProvider</c> for the save-time behaviour that now
+    /// lives in interceptors. <c>IDbContextFactory</c> builds contexts through
     /// <c>ActivatorUtilities</c> (ADR-0022), which — unlike the service provider's greedy rule —
-    /// refuses to choose between constructors that all accept the arguments it was given, and fails
-    /// at startup with "multiple constructors accepting all given argument types".
+    /// refuses to choose between constructors that all accept the arguments it was given, and failed
+    /// at startup with "multiple constructors accepting all given argument types". With one
+    /// constructor taking only options there is nothing left to choose between.
     /// </remarks>
-    [ActivatorUtilitiesConstructor]
-    public ApplicationDbContext(
-        DbContextOptions<ApplicationDbContext> options,
-        IUserService userService,
-        TimeProvider clock) :
-        base(options, userService, clock)
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
     {
     }
 

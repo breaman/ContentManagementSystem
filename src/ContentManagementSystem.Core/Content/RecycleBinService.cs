@@ -212,7 +212,7 @@ public sealed class RecycleBinService(
                 node.PublishedVersionId = null;
             }
 
-            // Assigned rather than removed through the set: ApplySoftDeletes would rewrite a Remove
+            // Assigned rather than removed through the set: SoftDeleteInterceptor would rewrite a Remove
             // into exactly this, and going through it directly keeps the intent visible at the call
             // site instead of relying on a hook to reinterpret it.
             node.IsDeleted = true;

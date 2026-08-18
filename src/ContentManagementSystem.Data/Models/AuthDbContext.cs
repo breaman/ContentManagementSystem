@@ -1,5 +1,5 @@
 using ContentManagementSystem.Data.Common;
-using ContentManagementSystem.Data.Interfaces;
+using ContentManagementSystem.Data.Interceptors;
 
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -7,99 +7,30 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace ContentManagementSystem.Data.Models;
 
+/// <summary>
+/// The Identity model plus the audit table, and nothing about what a save does.
+/// </summary>
+/// <remarks>
+/// Soft-delete rewriting, fingerprint stamping, and audit capture used to run from overrides of
+/// <c>SaveChanges</c> here. They are <see cref="SoftDeleteInterceptor"/>,
+/// <see cref="FingerPrintInterceptor"/>, and <see cref="AuditLogInterceptor"/> now, registered on
+/// the options the context is built from — see <see cref="CmsSaveInterceptors"/> for the order they
+/// run in and for what a context built without them silently loses.
+/// <para>
+/// What that bought is that the context no longer takes services. It needed <c>IUserService</c> and
+/// <c>TimeProvider</c> only to feed those three concerns, and taking them cost three constructor
+/// overloads, an <c>[ActivatorUtilitiesConstructor]</c> to tell the factory's activator which one to
+/// use, and a test fixture that built the parameterless one and so quietly stamped from the wall
+/// clock with no user attached.
+/// </para>
+/// </remarks>
 public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
 {
-    /// <summary>
-    /// Entity types deliberately excluded from audit capture.
-    /// </summary>
-    /// <remarks>
-    /// Every one of these is high-churn derived data written by a background service rather than by
-    /// a person: search projections, outbox rows, generated image renditions, editor heartbeats,
-    /// and 404 hit counters. Auditing them grows <c>AuditLog</c> without bound and slows every
-    /// <c>SaveChanges</c>, while recording nothing anybody would ever ask about — the source of
-    /// truth they derive from is audited already (spec section 23.5).
-    /// <para>
-    /// Names are matched rather than types because the tables arrive across several phases; the
-    /// exclusion is registered up front so a later phase cannot land the table and forget the
-    /// exclusion. Keep this list in step with the guidance in <c>CONTRIBUTING.md</c>.
-    /// </para>
-    /// </remarks>
-    private static readonly HashSet<string> AuditExemptEntityNames = new(StringComparer.Ordinal)
-    {
-        "SearchDocument",
-        "OutboxMessage",
-        "MediaRendition",
-        "EditLock",
-        "NotFoundLog",
-
-        // Beyond the list in spec section 23.5, and deliberately so. ContentReference rows are a
-        // projection of the payload, deleted and reinserted wholesale on every draft save — which
-        // happens every twenty seconds per open editor. Auditing them would multiply the audit
-        // table by the number of references on a page, per autosave, to record something already
-        // recoverable from the payload that is audited beside it.
-        "ContentReference",
-    };
-
-    private readonly IUserService? _userService;
-
-    /// <summary>
-    /// The clock every timestamp this context stamps is read from.
-    /// </summary>
-    /// <remarks>
-    /// <b>Injected rather than read from <see cref="DateTimeOffset.UtcNow"/>, because a stamp that
-    /// ignores the container's clock cannot be tested against anything that honours it.</b> The
-    /// retention sweep computes its cutoff from the registered <see cref="TimeProvider"/> and
-    /// compares it to <c>CreatedOn</c> written here; when the two came from different clocks, a
-    /// suite that advanced the fake one moved the cutoff and left the rows behind, so whether a test
-    /// passed depended on the real calendar date it ran on. Anything that later ages a row out —
-    /// scheduled publishing, recycle-bin purging, audit retention — needs the same seam.
-    /// <para>
-    /// Defaults to <see cref="TimeProvider.System"/> so the constructor that takes no services
-    /// behaves exactly as it did; in the application the container supplies the same instance the
-    /// services read.
-    /// </para>
-    /// </remarks>
-    private readonly TimeProvider _clock = TimeProvider.System;
-
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected AuthDbContext(DbContextOptions options) : base(options)
     {
         DeferCascadesToSaveChanges();
-    }
-
-    protected AuthDbContext(DbContextOptions options, IUserService userService) :
-        base(options)
-    {
-        _userService = userService;
-        DeferCascadesToSaveChanges();
-    }
-
-    protected AuthDbContext(DbContextOptions options, IUserService userService, TimeProvider clock) :
-        base(options)
-    {
-        _userService = userService;
-        _clock = clock;
-        DeferCascadesToSaveChanges();
-    }
-
-    public override Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess,
-        CancellationToken cancellationToken = default)
-    {
-        ApplySoftDeletes();
-        AddFingerPrinting();
-        AddApplicationInfo();
-        AddLogging();
-        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
-    }
-
-    public override int SaveChanges()
-    {
-        ApplySoftDeletes();
-        AddFingerPrinting();
-        AddApplicationInfo();
-        AddLogging();
-        return base.SaveChanges();
     }
 
     /// <inheritdoc />
@@ -114,149 +45,26 @@ public abstract class AuthDbContext : IdentityDbContext<User, Role, int>
         configurationBuilder.Properties<DateTimeOffset>().HaveColumnType(ColumnTypes.Timestamp);
     }
 
-    protected virtual void AddApplicationInfo()
-    {
-    }
-
-    protected virtual void ModifyAddedEntity(EntityEntry entry)
-    {
-    }
-
-    protected virtual void ModifyExistingEntity(EntityEntry entry)
-    {
-    }
-
-    /// <summary>
-    /// Rewrites hard deletes of soft-deletable entities into flag updates.
-    /// </summary>
-    /// <remarks>
-    /// This is a safety net, not the intended path: services expose explicit deactivate/restore
-    /// operations. It exists so that a stray <c>Remove</c> call cannot destroy a row that order or
-    /// invoice history still references — or, in the CMS, take a page's entire version history with
-    /// it, which is exactly what the recycle bin exists to prevent (spec section 23.5).
-    /// <para>
-    /// It runs before fingerprinting and audit capture, so the rewritten entry is stamped and logged
-    /// as the update it has become rather than as the delete it was written as. An entity already
-    /// flagged deleted is left <see cref="EntityState.Deleted"/>: reaching <c>Remove</c> a second
-    /// time is the permanent delete the recycle bin performs deliberately, and turning that into a
-    /// no-op would make purging impossible.
-    /// </para>
-    /// </remarks>
-    protected virtual void ApplySoftDeletes()
-    {
-        foreach (var entry in ChangeTracker.Entries<ISoftDeletable>())
-        {
-            if (entry.State is not EntityState.Deleted || entry.Entity.IsDeleted) continue;
-
-            entry.State = EntityState.Modified;
-            entry.Entity.IsDeleted = true;
-            entry.Entity.DeletedOn = _clock.GetUtcNow();
-            entry.Entity.DeletedBy = _userService?.UserId;
-        }
-    }
-
     /// <summary>
     /// Moves cascade and orphan handling from <c>Remove</c> to <c>SaveChanges</c>.
     /// </summary>
     /// <remarks>
-    /// Without this, <see cref="ApplySoftDeletes"/> is a net with a hole in it. EF's default timing
-    /// resolves severed required relationships the instant <c>Remove</c> is called, so removing a
-    /// page whose versions happen to be loaded throws there — before any override of
-    /// <c>SaveChanges</c> gets a chance to rewrite the delete into a flag update. The same call
-    /// against a page whose versions are <em>not</em> loaded succeeds and is caught, which makes the
-    /// safety net's behaviour depend on what the change tracker happened to be holding.
+    /// Without this, <see cref="SoftDeleteInterceptor"/> is a net with a hole in it. EF's default
+    /// timing resolves severed required relationships the instant <c>Remove</c> is called, so
+    /// removing a page whose versions happen to be loaded throws there — before anything gets a
+    /// chance to rewrite the delete into a flag update. The same call against a page whose versions
+    /// are <em>not</em> loaded succeeds and is caught, which makes the safety net's behaviour depend
+    /// on what the change tracker happened to be holding.
     /// <para>
     /// Deferring changes nothing about the SQL that is finally sent; it only decides when the change
-    /// tracker computes it.
+    /// tracker computes it. It stays on the context rather than moving to an interceptor because it
+    /// has to be in force from the moment the context exists — by the time a save begins, the
+    /// <c>Remove</c> it protects has already happened.
     /// </para>
     /// </remarks>
     private void DeferCascadesToSaveChanges()
     {
         ChangeTracker.CascadeDeleteTiming = CascadeTiming.OnSaveChanges;
         ChangeTracker.DeleteOrphansTiming = CascadeTiming.OnSaveChanges;
-    }
-
-    private void AddFingerPrinting()
-    {
-        var modified = ChangeTracker.Entries().Where(e => e.State == EntityState.Modified);
-        var added = ChangeTracker.Entries().Where(e => e.State == EntityState.Added);
-        var now = _clock.GetUtcNow();
-
-        foreach (var entry in added)
-        {
-            if (entry.Entity is FingerPrintEntityBase fingerPrintEntry)
-            {
-                fingerPrintEntry.CreatedBy = _userService?.UserId ?? default;
-                fingerPrintEntry.CreatedOn = now;
-                fingerPrintEntry.ModifiedBy = _userService?.UserId ?? default;
-                fingerPrintEntry.ModifiedOn = now;
-            }
-            ModifyAddedEntity(entry);
-        }
-
-        foreach (var entry in modified)
-        {
-            if (entry.Entity is FingerPrintEntityBase fingerPrintEntry)
-            {
-                fingerPrintEntry.ModifiedBy = _userService?.UserId ?? default;
-                fingerPrintEntry.ModifiedOn = now;
-            }
-            ModifyExistingEntity(entry);
-        }
-    }
-
-    private void AddLogging()
-    {
-        ChangeTracker.DetectChanges();
-        var auditEntries = new List<AuditEntry>();
-        foreach (var entry in ChangeTracker.Entries())
-        {
-            if (entry.Entity is AuditLog || entry.State == EntityState.Detached ||
-                entry.State == EntityState.Unchanged) continue;
-
-            var entityName = entry.Entity.GetType().Name;
-            if (AuditExemptEntityNames.Contains(entityName)) continue;
-
-            var auditEntry = new AuditEntry(entry)
-            {
-                TableName = entityName,
-                UserId = _userService?.UserId ?? default
-            };
-            auditEntries.Add(auditEntry);
-            foreach (var property in entry.Properties)
-            {
-                var propertyName = property.Metadata.Name;
-                if (property.Metadata.IsPrimaryKey()) auditEntry.KeyValues[propertyName] = property.CurrentValue!;
-                switch (entry.State)
-                {
-                    case EntityState.Added:
-                        auditEntry.AuditType = AuditType.Create;
-                        auditEntry.NewValues[propertyName] = property.CurrentValue!;
-                        break;
-                    case EntityState.Deleted:
-                        auditEntry.AuditType = AuditType.Delete;
-                        auditEntry.OldValues[propertyName] = property.OriginalValue!;
-                        break;
-                    case EntityState.Modified:
-                        if (property.IsModified)
-                        {
-                            auditEntry.ChangedColumns.Add(propertyName);
-                            auditEntry.AuditType = AuditType.Update;
-                            auditEntry.OldValues[propertyName] = property.OriginalValue!;
-                            auditEntry.NewValues[propertyName] = property.CurrentValue!;
-                        }
-
-                        break;
-                    case EntityState.Detached:
-                        break;
-                    case EntityState.Unchanged:
-                        break;
-                    default:
-                        throw new ArgumentOutOfRangeException();
-                }
-            }
-        }
-
-        foreach (var auditEntry in auditEntries) AuditLogs.Add(auditEntry.ToAuditLog(_clock));
     }
 }

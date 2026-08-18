@@ -13,6 +13,7 @@ using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Common;
+using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Rendering;
@@ -76,6 +77,11 @@ try
         .AddIdentityCookies();
     builder.Services.AddAuthorization();
 
+    // Soft-delete rewriting, fingerprint stamping, and audit capture. They are the context's
+    // save-time behaviour and are registered onto its options below, so a context built without
+    // them saves silently doing none of it — see CmsSaveInterceptors.
+    builder.Services.AddCmsSaveInterceptors();
+
     // AddDbContextFactory rather than AddDbContext, and scoped rather than the default singleton
     // (ADR-0022). Since EF Core 6 the factory registration also registers the context itself as a
     // scoped service, so every service taking an ApplicationDbContext is unaffected; what it adds is
@@ -83,11 +89,12 @@ try
     // context. Scoped is load-bearing twice over: it keeps DbContextOptions scoped, which is the
     // lifetime EnrichSqlServerDbContext preserves when it patches the descriptor, and it gives the
     // factory a scoped provider to build contexts from — a singleton factory could not resolve the
-    // scoped IUserService the context's constructor takes.
+    // scoped IUserService the save interceptors read the caller from.
     builder.Services.AddDbContextFactory<ApplicationDbContext>(
-        options => options
+        (services, options) => options
             .UseSqlServer(builder.Configuration.GetConnectionString(Constants.DatabaseConnectionString))
-            .EnableSensitiveDataLogging(),
+            .EnableSensitiveDataLogging()
+            .AddInterceptors(CmsSaveInterceptors.Resolve(services)),
         ServiceLifetime.Scoped);
     builder.EnrichSqlServerDbContext<ApplicationDbContext>();
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
