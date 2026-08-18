@@ -30,18 +30,20 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// must be told so — a 2xx over a rolled-back transaction produces a page everybody believes is live.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PublishFaultInjectionApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PublishFaultInjectionApiTests(SqlServerFixture fixture)
 {
     private FailingSaveInterceptor _interceptor = null!;
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync()
     {
         _interceptor = new FailingSaveInterceptor();
         _factory = await CmsApplicationFactory.CreateAsync(
             fixture,
-            TestContext.Current.CancellationToken,
+            TestContext.Current!.Execution.CancellationToken,
             (services, connectionString) =>
             {
                 // Re-registered rather than added to DI: EF resolves interceptors from the options
@@ -59,6 +61,7 @@ public class PublishFaultInjectionApiTests(SqlServerFixture fixture) : IAsyncLif
             });
     }
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
     /// <summary>
@@ -68,14 +71,14 @@ public class PublishFaultInjectionApiTests(SqlServerFixture fixture) : IAsyncLif
     /// In order: insert the new version; archive the previous one and repoint the page; project the
     /// reference rows; and the placeholder for the cache-invalidation outbox row arriving in P8.
     /// </remarks>
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
+    [Test]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    [Arguments(4)]
     public async Task AFailedPublishAnswersWithAServerErrorAndChangesNothing(int failingStep)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, $"fault-{failingStep}", cancellationToken);
         var page = await CreatePageAsync(client, template, "Pricing", cancellationToken);
@@ -116,10 +119,10 @@ public class PublishFaultInjectionApiTests(SqlServerFixture fixture) : IAsyncLif
         after.Should().BeEquivalentTo(before, "the whole publish rolls back or none of it does");
     }
 
-    [Fact]
+    [Test]
     public async Task APublishThatSucceedsThroughTheApiLeavesEveryStepApplied()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "fault-control", cancellationToken);
         var page = await CreatePageAsync(client, template, "Pricing", cancellationToken);

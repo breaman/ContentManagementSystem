@@ -23,22 +23,25 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// template a distinct key rather than starting from an empty table.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ZoneApiTests(SqlServerFixture fixture)
 {
     private const string Templates = $"{CmsApiEndpoints.BasePath}/templates";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AddingAZoneStoresItAndCutsARevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-add", cancellationToken);
 
@@ -76,10 +79,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().EndWith($"{ZonesOf(template)}/{saved.Zone.Id}");
     }
 
-    [Fact]
+    [Test]
     public async Task ANewRevisionCapturesTheZoneAndTheOldOneDoesNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-snapshot", cancellationToken);
         await AddZoneAsync(client, template, "body", FieldTypeKeys.RichText, cancellationToken);
@@ -99,10 +102,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         after.Zones[0].GetProperty("fieldTypeKey").GetString().Should().Be(FieldTypeKeys.RichText);
     }
 
-    [Fact]
+    [Test]
     public async Task RenamingAZoneKeyIsRefusedAndRenamingItsLabelIsNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-rename", cancellationToken);
         var zone = await AddZoneAsync(client, template, "body", FieldTypeKeys.PlainText, cancellationToken);
@@ -132,10 +135,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         updated.CurrentRevision.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task ChangingWhatAZoneRequiresCutsARevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-structural", cancellationToken);
         var zone = await AddZoneAsync(client, template, "body", FieldTypeKeys.PlainText, cancellationToken);
@@ -161,10 +164,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         updated.CurrentRevision.Should().Be(3);
     }
 
-    [Fact]
+    [Test]
     public async Task ChangingAZonesFieldTypeIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-retype", cancellationToken);
         var zone = await AddZoneAsync(client, template, "body", FieldTypeKeys.PlainText, cancellationToken);
@@ -186,10 +189,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         reread!.FieldTypeKey.Should().Be(FieldTypeKeys.PlainText);
     }
 
-    [Fact]
+    [Test]
     public async Task RemovingAZoneCutsARevisionAndReportsTheKeyItRetains()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-remove", cancellationToken);
         var zone = await AddZoneAsync(client, template, "obsolete", FieldTypeKeys.PlainText, cancellationToken);
@@ -216,10 +219,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         captured!.Zones.GetArrayLength().Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ReusingAZoneKeyWithinATemplateIsRefusedButNotAcrossTemplates()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var first = await CreateTemplateAsync(client, "zone-key-first", cancellationToken);
         var second = await CreateTemplateAsync(client, "zone-key-second", cancellationToken);
@@ -242,10 +245,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         elsewhere.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
-    [Fact]
+    [Test]
     public async Task AConfigurationTheFieldTypeCannotHonourIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-config", cancellationToken);
 
@@ -292,10 +295,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// <c>FieldConfigurationValidatorTests</c> — re-pointing this test at whichever real field type
     /// happened to be behind would put it back in the same position one phase later.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task TheMediaPickerSettingsAreStoredWithNothingReported()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-early-config", cancellationToken);
 
@@ -316,10 +319,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         saved.Warnings.Should().BeEmpty("the publish check enforces all three of these now");
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneBoundToAnUnregisteredFieldTypeIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-unknown-type", cancellationToken);
 
@@ -342,10 +345,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(missing, cancellationToken)).Should().Contain(StructureCodes.FieldTypeRequired);
     }
 
-    [Fact]
+    [Test]
     public async Task EveryBrokenRuleIsReportedAtOnce()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-many-problems", cancellationToken);
 
@@ -362,10 +365,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         ]);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyConfigurationIsStoredAsNone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-empty-config", cancellationToken);
 
@@ -387,10 +390,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         revision!.Zones[0].TryGetProperty("configuration", out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ZonesAreListedInEditorOrder()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(client, "zone-order", cancellationToken);
 
@@ -408,10 +411,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         zones!.Select(zone => zone.Key).Should().Equal("hero", "footer");
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayReadZonesButNotChangeThem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var developer = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(developer, "zone-viewer", cancellationToken);
         var zone = await AddZoneAsync(developer, template, "body", FieldTypeKeys.PlainText, cancellationToken);
@@ -430,10 +433,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         delete.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AWriteWithoutAnAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var developer = await DeveloperAsync(cancellationToken);
         var template = await CreateTemplateAsync(developer, "zone-forged", cancellationToken);
 
@@ -450,10 +453,10 @@ public class ZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain("request.antiforgery");
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneOfAnotherTemplateIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var owner = await CreateTemplateAsync(client, "zone-owner", cancellationToken);
         var other = await CreateTemplateAsync(client, "zone-other", cancellationToken);

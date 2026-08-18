@@ -14,7 +14,7 @@ namespace ContentManagementSystem.Core.Tests.Media;
 /// </remarks>
 public class RenditionGeometryTests
 {
-    [Fact]
+    [Test]
     public void AWideSourceCroppedToASquareKeepsFullHeight()
     {
         var crop = RenditionGeometry.FocalCrop(new PixelSize(4000, 2000), new PixelSize(600, 600), null);
@@ -25,7 +25,7 @@ public class RenditionGeometryTests
         crop.X.Should().Be(1000, "a centred crop leaves equal margins");
     }
 
-    [Fact]
+    [Test]
     public void ATallSourceCroppedToAWideBoxKeepsFullWidth()
     {
         var crop = RenditionGeometry.FocalCrop(new PixelSize(1000, 4000), new PixelSize(1200, 600), null);
@@ -36,7 +36,7 @@ public class RenditionGeometryTests
         crop.Y.Should().Be(1750);
     }
 
-    [Fact]
+    [Test]
     public void TheFocalPointMovesTheCrop()
     {
         var crop = RenditionGeometry.FocalCrop(
@@ -47,7 +47,7 @@ public class RenditionGeometryTests
         crop.Width.Should().Be(2000);
     }
 
-    [Fact]
+    [Test]
     public void AFocalPointNearAnEdgeSlidesTheCropRatherThanShrinkingIt()
     {
         var crop = RenditionGeometry.FocalCrop(
@@ -61,7 +61,7 @@ public class RenditionGeometryTests
         (crop.X + crop.Width).Should().Be(4000);
     }
 
-    [Fact]
+    [Test]
     public void ACropNeverExtendsPastTheSource()
     {
         var crop = RenditionGeometry.ToPixels(new PixelSize(1000, 800), new NormalizedRect(0.9, 0.9, 0.2, 0.2));
@@ -70,24 +70,24 @@ public class RenditionGeometryTests
         (crop.Y + crop.Height).Should().BeLessThanOrEqualTo(800);
     }
 
-    [Fact]
+    [Test]
     public void AFullCropIsTheWholeImage() =>
         RenditionGeometry.ToPixels(new PixelSize(1280, 720), NormalizedRect.Full)
             .Should().Be(new PixelRect(0, 0, 1280, 720));
 
-    [Fact]
+    [Test]
     public void CropModeReturnsTheRequestedBoxExactly() =>
         // What makes the width and height safe to write into the <img> tag, which is what protects
         // Cumulative Layout Shift (spec section 13.6).
         RenditionGeometry.Resolve(new PixelSize(4000, 3000), new PixelSize(1280, 720), RenditionMode.Crop)
             .Should().Be(new PixelSize(1280, 720));
 
-    [Fact]
+    [Test]
     public void ContainModeFitsInsideTheBox() =>
         RenditionGeometry.Resolve(new PixelSize(4000, 2000), new PixelSize(1280, 1280), RenditionMode.Contain)
             .Should().Be(new PixelSize(1280, 640));
 
-    [Fact]
+    [Test]
     public void NothingIsEverUpscaled()
     {
         // A 400px original asked for at 1280px comes back at 400: upscaling produces a blurrier file
@@ -99,7 +99,7 @@ public class RenditionGeometryTests
             .Should().Be(new PixelSize(400, 300));
     }
 
-    [Fact]
+    [Test]
     public void ASmallSourceKeepsTheRequestedAspectRatio()
     {
         var size = RenditionGeometry.Resolve(new PixelSize(600, 600), new PixelSize(1280, 720), RenditionMode.Crop);
@@ -107,7 +107,7 @@ public class RenditionGeometryTests
         ((double)size.Width / size.Height).Should().BeApproximately(1280d / 720, 0.01);
     }
 
-    [Fact]
+    [Test]
     public void TheCanonicalSpecIsStableAcrossEquivalentSpellings()
     {
         var first = new RenditionSpec(
@@ -123,7 +123,7 @@ public class RenditionGeometryTests
         first.ComputeHash().Should().Equal(second.ComputeHash());
     }
 
-    [Fact]
+    [Test]
     public void TheEditsVersionIsPartOfTheIdentity()
     {
         var before = new RenditionSpec(812, 1280, 720, RenditionMode.Crop, ImageOutputFormat.Webp, 82, 3);
@@ -134,25 +134,25 @@ public class RenditionGeometryTests
         after.ToCanonicalString().Should().NotBe(before.ToCanonicalString());
     }
 
-    [Theory]
-    [InlineData(1281)]
-    [InlineData(0)]
-    [InlineData(-320)]
+    [Test]
+    [Arguments(1281)]
+    [Arguments(0)]
+    [Arguments(-320)]
     public void AWidthOutsideTheAllowlistIsRefused(int width) =>
         new RenditionSpec(812, width, 720, RenditionMode.Crop, ImageOutputFormat.Webp, 82, 0)
             .IsAllowed.Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void AnAllowlistedWidthIsAccepted() =>
         new RenditionSpec(812, 1280, 720, RenditionMode.Crop, ImageOutputFormat.Webp, 82, 0)
             .IsAllowed.Should().BeTrue();
 
-    [Fact]
+    [Test]
     public void AQualityOutsideTheBoundsIsRefused() =>
         new RenditionSpec(812, 1280, 720, RenditionMode.Crop, ImageOutputFormat.Webp, 100, 0)
             .IsAllowed.Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void AnImpossibleCropIsRefused() =>
         new RenditionSpec(
             812, 1280, 720, RenditionMode.Crop, ImageOutputFormat.Webp, 82, 0,

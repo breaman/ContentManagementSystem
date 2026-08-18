@@ -39,7 +39,7 @@ public class ReferenceContentTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void TheReferenceTemplatesAndBlockTypesAreDeclaredWithTheKeysContentStores()
     {
         var declarations = CmsComponentScanner.ScanTypes(
@@ -57,7 +57,7 @@ public class ReferenceContentTests : IDisposable
             ["hero-banner", "rich-text", "feature-grid", "rawHtml"]);
     }
 
-    [Fact]
+    [Test]
     public void TheFallbackTemplateIsNotSelectable()
     {
         var declarations = CmsComponentScanner.ScanTypes(
@@ -69,7 +69,7 @@ public class ReferenceContentTests : IDisposable
             .Should().NotContain(declaration => declaration.ComponentType == typeof(CmsFallbackTemplate));
     }
 
-    [Fact]
+    [Test]
     public void TheReferenceSetBetweenThemPlacesEveryRegisteredFieldType()
     {
         // Compared against the registry rather than against a list restated here: a field type added
@@ -92,7 +92,7 @@ public class ReferenceContentTests : IDisposable
             "or its renderer is never exercised by anything");
     }
 
-    [Fact]
+    [Test]
     public void TheArticleTemplateRendersEveryValueShapedZoneThroughItsOwnRenderer()
     {
         var markup = _harness.RenderPage(ArticleContext());
@@ -116,7 +116,7 @@ public class ReferenceContentTests : IDisposable
         markup.Should().Contain("Embedded");
     }
 
-    [Fact]
+    [Test]
     public void TheNumberZoneIsRenderedExactlyAsStored()
     {
         var markup = _harness.RenderPage(ArticleContext());
@@ -126,7 +126,7 @@ public class ReferenceContentTests : IDisposable
         markup.Should().Contain("<dd>7.50</dd>");
     }
 
-    [Fact]
+    [Test]
     public void AJsonZoneRendersNothingAndIsNotReportedAsAProblem()
     {
         var markup = _harness.RenderPage(ArticleContext());
@@ -137,7 +137,7 @@ public class ReferenceContentTests : IDisposable
         _harness.Logs.Entries.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TheLandingTemplateRendersItsBlockZonesThroughTheBlockComponents()
     {
         var markup = _harness.RenderPage(LandingContext());
@@ -158,7 +158,7 @@ public class ReferenceContentTests : IDisposable
         markup.Should().Contain("href=\"https://example.test/buy\"");
     }
 
-    [Fact]
+    [Test]
     public void ABlockNestedInsideABlockRendersThroughTheSameDispatch()
     {
         var markup = _harness.RenderPage(LandingContext());
@@ -172,7 +172,7 @@ public class ReferenceContentTests : IDisposable
         markup.Should().Contain("Nested prose");
     }
 
-    [Fact]
+    [Test]
     public void ABlockTypeNoComponentDeclaresIsSkippedAndItsSiblingsStillRender()
     {
         var payload = RenderingHarness.PayloadFor(

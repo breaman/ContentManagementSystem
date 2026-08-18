@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Components;
 namespace ContentManagementSystem.Core.Tests;
 
 /// <summary>
-/// Proves the unit-test harness itself works: xUnit discovery, FluentAssertions, and bUnit
+/// Proves the unit-test harness itself works: TUnit discovery, FluentAssertions, and bUnit
 /// rendering (tasks P0-08, P0-12).
 /// </summary>
 /// <remarks>
@@ -17,14 +17,14 @@ namespace ContentManagementSystem.Core.Tests;
 /// </remarks>
 public class HarnessSmokeTests
 {
-    [Fact]
+    [Test]
     public void CoreAndRenderingAssembliesAreResolvable()
     {
         CoreAssemblyMarker.Assembly.GetName().Name.Should().Be("ContentManagementSystem.Core");
         RenderingAssemblyMarker.Assembly.GetName().Name.Should().Be("ContentManagementSystem.Rendering");
     }
 
-    [Fact]
+    [Test]
     public void BunitCanRenderAComponent()
     {
         using var context = new BunitContext();

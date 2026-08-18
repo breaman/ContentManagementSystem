@@ -16,7 +16,8 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// does not have: a filtered unique index, a cascade, and a global query filter interacting with a
 /// soft delete.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class MediaSchemaTests(SqlServerFixture fixture)
 {
     private static MediaItem Image(byte[] hash, string name = "photo.jpg") => new()
@@ -35,10 +36,10 @@ public class MediaSchemaTests(SqlServerFixture fixture)
 
     private static byte[] Hash(string content) => SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(content));
 
-    [Fact]
+    [Test]
     public async Task IdenticalBytesCannotProduceASecondLiveItem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var hash = Hash("the same photograph");
@@ -57,10 +58,10 @@ public class MediaSchemaTests(SqlServerFixture fixture)
             .Where(exception => exception.Message.Contains("IX_MediaItems_Sha256_Live"));
     }
 
-    [Fact]
+    [Test]
     public async Task AnItemInTheRecycleBinDoesNotBlockReUploadingTheSameFile()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var hash = Hash("a deleted photograph");
@@ -83,10 +84,10 @@ public class MediaSchemaTests(SqlServerFixture fixture)
         await save.Should().NotThrowAsync();
     }
 
-    [Fact]
+    [Test]
     public async Task ASoftDeletedItemIsInvisibleToOrdinaryQueries()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = Image(Hash("hidden"));
@@ -104,10 +105,10 @@ public class MediaSchemaTests(SqlServerFixture fixture)
         (await context.MediaItems.IgnoreQueryFilters().AnyAsync(cancellationToken)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task RenditionsGoWithTheItemTheyDeriveFrom()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = Image(Hash("with renditions"));
@@ -144,10 +145,10 @@ public class MediaSchemaTests(SqlServerFixture fixture)
         (await context.MediaRenditions.AnyAsync(cancellationToken)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task OneSpecCannotBeRecordedTwiceForAnItem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = Image(Hash("one spec"));

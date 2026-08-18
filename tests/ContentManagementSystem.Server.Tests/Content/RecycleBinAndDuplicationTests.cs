@@ -13,20 +13,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// <summary>
 /// The recycle bin and duplication (tasks P2-08 and P2-09).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class RecycleBinAndDuplicationTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task TheDeleteImpactStatesTheSubtreeSizeAndHowMuchOfItIsLive()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -56,10 +59,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         (await _bench.Context.Pages.CountAsync(cancellationToken)).Should().Be(4);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingAPageTakesItsSubtreeAndHidesItWhileKeepingItsHistory()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -95,10 +98,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         history.Value.Should().NotBeEmpty("a deleted page keeps its version history");
     }
 
-    [Fact]
+    [Test]
     public async Task RestoringBringsTheSubtreeBackAsDraftsAndNeverRepublishesIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -137,10 +140,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         pages.Should().AllSatisfy(page => page.DraftVersionId.Should().NotBeNull());
     }
 
-    [Fact]
+    [Test]
     public async Task APageWhoseParentIsStillDeletedComesBackAtTheRootWithAWarning()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -168,10 +171,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         stored.Path.Should().Be($"/{child.Summary.Id}/");
     }
 
-    [Fact]
+    [Test]
     public async Task APermanentDeleteIsRefusedWhileAnythingStillLinksToThePage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -222,10 +225,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
             .Should().BeFalse("the versions go with it");
     }
 
-    [Fact]
+    [Test]
     public async Task APermanentDeleteNeedsAPageInTheBinAndAnAdministrator()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
 
@@ -253,10 +256,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
             .Outcome.Should().Be(CmsOutcome.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AShallowDuplicateStartsAtVersionOneUnpublishedWithAFreeSlug()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Detail", cancellationToken, page.Summary.Id);
@@ -295,10 +298,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         _ = child;
     }
 
-    [Fact]
+    [Test]
     public async Task ADeepDuplicateRewritesLinksInsideTheSubtreeAndLeavesLinksOutOfItAlone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -362,10 +365,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
         rows.Should().ContainSingle().Which.TargetId.Should().Be(copiedThanks.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task ASectionCannotBeDuplicatedIntoItself()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -381,10 +384,10 @@ public class RecycleBinAndDuplicationTests(SqlServerFixture fixture) : IAsyncLif
             .Which.Code.Should().Be(PageCodes.ParentNotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task DuplicatingTwiceProducesTwoDistinctSlugs()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var duplication = _bench.Resolve<IDuplicationService>();

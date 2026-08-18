@@ -14,27 +14,27 @@ namespace ContentManagementSystem.Core.Tests.Structure;
 /// </remarks>
 public class ContentKeysTests
 {
-    [Theory]
-    [InlineData("hero")]
-    [InlineData("heroImage")]
-    [InlineData("marketing-landing")]
-    [InlineData("marketing_landing")]
-    [InlineData("a1")]
-    [InlineData("section-2-body")]
+    [Test]
+    [Arguments("hero")]
+    [Arguments("heroImage")]
+    [Arguments("marketing-landing")]
+    [Arguments("marketing_landing")]
+    [Arguments("a1")]
+    [Arguments("section-2-body")]
     public void AUsableKeyIsAccepted(string key) =>
         ContentKeys.Validate(key).IsValid.Should().BeTrue();
 
-    [Theory]
-    [InlineData(null, StructureCodes.KeyRequired)]
-    [InlineData("", StructureCodes.KeyRequired)]
-    [InlineData("   ", StructureCodes.KeyRequired)]
-    [InlineData("9lives", StructureCodes.KeyFormat)]
-    [InlineData("-leading", StructureCodes.KeyFormat)]
-    [InlineData("trailing-", StructureCodes.KeyFormat)]
-    [InlineData("double--hyphen", StructureCodes.KeyFormat)]
-    [InlineData("has space", StructureCodes.KeyFormat)]
-    [InlineData("has.dot", StructureCodes.KeyFormat)]
-    [InlineData("hero!", StructureCodes.KeyFormat)]
+    [Test]
+    [Arguments(null, StructureCodes.KeyRequired)]
+    [Arguments("", StructureCodes.KeyRequired)]
+    [Arguments("   ", StructureCodes.KeyRequired)]
+    [Arguments("9lives", StructureCodes.KeyFormat)]
+    [Arguments("-leading", StructureCodes.KeyFormat)]
+    [Arguments("trailing-", StructureCodes.KeyFormat)]
+    [Arguments("double--hyphen", StructureCodes.KeyFormat)]
+    [Arguments("has space", StructureCodes.KeyFormat)]
+    [Arguments("has.dot", StructureCodes.KeyFormat)]
+    [Arguments("hero!", StructureCodes.KeyFormat)]
     public void AnUnusableKeyIsRefusedWithItsReason(string? key, string code)
     {
         var result = ContentKeys.Validate(key);
@@ -43,7 +43,7 @@ public class ContentKeysTests
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(code);
     }
 
-    [Fact]
+    [Test]
     public void AKeyLongerThanItsColumnIsRefused()
     {
         var result = ContentKeys.Validate("k" + new string('e', FieldLengths.ContentKey));
@@ -53,7 +53,7 @@ public class ContentKeysTests
         result.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(StructureCodes.TooLong);
     }
 
-    [Fact]
+    [Test]
     public void TheOffendingMemberIsNamed()
     {
         ContentKeys.Validate("9lives", "templateKey")

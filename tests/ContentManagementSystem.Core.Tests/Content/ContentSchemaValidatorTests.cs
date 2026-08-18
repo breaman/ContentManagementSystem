@@ -28,7 +28,7 @@ public class ContentSchemaValidatorTests
     private static readonly Core.Content.Schema.ContentSchemaCatalog Catalog =
         ContentEngineHarness.Catalog(Template, HeroBanner);
 
-    [Fact]
+    [Test]
     public async Task AValidPayloadIsAccepted()
     {
         var report = await Catalog.ValidateAsync(
@@ -53,7 +53,7 @@ public class ContentSchemaValidatorTests
         report.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APayloadThatIsNotAnObjectIsRejected()
     {
         var report = await Catalog.ValidateAsync("[]");
@@ -61,7 +61,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(ContentValidationCodes.PayloadShape);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEnvelopeWithNoSchemaVersionIsRejected()
     {
         var report = await Catalog.ValidateAsync("""{ "templateKey": "marketing-landing" }""");
@@ -69,7 +69,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(ContentValidationCodes.SchemaVersionMissing);
     }
 
-    [Fact]
+    [Test]
     public async Task ASchemaVersionThisBuildCannotReadIsRejected()
     {
         var report = await Catalog.ValidateAsync(
@@ -80,7 +80,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(ContentValidationCodes.SchemaVersionUnsupported);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEnvelopeNamingNoTemplateIsRejected()
     {
         var report = await Catalog.ValidateAsync("""{ "schemaVersion": 1, "zones": {} }""");
@@ -88,7 +88,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(ContentValidationCodes.TemplateMissing);
     }
 
-    [Fact]
+    [Test]
     public async Task ATemplateRevisionThisDeploymentDoesNotKnowIsRejected()
     {
         var report = await Catalog.ValidateAsync(
@@ -100,7 +100,7 @@ public class ContentSchemaValidatorTests
         report.HasErrors.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnEnvelopeWithNoZonesObjectIsRejected()
     {
         var report = await Catalog.ValidateAsync(
@@ -109,7 +109,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(ContentValidationCodes.ZonesMissing);
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneValueIsCheckedByItsFieldTypeAndAddressedByTheWalk()
     {
         var report = await Catalog.ValidateAsync(
@@ -127,7 +127,7 @@ public class ContentSchemaValidatorTests
         diagnostic.BlockId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnfilledRequiredZoneBlocksPublishingButNotADraftSave()
     {
         const string Payload =
@@ -145,7 +145,7 @@ public class ContentSchemaValidatorTests
         publish.Paths().Should().Equal("zones.body");
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneClearedOnPurposeIsStillUnfilledWhenPublishing()
     {
         var report = await Catalog.ValidateAsync(
@@ -158,7 +158,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneTheTemplateNoLongerDefinesIsAWarningAndItsDataIsUntouched()
     {
         var payloadJson =
@@ -182,7 +182,7 @@ public class ContentSchemaValidatorTests
             .Should().Be("orphaned but retained");
     }
 
-    [Fact]
+    [Test]
     public async Task AZoneDefinedAgainstAFieldTypeThisBuildNoLongerHasIsAWarning()
     {
         var schema = ContentEngineHarness.Template(
@@ -203,7 +203,7 @@ public class ContentSchemaValidatorTests
         report.HasErrors.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AValueWrittenByADifferentFieldTypeThanTheSchemaDeclaresIsRejected()
     {
         var report = await Catalog.ValidateAsync(
@@ -217,7 +217,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(FieldValidationCodes.TypeMismatch);
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockPropertyIsCheckedAgainstItsBlockTypeRevision()
     {
         var report = await Catalog.ValidateAsync(
@@ -233,7 +233,7 @@ public class ContentSchemaValidatorTests
         report.Paths().Should().Equal("zones.hero.items[0].properties.headline.value");
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockDiagnosticNamesTheZoneTheBlockAndTheProperty()
     {
         var report = await Catalog.ValidateAsync(
@@ -258,7 +258,7 @@ public class ContentSchemaValidatorTests
         diagnostic.Path.Should().Be("zones.hero.items[0].properties.image");
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockWithNoPropertiesAtAllStillFailsItsRequiredProperties()
     {
         var report = await Catalog.ValidateAsync(
@@ -276,7 +276,7 @@ public class ContentSchemaValidatorTests
         report.Paths().Should().Equal("zones.hero.items[0].properties.image");
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockTypeRevisionThisDeploymentDoesNotKnowIsAWarning()
     {
         var report = await Catalog.ValidateAsync(
@@ -299,7 +299,7 @@ public class ContentSchemaValidatorTests
         report.Diagnostics[0].BlockId.Should().Be(Guid.Parse(BlockId));
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockCarryingNoRevisionFallsBackToTheNewestKnownOne()
     {
         var report = await Catalog.ValidateAsync(
@@ -316,7 +316,7 @@ public class ContentSchemaValidatorTests
         report.Codes().Should().Equal(FieldValidationCodes.MaxLength);
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockPropertyTheBlockTypeNoLongerDefinesIsAWarning()
     {
         var report = await Catalog.ValidateAsync(
@@ -337,7 +337,7 @@ public class ContentSchemaValidatorTests
         report.HasErrors.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task APropertyNestedAWholeBlockLevelDownIsStillChecked()
     {
         var nestedId = "7a1b2c3d-4e5f-4061-8293-a4b5c6d7e8f9";
@@ -377,7 +377,7 @@ public class ContentSchemaValidatorTests
         report.Diagnostics[0].BlockId.Should().Be(Guid.Parse(nestedId));
     }
 
-    [Fact]
+    [Test]
     public async Task ARemovedZoneAndANewlyRequiredOneBehaveAsTemplateEvolutionPromises()
     {
         // The S1 scenario: content authored against revision 7 checked against revision 8, which
@@ -409,7 +409,7 @@ public class ContentSchemaValidatorTests
                 diagnostic.Path == "zones.announcement");
     }
 
-    [Fact]
+    [Test]
     public async Task EveryDiagnosticInABrokenPayloadIsReportedAtOnce()
     {
         var report = await Catalog.ValidateAsync(
@@ -435,7 +435,7 @@ public class ContentSchemaValidatorTests
             ContentValidationCodes.ZoneOrphaned);
     }
 
-    [Fact]
+    [Test]
     public async Task ACancelledWalkStops()
     {
         using var cancellation = new CancellationTokenSource();

@@ -16,20 +16,23 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// <summary>
 /// The version, diff, and edit-lock API (tasks P2-18 and P2-19).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageVersionApiTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task HistoryListsEveryVersionNewestFirstWithItsRole()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "version-history", cancellationToken);
         var page = await CreatePageAsync(client, template, "Historic", cancellationToken);
@@ -55,10 +58,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         versions.Should().OnlyContain(version => version.CreatedOn != null);
     }
 
-    [Fact]
+    [Test]
     public async Task OneVersionIsReadableAndAnotherPagesVersionIsNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "version-read", cancellationToken);
         var page = await CreatePageAsync(client, template, "Readable", cancellationToken);
@@ -84,10 +87,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         theirs.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task TheDiffReportsAReorderedBlockAsMovedRatherThanRemovedAndAdded()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateBlocksTemplateAsync(client, "version-diff", cancellationToken);
         var page = await CreatePageAsync(client, template, "Rearranged", cancellationToken);
@@ -127,10 +130,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         blocks.Should().Contain(block => block.BlockId == first && block.BeforeIndex == 0 && block.AfterIndex == 1);
     }
 
-    [Fact]
+    [Test]
     public async Task RestoringAVersionCopiesItIntoTheDraftAndReturnsTheNewETag()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "version-restore", cancellationToken);
         var page = await CreatePageAsync(client, template, "Restorable", cancellationToken);
@@ -171,10 +174,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         live.Summary.IsPublished.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayReadHistoryButNotRestoreFromIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(administrator, "version-viewer", cancellationToken);
         var page = await CreatePageAsync(administrator, template, "Guarded", cancellationToken);
@@ -195,10 +198,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         restore.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnheldPageAnswersNoContentRatherThanNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lock-empty", cancellationToken);
         var page = await CreatePageAsync(client, template, "Nobody Home", cancellationToken);
@@ -210,10 +213,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    [Fact]
+    [Test]
     public async Task ALockIsVisibleToASecondEditorAndNeverBlocksTheirSave()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var elena = await AddUserAsync("elena", cancellationToken);
         var marcus = await AddUserAsync("marcus", cancellationToken);
 
@@ -250,10 +253,10 @@ public class PageVersionApiTests(SqlServerFixture fixture) : IAsyncLifetime
         save.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [Test]
     public async Task ALockCanBeTakenOverAndReleased()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var elena = await AddUserAsync("elena", cancellationToken);
         var marcus = await AddUserAsync("marcus", cancellationToken);
 

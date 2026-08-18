@@ -22,8 +22,9 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// any single-endpoint test would notice, because the endpoint in question does not exist yet when
 /// its test is written.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ApiContractTests(SqlServerFixture fixture)
 {
     /// <summary>
     /// Columns that decide what the public site serves, or whether a row exists at all.
@@ -53,12 +54,14 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public void EveryPermissionHasAPolicyAndEveryPolicyHasAPermission()
     {
         var declared = typeof(CmsPermissions)
@@ -78,7 +81,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().OnlyContain(role => KnownRoles.Contains(role));
     }
 
-    [Fact]
+    [Test]
     public async Task EveryPermissionsPolicyIsRegistered()
     {
         var policies = _factory.Services.GetRequiredService<IAuthorizationPolicyProvider>();
@@ -91,7 +94,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public void PhaseTwosPermissionsGrantWhatTheSpecTableSays()
     {
         // Spec section 21.1, transcribed as an assertion rather than as a second copy of the table:
@@ -112,7 +115,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
         RolesFor(CmsPermissions.UsersManage).Should().BeEquivalentTo([CmsRoles.Administrator]);
     }
 
-    [Fact]
+    [Test]
     public void TheBackofficesRoleListsMatchThePermissionsTheyStandInFor()
     {
         // The screens run in WebAssembly, where the server's permission policies do not exist, so
@@ -125,7 +128,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
         Roles(CmsRoles.StructureEditors).Should().BeEquivalentTo(RolesFor(CmsPermissions.StructureEdit));
     }
 
-    [Fact]
+    [Test]
     public void EveryCmsEndpointRequiresAnAuthorizationPolicy()
     {
         var unprotected = new List<string>();
@@ -159,7 +162,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
         ]);
     }
 
-    [Fact]
+    [Test]
     public void EveryWriteEndpointRequiresAnAntiforgeryToken()
     {
         var forgeable = CmsEndpoints()
@@ -173,7 +176,7 @@ public class ApiContractTests(SqlServerFixture fixture) : IAsyncLifetime
         forgeable.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void NoWriteEndpointBindsATypeThatCouldMoveAPagesLifecycle()
     {
         var offences = new List<string>();

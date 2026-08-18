@@ -16,20 +16,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// that block are locks that get stuck, and the authoritative defence against a lost update is the
 /// row version on the draft — which works whether or not anybody acquired anything.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class EditLockTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ASecondEditorSeesWhoHoldsTheLockAndCanStillEdit()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
         var locks = _bench.Resolve<IEditLockService>();
 
@@ -62,10 +65,10 @@ public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
         saved.IsSuccess.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ALockCanBeTakenOverExplicitly()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
         var locks = _bench.Resolve<IEditLockService>();
 
@@ -90,10 +93,10 @@ public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
         rows.Should().ContainSingle().Which.UserId.Should().Be(marcus);
     }
 
-    [Fact]
+    [Test]
     public async Task ALockExpiresAfterTwoMinutesOfSilenceAndAHeartbeatKeepsItAlive()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
         var locks = _bench.Resolve<IEditLockService>();
 
@@ -126,10 +129,10 @@ public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
         inherited.Value!.IsMine.Should().BeTrue("an expired lock is taken without asking");
     }
 
-    [Fact]
+    [Test]
     public async Task TheReaperClearsLocksNobodyIsHoldingAnyMore()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
         var locks = _bench.Resolve<IEditLockService>();
 
@@ -146,10 +149,10 @@ public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
         (await _bench.Context.EditLocks.CountAsync(cancellationToken)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task ReleasingSomebodyElsesLockDoesNothingAndIsNotAnError()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
         var locks = _bench.Resolve<IEditLockService>();
 
@@ -174,19 +177,19 @@ public class EditLockTests(SqlServerFixture fixture) : IAsyncLifetime
         (await _bench.Context.EditLocks.CountAsync(cancellationToken)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task ALockOnAPageThatIsNotThereIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         (await _bench.Resolve<IEditLockService>().AcquireAsync(999_999, cancellationToken: cancellationToken))
             .Outcome.Should().Be(CmsOutcome.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMaySeeALockAndMayNotTakeOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageAsync(cancellationToken);
 
         await using var viewer = await PageWorkbench.CreateAsync(

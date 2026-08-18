@@ -37,7 +37,7 @@ public class BuiltInFieldTypeTests
         FieldTypeKeys.Tags,
     ];
 
-    [Fact]
+    [Test]
     public void EveryBuiltInFieldTypeIsRegisteredByTheScan()
     {
         using var provider = BuildProvider();
@@ -49,7 +49,7 @@ public class BuiltInFieldTypeTests
         registry.All.Select(fieldType => fieldType.Key).Should().Equal(ExpectedKeys);
     }
 
-    [Fact]
+    [Test]
     public void EveryBuiltInFieldTypeHasADisplayName()
     {
         using var provider = BuildProvider();
@@ -59,7 +59,7 @@ public class BuiltInFieldTypeTests
         registry.All.Should().OnlyContain(fieldType => !string.IsNullOrWhiteSpace(fieldType.DisplayName));
     }
 
-    [Fact]
+    [Test]
     public void RegisteringTheBuiltInsWithoutASanitizerFailsRatherThanStoringMarkupUnchecked()
     {
         using var provider = new ServiceCollection()
@@ -72,7 +72,7 @@ public class BuiltInFieldTypeTests
         resolve.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void OnlyTheFieldTypesThatPointAtSomethingClaimToBearReferences()
     {
         using var provider = BuildProvider();
@@ -95,7 +95,7 @@ public class BuiltInFieldTypeTests
                 FieldTypeKeys.Reusable);
     }
 
-    [Fact]
+    [Test]
     public void OnlyBlocksIsAContainer()
     {
         using var provider = BuildProvider();
@@ -110,7 +110,7 @@ public class BuiltInFieldTypeTests
             .Should().BeEquivalentTo(FieldTypeKeys.Blocks);
     }
 
-    [Fact]
+    [Test]
     public void OnlyTheMarkupBearingFieldTypesClaimSanitization()
     {
         using var provider = BuildProvider();

@@ -77,15 +77,21 @@ jobs:
       # highest-severity item in the specification (task P1-20, acceptance criterion P1 #6).
       #
       # The suite writes what each profile stripped from each payload to the test log, because
-      # over-stripping is the other failure mode (risk R3) and it has no attacker to catch it.
+      # over-stripping is the other failure mode (risk R3) and it has no attacker to catch it. TUnit
+      # buffers that log per test rather than streaming it, so it rides in the uploaded TRX below
+      # rather than appearing in the step output.
+      #
+      # The filter is a tree-node path — /assembly/namespace/class/test — and the alternation has to
+      # sit inside one segment, since a bare `|` between two whole paths silently matches only the
+      # first.
       - name: Sanitization and XSS corpus
         run: >-
-          dotnet test tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
           --configuration Release
-          --filter "FullyQualifiedName~ContentManagementSystem.Core.Tests.Security|FullyQualifiedName~ContentManagementSystem.Core.Tests.Content.Markdown"
-          --logger "trx;LogFileName=xss-corpus.trx"
+          --treenode-filter "/*/(ContentManagementSystem.Core.Tests.Security|ContentManagementSystem.Core.Tests.Content.Markdown)/*/*"
+          --report-trx --report-trx-filename xss-corpus.trx
           --results-directory ${{ runner.temp }}/test-results
-          -- xunit.showLiveOutput=true
+          --output Detailed
 
       - name: Upload results
         if: always()
@@ -108,11 +114,11 @@ jobs:
 
       - name: Test
         run: >-
-          dotnet test tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.Core.Tests/ContentManagementSystem.Core.Tests.csproj
           --configuration Release
-          --logger "trx;LogFileName=core.trx"
+          --report-trx --report-trx-filename core.trx
           --results-directory ${{ runner.temp }}/test-results
-          --collect "XPlat Code Coverage"
+          --coverage --coverage-output-format cobertura
 
       - name: Upload results
         if: always()
@@ -145,9 +151,9 @@ jobs:
       # floating on a tag, so a new upstream build cannot change behaviour under a green run.
       - name: Data integration tests
         run: >-
-          dotnet test tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
           --configuration Release
-          --logger "trx;LogFileName=data.trx"
+          --report-trx --report-trx-filename data.trx
           --results-directory ${{ runner.temp }}/test-results
 
       # need to install the node dependencies so that the bootstrap.js file exists for the integration tests build
@@ -158,9 +164,9 @@ jobs:
 
       - name: API and delivery integration tests
         run: >-
-          dotnet test tests/ContentManagementSystem.Server.Tests/ContentManagementSystem.Server.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.Server.Tests/ContentManagementSystem.Server.Tests.csproj
           --configuration Release
-          --logger "trx;LogFileName=server.trx"
+          --report-trx --report-trx-filename server.trx
           --results-directory ${{ runner.temp }}/test-results
 
       - name: Upload results
@@ -187,9 +193,9 @@ jobs:
       # its own signal instead of being one red test among many.
       - name: Apply and revert every migration
         run: >-
-          dotnet test tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.Data.Tests/ContentManagementSystem.Data.Tests.csproj
           --configuration Release
-          --filter "FullyQualifiedName~MigrationsApplyFromEmptyTests"
+          --treenode-filter "/*/*/MigrationsApplyFromEmptyTests/*"
 
   accessibility:
     name: Accessibility (axe)
@@ -214,10 +220,10 @@ jobs:
       # needs the compiled stylesheet — is P9's.
       - name: Structure screen accessibility
         run: >-
-          dotnet test tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
           --configuration Release
-          --filter "FullyQualifiedName~StructureScreenAccessibilityTests"
-          --logger "trx;LogFileName=accessibility.trx"
+          --treenode-filter "/*/*/StructureScreenAccessibilityTests/*"
+          --report-trx --report-trx-filename accessibility.trx
           --results-directory ${{ runner.temp }}/test-results
 
       - name: Upload results
@@ -257,9 +263,9 @@ jobs:
       # in Phase 1 against the structure screens, not at the end of the project.
       - name: Test
         run: >-
-          dotnet test tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
+          dotnet test --project tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
           --configuration Release
-          --logger "trx"
+          --report-trx
           --results-directory ${{ runner.temp }}/test-results
 
       - name: Upload results

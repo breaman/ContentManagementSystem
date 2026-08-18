@@ -30,7 +30,7 @@ public class EditorTeardownTests
     /// </remarks>
     private const int Cycles = 10;
 
-    [Fact]
+    [Test]
     public async Task MountingAndUnmountingASourceEditorTenTimesLeavesNothingBehind()
     {
         var counts = await CycleAsync("cms-source-editor.js", """
@@ -48,7 +48,7 @@ public class EditorTeardownTests
             "never called");
     }
 
-    [Fact]
+    [Test]
     public async Task MountingAndUnmountingAWysiwygEditorTenTimesLeavesNoToolbarsBehind()
     {
         var counts = await CycleAsync("cms-wysiwyg-editor.js", """
@@ -68,7 +68,7 @@ public class EditorTeardownTests
         counts.QuillEditor.Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task CodeMirrorIsStyledUnderAStrictPolicyBecauseTheNonceReachesIt()
     {
         PlaywrightBrowsers.EnsureInstalled();
@@ -119,7 +119,7 @@ public class EditorTeardownTests
             string.Join(" | ", refusals));
     }
 
-    [Fact]
+    [Test]
     public async Task WithoutTheNonceTheSameEditorIsSilentlyUnstyled()
     {
         PlaywrightBrowsers.EnsureInstalled();

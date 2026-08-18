@@ -20,8 +20,9 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// type composing it, and that a key can only be defined once across both. None of those can be
 /// asserted against a single service in isolation.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class BlockTypeApiTests(SqlServerFixture fixture)
 {
     private const string BlockTypes = $"{CmsApiEndpoints.BasePath}/block-types";
     private const string Compositions = $"{CmsApiEndpoints.BasePath}/compositions";
@@ -29,15 +30,17 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task CreatingABlockTypeReturnsItWithAnEmptyFirstRevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -61,10 +64,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         created.EffectiveProperties.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task AddingAPropertyCutsARevisionThatCapturesIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "quote", cancellationToken);
 
@@ -83,10 +86,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         revision.Revision.PropertyCount.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task APropertyKeyAndFieldTypeAreBothImmutable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "immutable-props", cancellationToken);
         var property = await AddPropertyAsync(client, blockType, "body", FieldTypeKeys.PlainText, cancellationToken);
@@ -110,10 +113,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(retype, cancellationToken)).Should().Contain(StructureCodes.FieldTypeImmutable);
     }
 
-    [Fact]
+    [Test]
     public async Task RemovingAPropertyCutsARevisionAndKeepsTheOldOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "shrinking", cancellationToken);
         var property = await AddPropertyAsync(client, blockType, "obsolete", FieldTypeKeys.PlainText, cancellationToken);
@@ -138,10 +141,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         captured!.Properties.GetArrayLength().Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task TheBuiltInBlockTypeRefusesStructuralChangesButAcceptsARename()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var all = await client.GetFromJsonAsync<List<BlockTypeSummary>>(BlockTypes, cancellationToken);
@@ -167,10 +170,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .BlockType.Name.Should().Be("Free-form HTML");
     }
 
-    [Fact]
+    [Test]
     public async Task AComposedGroupFlattensIntoTheBlockTypeAfterItsOwnProperties()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "composed-host", cancellationToken);
         await AddPropertyAsync(client, blockType, "headline", FieldTypeKeys.PlainText, cancellationToken);
@@ -204,10 +207,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         revision.Properties[1].GetProperty("key").GetString().Should().Be("marginTop");
     }
 
-    [Fact]
+    [Test]
     public async Task EditingASharedGroupRecutsEveryBlockTypeComposingIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var composition = await CreateCompositionAsync(client, "analytics-attrs", cancellationToken);
 
@@ -246,10 +249,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task AKeyCannotBeDefinedTwiceInOneBlockInstance()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "collision-host", cancellationToken);
         await AddPropertyAsync(client, blockType, "spacing", FieldTypeKeys.PlainText, cancellationToken);
@@ -266,10 +269,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(attach, cancellationToken)).Should().Contain(StructureCodes.CompositionCollision);
     }
 
-    [Fact]
+    [Test]
     public async Task AGroupPropertyThatWouldCollideOnAHostIsRefusedAtTheGroup()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "late-collision-host", cancellationToken);
         await AddPropertyAsync(client, blockType, "caption", FieldTypeKeys.PlainText, cancellationToken);
@@ -292,10 +295,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain(StructureCodes.CompositionCollision);
     }
 
-    [Fact]
+    [Test]
     public async Task ComposingTheSameGroupTwiceIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "double-compose", cancellationToken);
         var composition = await CreateCompositionAsync(client, "double-compose-group", cancellationToken);
@@ -314,10 +317,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(again, cancellationToken)).Should().Contain(StructureCodes.CompositionDuplicate);
     }
 
-    [Fact]
+    [Test]
     public async Task DetachingAGroupRemovesItsPropertiesFromTheNextRevisionOnly()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "detach-host", cancellationToken);
         var composition = await CreateCompositionAsync(client, "detach-group", cancellationToken);
@@ -349,10 +352,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         before!.Properties.GetArrayLength().Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingAComposedGroupIsRefusedAndNamesWhatIsInTheWay()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "guard-host", cancellationToken);
         var composition = await CreateCompositionAsync(client, "guard-group", cancellationToken);
@@ -376,10 +379,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         allowed.StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    [Fact]
+    [Test]
     public async Task TheFieldTypeRegistryIsServedWithEachConfigurationSchema()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var all = await client.GetFromJsonAsync<List<FieldTypeDescriptor>>(FieldTypes, cancellationToken);
@@ -406,10 +409,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         unknown.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayReadStructureButNotChangeIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var developer = await DeveloperAsync(cancellationToken);
         await CreateBlockTypeAsync(developer, "viewer-visible", cancellationToken);
 
@@ -432,10 +435,10 @@ public class BlockTypeApiTests(SqlServerFixture fixture) : IAsyncLifetime
         createComposition.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task ConfigurationIsCheckedOnAPropertyExactlyAsOnAZone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var blockType = await CreateBlockTypeAsync(client, "config-checked", cancellationToken);
 

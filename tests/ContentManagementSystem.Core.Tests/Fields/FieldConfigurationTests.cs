@@ -9,10 +9,10 @@ namespace ContentManagementSystem.Core.Tests.Fields;
 /// </summary>
 public class FieldConfigurationTests
 {
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
     public void AMissingConfigurationParsesToEmpty(string? configurationJson)
     {
         var configuration = FieldConfiguration.Parse(configurationJson);
@@ -22,7 +22,7 @@ public class FieldConfigurationTests
         configuration.GetStringArray("allowedBlockTypes").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TypedAccessorsReadTheirSettings()
     {
         var configuration = FieldConfiguration.Parse(
@@ -43,7 +43,7 @@ public class FieldConfigurationTests
         configuration.GetStringArray("allowedBlockTypes").Should().Equal("hero-banner", "quote");
     }
 
-    [Fact]
+    [Test]
     public void AnAbsentSettingFallsBackRatherThanThrowing()
     {
         var configuration = FieldConfiguration.Parse("""{"maxLength": 120}""");
@@ -54,7 +54,7 @@ public class FieldConfigurationTests
         configuration.GetBoolean("allowNesting", defaultValue: true).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ASettingOfTheWrongKindIsTreatedAsAbsent()
     {
         // Configuration is validated against a per-field-type JSON Schema on save (P1-12), so a
@@ -66,7 +66,7 @@ public class FieldConfigurationTests
         configuration.GetStringArray("allowedBlockTypes").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AnExplicitNullIsTreatedAsAbsent()
     {
         var configuration = FieldConfiguration.Parse("""{"maxLength": null}""");
@@ -75,7 +75,7 @@ public class FieldConfigurationTests
         configuration.GetInt32("maxLength").Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void NonStringEntriesAreSkippedWhenReadingAStringArray()
     {
         var configuration = FieldConfiguration.Parse("""{"options": ["a", 3, null, "b"]}""");
@@ -83,7 +83,7 @@ public class FieldConfigurationTests
         configuration.GetStringArray("options").Should().Equal("a", "b");
     }
 
-    [Fact]
+    [Test]
     public void TheParsedConfigurationOutlivesTheDocumentItCameFrom()
     {
         // The instance is cached per schema row and reused across every payload validated against
@@ -97,7 +97,7 @@ public class FieldConfigurationTests
         configuration.GetInt32("maxLength").Should().Be(120);
     }
 
-    [Fact]
+    [Test]
     public void MalformedConfigurationThrows()
     {
         var parse = () => FieldConfiguration.Parse("{ not json");

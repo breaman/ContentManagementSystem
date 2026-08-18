@@ -16,20 +16,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// correct is that a prefix query over the stored column returns the same subtree the parent
 /// pointers describe, and there is no way to observe that without both.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageTreeServiceTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AttachingBuildsThePathFromTheParentAndTheNewIdentity()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -45,10 +48,10 @@ public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         grandchild.Depth.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task APathOnlyMatchesWholeAncestors()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -67,10 +70,10 @@ public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         lookalikes.Should().Equal(child.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task MovingASubtreeRewritesEveryDescendantPathAndDepth()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -93,10 +96,10 @@ public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         spec.Depth.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task ADeletedDescendantMovesWithItsSubtree()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -123,10 +126,10 @@ public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.Path.Should().Be($"/{archive.Id}/{widget.Id}/{retired.Id}/");
     }
 
-    [Fact]
+    [Test]
     public async Task APageCannotBeMovedUnderItsOwnDescendant()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -146,10 +149,10 @@ public class PageTreeServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         products.ParentId.Should().BeNull("a refused move changes nothing");
     }
 
-    [Fact]
+    [Test]
     public async Task MovingUnderAPageThatIsNotThereIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();

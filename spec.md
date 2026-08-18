@@ -2136,7 +2136,7 @@ All are `IHostedService` implementations guarded by a distributed lock (a claime
 
 | Layer | Tooling | Coverage focus |
 |---|---|---|
-| **Unit** | xUnit, FluentAssertions, NSubstitute | Slug generation, URL construction, redirect chain flattening and loop detection, payload validation, diff algorithm, ACL resolution, cache-tag derivation, focal-point crop math |
+| **Unit** | TUnit, FluentAssertions, NSubstitute | Slug generation, URL construction, redirect chain flattening and loop detection, payload validation, diff algorithm, ACL resolution, cache-tag derivation, focal-point crop math |
 | **Contract** | Snapshot tests over serialized payloads | Payload envelope stability across schema versions |
 | **Data integration** | Testcontainers SQL Server | Migrations apply cleanly and are reversible; filtered unique indexes behave; concurrency conflicts surface; query filters exclude deleted rows |
 | **API integration** | `WebApplicationFactory` | Every endpoint's authorization, validation, and concurrency behavior; publish transactionality |

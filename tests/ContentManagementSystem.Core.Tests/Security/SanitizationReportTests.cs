@@ -16,7 +16,7 @@ public class SanitizationReportTests
 {
     private readonly SanitizationService _sanitizer = new();
 
-    [Fact]
+    [Test]
     public void ARemovedElementIsNamed()
     {
         var result = _sanitizer.SanitizeWithReport("<p>x</p><script>alert(1)</script>", SanitizationProfile.Basic);
@@ -25,7 +25,7 @@ public class SanitizationReportTests
             .Which.Should().BeEquivalentTo(new SanitizationRemoval(SanitizationRemovalKind.Tag, "script"));
     }
 
-    [Fact]
+    [Test]
     public void ARemovedEventHandlerNamesTheAttributeAndItsElement()
     {
         var result = _sanitizer.SanitizeWithReport(
@@ -40,7 +40,7 @@ public class SanitizationReportTests
         removal.Value.Should().Be("alert(1)");
     }
 
-    [Fact]
+    [Test]
     public void ARefusedUrlIsReportedApartFromADisallowedAttribute()
     {
         var result = _sanitizer.SanitizeWithReport(
@@ -53,7 +53,7 @@ public class SanitizationReportTests
             .Which.Kind.Should().Be(SanitizationRemovalKind.Url);
     }
 
-    [Fact]
+    [Test]
     public void ARemovedStyleNamesTheProperty()
     {
         var result = _sanitizer.SanitizeWithReport(
@@ -64,7 +64,7 @@ public class SanitizationReportTests
         result.Removals.Should().Contain(removal => removal.Kind == SanitizationRemovalKind.Style);
     }
 
-    [Fact]
+    [Test]
     public void AnEmptiedAttributeIsNotReportedTwice()
     {
         var result = _sanitizer.SanitizeWithReport(
@@ -77,7 +77,7 @@ public class SanitizationReportTests
             .Which.Kind.Should().Be(SanitizationRemovalKind.Style);
     }
 
-    [Fact]
+    [Test]
     public void ARemovedCommentIsReported()
     {
         var result = _sanitizer.SanitizeWithReport("<p>x</p><!-- a note -->", SanitizationProfile.Basic);
@@ -86,7 +86,7 @@ public class SanitizationReportTests
             .Which.Kind.Should().Be(SanitizationRemovalKind.Comment);
     }
 
-    [Fact]
+    [Test]
     public void ADroppedClassIsReported()
     {
         var options = new SanitizationOptions();
@@ -101,7 +101,7 @@ public class SanitizationReportTests
                 new SanitizationRemoval(SanitizationRemovalKind.CssClass, "admin-only", "p"));
     }
 
-    [Fact]
+    [Test]
     public void AnExcerptIsTruncatedRatherThanCarryingTheWholePayload()
     {
         var long_ = new string('a', SanitizationRemoval.MaxValueLength + 50);
@@ -116,7 +116,7 @@ public class SanitizationReportTests
             .Which.Value!.Length.Should().Be(SanitizationRemoval.MaxValueLength + 1);
     }
 
-    [Fact]
+    [Test]
     public void EveryRemovalDescribesItself()
     {
         var result = _sanitizer.SanitizeWithReport(
@@ -127,7 +127,7 @@ public class SanitizationReportTests
         result.Removals.Should().OnlyContain(removal => removal.Describe().Length > 0);
     }
 
-    [Fact]
+    [Test]
     public void RemovalsAreNotSharedBetweenCalls()
     {
         var first = _sanitizer.SanitizeWithReport("<script>alert(1)</script>", SanitizationProfile.Basic);

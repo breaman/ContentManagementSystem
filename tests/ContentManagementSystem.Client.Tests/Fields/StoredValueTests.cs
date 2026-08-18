@@ -16,13 +16,13 @@ namespace ContentManagementSystem.Client.Tests.Fields;
 /// </remarks>
 public class StoredValueTests
 {
-    [Fact]
+    [Test]
     public void ReadingTakesTheValueOutOfTheEnvelope()
     {
         StoredValue.ReadText("""{ "type": "plainText", "value": "Hello" }""").Should().Be("Hello");
     }
 
-    [Fact]
+    [Test]
     public void AWriteKeepsEveryMemberItDidNotWrite()
     {
         var stored = StoredValue.Write(
@@ -37,7 +37,7 @@ public class StoredValueTests
         written["altOverride"]!.GetValue<string>().Should().Be("A cat");
     }
 
-    [Fact]
+    [Test]
     public void AnEmptiedControlRemovesTheSlotRatherThanStoringNothing()
     {
         // Absent means never authored and null means deliberately cleared. Writing "" for a box
@@ -46,7 +46,7 @@ public class StoredValueTests
             .Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AValueWithNoEnvelopeYetGetsItsDiscriminator()
     {
         var stored = StoredValue.WriteText(null, FieldTypeKeys.PlainText, "Hello");
@@ -54,7 +54,7 @@ public class StoredValueTests
         JsonNode.Parse(stored)!["type"]!.GetValue<string>().Should().Be(FieldTypeKeys.PlainText);
     }
 
-    [Fact]
+    [Test]
     public void AnUnparseableValueReadsAsNothingRatherThanThrowing()
     {
         // A value this cannot parse is one the validator has already complained about against the
@@ -64,7 +64,7 @@ public class StoredValueTests
         StoredValue.ReadItems("not json at all", "items").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AChoiceWrittenAsOneValueStillReadsAsAList()
     {
         // The field type stores one value or an array under the same member, so a property switched
@@ -74,7 +74,7 @@ public class StoredValueTests
             .Should().Equal("wide", "tall");
     }
 
-    [Fact]
+    [Test]
     public void AnIntegerMemberRefusesANumberThatIsNotOne()
     {
         StoredValue.ReadInt32("""{ "value": 44 }""").Should().Be(44);

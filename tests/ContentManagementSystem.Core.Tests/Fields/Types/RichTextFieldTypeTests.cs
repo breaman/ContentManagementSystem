@@ -14,7 +14,7 @@ public class RichTextFieldTypeTests
 
     public RichTextFieldTypeTests() => _fieldType = new RichTextFieldType(_sanitizer);
 
-    [Fact]
+    [Test]
     public async Task MarkdownAndHtmlAreBothAcceptedFormats()
     {
         var markdown = await _fieldType.ValidateAsync(
@@ -26,7 +26,7 @@ public class RichTextFieldTypeTests
         html.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AValueWithNoFormatIsRejected()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "richText", "value": "**bold**" }""");
@@ -36,7 +36,7 @@ public class RichTextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.RichTextFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnrecognisedFormatIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -45,7 +45,7 @@ public class RichTextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.RichTextFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyValueIsNotRejectedForItsFormat()
     {
         // Nothing has been authored yet, so complaining about the format of nothing is noise.
@@ -54,7 +54,7 @@ public class RichTextFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task LongerThanMaxLengthIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -64,7 +64,7 @@ public class RichTextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxLength);
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnknownProfileWarnsWithoutBlockingTheSave()
     {
         var result = await _fieldType.ValidateAsync(
@@ -77,7 +77,7 @@ public class RichTextFieldTypeTests
         result.HasErrors.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task HtmlIsSanitizedOnTheWayIn()
     {
         _sanitizer.Transform = _ => "<p>clean</p>";
@@ -90,7 +90,7 @@ public class RichTextFieldTypeTests
             .Which.Profile.Should().Be(SanitizationProfile.Basic);
     }
 
-    [Fact]
+    [Test]
     public async Task TheConfiguredProfileSelectsTheAllowlist()
     {
         await _fieldType.SanitizeAsync(
@@ -101,7 +101,7 @@ public class RichTextFieldTypeTests
             .Which.Profile.Should().Be(SanitizationProfile.Extended);
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnknownProfileFallsBackToTheStrictestAllowlist()
     {
         await _fieldType.SanitizeAsync(
@@ -113,7 +113,7 @@ public class RichTextFieldTypeTests
             .Which.Profile.Should().Be(SanitizationProfile.Basic);
     }
 
-    [Fact]
+    [Test]
     public async Task SanitizingLeavesTheOtherMembersOfTheValueAlone()
     {
         _sanitizer.Transform = _ => "<p>clean</p>";
@@ -128,7 +128,7 @@ public class RichTextFieldTypeTests
         sanitized.GetProperty("authoredWith").GetString().Should().Be("quill");
     }
 
-    [Fact]
+    [Test]
     public async Task MarkdownIsStoredExactlyAsAuthored()
     {
         _sanitizer.Transform = _ => "mangled";
@@ -142,7 +142,7 @@ public class RichTextFieldTypeTests
         _sanitizer.Calls.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnchangedValueIsNotRewritten()
     {
         var property = FieldTypeTestHarness.Element(
@@ -151,12 +151,12 @@ public class RichTextFieldTypeTests
         var sanitized = await _fieldType.SanitizeAsync(
             property,
             FieldConfiguration.Empty,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         sanitized.GetRawText().Should().Be(property.GetRawText());
     }
 
-    [Fact]
+    [Test]
     public void SearchTextDropsTheMarkup()
     {
         var property = FieldTypeTestHarness.Element(
@@ -165,7 +165,7 @@ public class RichTextFieldTypeTests
         _fieldType.ExtractSearchText(property).Should().Be("Ship faster & safer");
     }
 
-    [Fact]
+    [Test]
     public void RichTextIsSearchableAndSanitizable()
     {
         _fieldType.Capabilities.Should().Be(

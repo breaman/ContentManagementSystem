@@ -25,8 +25,9 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// <c>docs/phase-4-fanout-baseline.md</c>.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ReferenceFanOutTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ReferenceFanOutTests(SqlServerFixture fixture)
 {
     /// <summary>How many published pages place the item under measurement.</summary>
     /// <remarks>
@@ -47,15 +48,17 @@ public class ReferenceFanOutTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task TheFanOutOfAHighReferenceItemIsOneQueryPerLevelRatherThanPerPage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var references = _bench.Resolve<IReferenceQueryService>();
 
         var item = await _bench.AddReusableAsync("Site footer", cancellationToken);
@@ -108,10 +111,10 @@ public class ReferenceFanOutTests(SqlServerFixture fixture) : IAsyncLifetime
             "the where-used walk queries once per level, not once per referencing page");
     }
 
-    [Fact]
+    [Test]
     public async Task TheListIsCappedWhileTheCountsStayExact()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // The cap exists so a confirmation dialog for a site-wide footer is not a download. Asserting
         // it needs no fixture at all beyond the contract: what matters is that the two members can

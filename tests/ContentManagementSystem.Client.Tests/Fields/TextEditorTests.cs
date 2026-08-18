@@ -18,7 +18,7 @@ public class TextEditorTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void WhatIsTypedIsStoredInsideTheEnvelope()
     {
         var editor = _harness.Render<PlainTextEditor>(
@@ -29,7 +29,7 @@ public class TextEditorTests : IDisposable
         _harness.Last.Should().Be("""{"type":"plainText","value":"What our plans cost"}""");
     }
 
-    [Fact]
+    [Test]
     public void ClearingTheBoxRemovesTheSlotRatherThanStoringAnEmptyString()
     {
         var editor = _harness.Render<PlainTextEditor>(
@@ -41,7 +41,7 @@ public class TextEditorTests : IDisposable
         _harness.Last.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void APlainTextZoneIsOneLineBecauseTheFieldTypeRefusesLineBreaks()
     {
         var editor = _harness.Render<PlainTextEditor>(
@@ -53,7 +53,7 @@ public class TextEditorTests : IDisposable
         editor.Find("input").GetAttribute("type").Should().Be("text");
     }
 
-    [Fact]
+    [Test]
     public void TheCountUpdatesAsTheAuthorTypesRatherThanOnCommit()
     {
         var editor = _harness.Render<PlainTextEditor>(
@@ -64,7 +64,7 @@ public class TextEditorTests : IDisposable
         editor.Find(".cms-field-count").TextContent.Should().Contain("5 characters");
     }
 
-    [Fact]
+    [Test]
     public void PassingTheSoftLimitAdvisesAndPassingTheHardOneRefuses()
     {
         var slot = FieldEditorHarness.Slot(
@@ -88,7 +88,7 @@ public class TextEditorTests : IDisposable
         refusal.TextContent.Should().Contain("publishing will refuse this");
     }
 
-    [Fact]
+    [Test]
     public void TheBrowsersOwnCeilingIsNotTheConfiguredMaximum()
     {
         var slot = FieldEditorHarness.Slot(
@@ -102,7 +102,7 @@ public class TextEditorTests : IDisposable
         editor.Find("input[type=text]").GetAttribute("maxlength").Should().NotBe("60");
     }
 
-    [Fact]
+    [Test]
     public void TheControlIsNamedAndDescribedByTheCardAroundIt()
     {
         var editor = _harness.Render<PlainTextEditor>(
@@ -115,7 +115,7 @@ public class TextEditorTests : IDisposable
         input.GetAttribute("aria-describedby").Should().Contain("zone-zone-help");
     }
 
-    [Fact]
+    [Test]
     public void TheMultilinePreviewBreaksLinesTheWayTheRendererDoes()
     {
         var editor = _harness.Render<MultilineTextEditor>(
@@ -132,7 +132,7 @@ public class TextEditorTests : IDisposable
         preview.TextContent.Should().Contain("One").And.Contain("Two");
     }
 
-    [Fact]
+    [Test]
     public void AReadOnlyFormCannotBeTypedInto()
     {
         var editor = _harness.Render<PlainTextEditor>(

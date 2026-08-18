@@ -38,7 +38,7 @@ public class PropertiesPanelTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void APatchCarriesOnlyTheFieldsTheEditorTouched()
     {
         var page = Page();
@@ -59,7 +59,7 @@ public class PropertiesPanelTests : IDisposable
         patch.InternalNotes.IsSet.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ClearingAFieldIsSentAsAClearingRatherThanOmitted()
     {
         var page = Page(metaTitle: "Pricing | Contoso");
@@ -75,7 +75,7 @@ public class PropertiesPanelTests : IDisposable
             "box means");
     }
 
-    [Fact]
+    [Test]
     public void WhitespaceRoundATrimmedValueIsNotAChange()
     {
         var page = Page(metaTitle: "Pricing");
@@ -88,7 +88,7 @@ public class PropertiesPanelTests : IDisposable
             "indicator that never goes out");
     }
 
-    [Fact]
+    [Test]
     public void ChangingNothingLeavesNothingToSave()
     {
         var page = Page();
@@ -96,7 +96,7 @@ public class PropertiesPanelTests : IDisposable
         PageProperties.From(page).HasChanges(page).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void TheSearchPreviewFallsBackToThePageTitleAndSaysSo()
     {
         var page = Page();
@@ -107,7 +107,7 @@ public class PropertiesPanelTests : IDisposable
         preview.Should().Contain("Pricing").And.Contain("from the page title");
     }
 
-    [Fact]
+    [Test]
     public void TheSearchPreviewTruncatesTheWayAResultDoes()
     {
         var page = Page();
@@ -124,7 +124,7 @@ public class PropertiesPanelTests : IDisposable
             "showing the whole thing would hide the one fact this widget exists to show");
     }
 
-    [Fact]
+    [Test]
     public void TheCountersGuideRatherThanRefuse()
     {
         var page = Page();
@@ -140,7 +140,7 @@ public class PropertiesPanelTests : IDisposable
             .Should().Contain("You can still publish it");
     }
 
-    [Fact]
+    [Test]
     public void ARefusalLandsOnTheFieldItIsAbout()
     {
         var page = Page();
@@ -156,7 +156,7 @@ public class PropertiesPanelTests : IDisposable
             "a message that landed on its field must not also be repeated at the top of the panel");
     }
 
-    [Fact]
+    [Test]
     public void ARefusalAboutNothingThisPanelDrawsIsStillReported()
     {
         var page = Page();
@@ -168,7 +168,7 @@ public class PropertiesPanelTests : IDisposable
         panel.Find(".alert").TextContent.Should().Contain("That template is disabled");
     }
 
-    [Fact]
+    [Test]
     public void TakingOwnershipWritesTheSignedInEditorsOwnId()
     {
         var page = Page();
@@ -190,7 +190,7 @@ public class PropertiesPanelTests : IDisposable
         model.ToPatch(page).OwnerUserId.Value.Should().Be(7);
     }
 
-    [Fact]
+    [Test]
     public void TheOwnerIsNamedRatherThanNumbered()
     {
         var page = Page(ownerUserId: 12, ownerName: "Marcus");
@@ -199,7 +199,7 @@ public class PropertiesPanelTests : IDisposable
         panel.Find(".cms-properties__owner-name").TextContent.Should().Contain("Marcus");
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewShowsTheAddressThePageIsActuallyServedAt()
     {
         var page = Page();

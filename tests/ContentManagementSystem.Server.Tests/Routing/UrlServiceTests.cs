@@ -22,20 +22,23 @@ namespace ContentManagementSystem.Server.Tests.Routing;
 /// index that lets a draft route sit at a URL a live page already serves, and a subtree rewrite that
 /// has to commit whole or not at all.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class UrlServiceTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ANewPageGetsADraftRouteAndNoPublishedOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Our Pricing", cancellationToken);
 
@@ -49,10 +52,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         routes[0].UrlHash.Should().Equal(SiteUrls.Hash("/our-pricing"));
     }
 
-    [Fact]
+    [Test]
     public async Task AUrlIsItsAncestorsSlugsJoined()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -66,10 +69,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Be("/products/widget/specifications");
     }
 
-    [Fact]
+    [Test]
     public async Task AnExplicitUrlIgnoresTheTreeButItsDescendantsStillBuildOnIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -94,10 +97,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Be("/shop/the-widget/specs");
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingMaterializesThePublicRouteAndUnpublishingWithdrawsIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "About", cancellationToken);
 
@@ -119,10 +122,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         afterwards.Should().ContainSingle().Which.IsPublished.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ChangingASlugMovesThePageAndEveryDescendantAndLeavesRedirectsBehind()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widget", cancellationToken, section.Summary.Id);
@@ -165,10 +168,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ARedirectPointingAtAPageFollowsThatPageWhenItMovesAgain()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
 
@@ -195,10 +198,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await resolver.ResolveAsync("/plans", cancellationToken)).TargetUrl.Should().Be("/cost");
     }
 
-    [Fact]
+    [Test]
     public async Task ALivePageAtAUrlOutranksARedirectWithTheSameSource()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var original = await _bench.AddPageAsync(template, "Offers", cancellationToken);
 
@@ -230,10 +233,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         resolution.PageId.Should().Be(replacement.Summary.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task TwoPublishedPagesCannotOccupyOneUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var occupant = await _bench.AddPageAsync(template, "Guides", cancellationToken);
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
@@ -267,10 +270,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await PublishedUrlAsync(occupant.Summary.Id, cancellationToken)).Should().Be("/guides");
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftRouteMaySitAtAUrlALivePageAlreadyServes()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var live = await _bench.AddPageAsync(template, "Handbook", cancellationToken);
 
@@ -304,10 +307,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         routes.Should().ContainSingle(route => !route.IsPublished && route.PageId == replacement.Summary.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task RecyclingAPageWithdrawsItsPublicUrlAndRestoringDoesNotBringItBack()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Archive", cancellationToken);
         var child = await _bench.AddPageAsync(template, "2025", cancellationToken, section.Summary.Id);
@@ -338,10 +341,10 @@ public class UrlServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().ContainSingle().Which.IsPublished.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ANonCanonicalSpellingResolvesToThePageAndAsksForARedirectToTheCanonicalUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Contact", cancellationToken);
 

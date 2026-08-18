@@ -11,7 +11,7 @@ public class TextFieldTypeTests
     private readonly PlainTextFieldType _plainText = new();
     private readonly MultilineTextFieldType _multilineText = new();
 
-    [Fact]
+    [Test]
     public async Task TextLongerThanMaxLengthIsRejected()
     {
         var result = await _plainText.ValidateAsync(
@@ -21,7 +21,7 @@ public class TextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxLength);
     }
 
-    [Fact]
+    [Test]
     public async Task TextExactlyAtMaxLengthIsAccepted()
     {
         var result = await _plainText.ValidateAsync(
@@ -31,7 +31,7 @@ public class TextFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task TextShorterThanMinLengthIsRejected()
     {
         var result = await _plainText.ValidateAsync(
@@ -41,7 +41,7 @@ public class TextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MinLength);
     }
 
-    [Fact]
+    [Test]
     public async Task EveryBrokenRuleIsReported()
     {
         var result = await _plainText.ValidateAsync(
@@ -56,7 +56,7 @@ public class TextFieldTypeTests
             FieldValidationCodes.Pattern);
     }
 
-    [Fact]
+    [Test]
     public async Task PlainTextRefusesLineBreaks()
     {
         var result = await _plainText.ValidateAsync("""{ "type": "plainText", "value": "one\ntwo" }""");
@@ -64,7 +64,7 @@ public class TextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.PlainTextLineBreak);
     }
 
-    [Fact]
+    [Test]
     public async Task MultilineTextKeepsLineBreaks()
     {
         var result = await _multilineText.ValidateAsync(
@@ -73,7 +73,7 @@ public class TextFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AValueMatchingThePatternIsAccepted()
     {
         var result = await _plainText.ValidateAsync(
@@ -83,7 +83,7 @@ public class TextFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AValueMissingThePatternCanCarryTheConfiguredMessage()
     {
         var result = await _plainText.ValidateAsync(
@@ -94,7 +94,7 @@ public class TextFieldTypeTests
             .Which.Message.Should().Be("Use a product code such as AB-1234.");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnusablePatternWarnsAndDoesNotBlockTheSave()
     {
         var result = await _plainText.ValidateAsync(
@@ -107,7 +107,7 @@ public class TextFieldTypeTests
         result.HasErrors.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ANumberStoredWhereTextBelongsIsAShapeError()
     {
         var result = await _plainText.ValidateAsync("""{ "type": "plainText", "value": 42 }""");
@@ -115,7 +115,7 @@ public class TextFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public void SearchTextIsTheStoredValueWithWhitespaceCollapsed()
     {
         var property = FieldTypeTestHarness.Element(
@@ -124,7 +124,7 @@ public class TextFieldTypeTests
         _multilineText.ExtractSearchText(property).Should().Be("Ship faster");
     }
 
-    [Fact]
+    [Test]
     public void SearchTextIsEmptyForAnUnfilledValue()
     {
         var property = FieldTypeTestHarness.Element("""{ "type": "plainText", "value": null }""");
@@ -132,7 +132,7 @@ public class TextFieldTypeTests
         _plainText.ExtractSearchText(property).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TextFieldTypesAreSearchable()
     {
         _plainText.Capabilities.Should().Be(FieldTypeCapabilities.Searchable);

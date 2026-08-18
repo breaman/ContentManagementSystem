@@ -22,7 +22,7 @@ public class ContentPayloadTests
         }
         """;
 
-    [Fact]
+    [Test]
     public void TheEnvelopeIsReadable()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -33,7 +33,7 @@ public class ContentPayloadTests
         payload.HasZones.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AZoneThatWasNeverAuthoredIsAbsent()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -43,7 +43,7 @@ public class ContentPayloadTests
         payload.GetZone("body").ValueKind.Should().Be(JsonValueKind.Undefined);
     }
 
-    [Fact]
+    [Test]
     public void AZoneThatWasExplicitlyClearedIsNotAbsent()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -55,7 +55,7 @@ public class ContentPayloadTests
         cleared.ValueKind.Should().Be(JsonValueKind.Null);
     }
 
-    [Fact]
+    [Test]
     public void AZoneHoldingAValueIsPresent()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -63,7 +63,7 @@ public class ContentPayloadTests
         payload.GetZoneState("headline").Should().Be(ContentValueState.Present);
     }
 
-    [Fact]
+    [Test]
     public void ZoneKeysAreReportedInDocumentOrder()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -71,7 +71,7 @@ public class ContentPayloadTests
         payload.ZoneKeys.Should().Equal("headline", "subtitle");
     }
 
-    [Fact]
+    [Test]
     public void AMalformedEnvelopeStillParses()
     {
         // Nothing about a missing member is this type's to refuse: the validator needs a readable
@@ -84,7 +84,7 @@ public class ContentPayloadTests
         payload.ZoneKeys.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void APayloadThatIsNotAnObjectParsesAndSaysSo()
     {
         var payload = ContentPayload.Parse("[]");
@@ -93,7 +93,7 @@ public class ContentPayloadTests
         payload.TemplateKey.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void TextThatIsNotJsonIsRefused()
     {
         var parse = () => ContentPayload.Parse("{ not json");
@@ -105,7 +105,7 @@ public class ContentPayloadTests
         payload!.TemplateKey.Should().Be("marketing-landing");
     }
 
-    [Fact]
+    [Test]
     public void AParsedPayloadOutlivesTheDocumentItCameFrom()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -118,7 +118,7 @@ public class ContentPayloadTests
         payload.GetZone("headline").GetProperty("value").GetString().Should().Be("Ship faster");
     }
 
-    [Fact]
+    [Test]
     public void RoundTrippingPreservesEverythingThatCarriesMeaning()
     {
         var payload = ContentPayload.Parse(Envelope);
@@ -130,7 +130,7 @@ public class ContentPayloadTests
         reparsed.GetZoneState("body").Should().Be(ContentValueState.Absent);
     }
 
-    [Fact]
+    [Test]
     public void AnEmptyPayloadCarriesTheEnvelopeAndNoZones()
     {
         var payload = ContentPayload.CreateEmpty("marketing-landing", 7);
@@ -144,7 +144,7 @@ public class ContentPayloadTests
         payload.ZoneKeys.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TheBuilderWritesTheZonesItIsGiven()
     {
         var payload = new ContentPayloadBuilder("marketing-landing", 7)
@@ -156,7 +156,7 @@ public class ContentPayloadTests
         payload.GetZoneState("subtitle").Should().Be(ContentValueState.Cleared);
     }
 
-    [Fact]
+    [Test]
     public void EditingAZoneLeavesEveryOtherZoneWhereItWas()
     {
         var payload = new ContentPayloadBuilder(ContentPayload.Parse(Envelope))
@@ -169,7 +169,7 @@ public class ContentPayloadTests
         payload.GetZone("headline").GetProperty("value").GetString().Should().Be("Ship sooner");
     }
 
-    [Fact]
+    [Test]
     public void RemovingAZoneIsNotTheSameAsClearingIt()
     {
         var source = ContentPayload.Parse(Envelope);
@@ -181,7 +181,7 @@ public class ContentPayloadTests
             .GetZoneState("headline").Should().Be(ContentValueState.Absent);
     }
 
-    [Fact]
+    [Test]
     public void AnEnvelopeMemberThisBuildDoesNotKnowSurvivesASave()
     {
         var source = ContentPayload.Parse(
@@ -198,7 +198,7 @@ public class ContentPayloadTests
         bucket.GetString().Should().Be("b");
     }
 
-    [Fact]
+    [Test]
     public void ASchemaVersionOlderThanThisBuildIsNotRestamped()
     {
         var source = ContentPayload.Parse("""{ "schemaVersion": 0, "templateKey": "t", "zones": {} }""");
@@ -208,7 +208,7 @@ public class ContentPayloadTests
         new ContentPayloadBuilder(source).Build().SchemaVersion.Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public void ThePayloadSurvivesASystemTextJsonRoundTrip()
     {
         var payload = ContentPayload.Parse(Envelope);

@@ -30,20 +30,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// exercising it here is exercising the case a site has on its first day.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ReusableContentTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AnItemIsCreatedPublishedAndReferencedFromThreePages()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         // Acceptance criterion P4 #1. Asserted through the where-used query rather than by counting
@@ -59,10 +62,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         impact.AffectedPages.Select(page => page.Id).Should().BeEquivalentTo(pages);
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingANewVersionChangesEveryLateBoundPageWithoutRepublishingThem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var publishedVersionsBefore = await PublishedVersionIdsAsync(pages, cancellationToken);
@@ -82,10 +85,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Equal(publishedVersionsBefore, "no page was republished");
     }
 
-    [Fact]
+    [Test]
     public async Task APinnedPageDoesNotChangeWhenANewerVersionPublishes()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var firstVersionId = (await _bench.Context.ReusableContents
@@ -121,10 +124,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         result.Impact.AffectedPages.Single(page => page.Id == pinned).IsPinned.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingIsRefusedUntilTheBlastRadiusIsAcknowledged()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, _) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var updated = await _bench.SetReusableHtmlAsync(item, "<p>Second footer</p>", cancellationToken);
@@ -146,10 +149,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .IsSuccess.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ThePublishIsAuditedWithTheListOfPagesItChanged()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var updated = await _bench.SetReusableHtmlAsync(item, "<p>Second footer</p>", cancellationToken);
@@ -174,10 +177,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().BeEquivalentTo(pages);
     }
 
-    [Fact]
+    [Test]
     public async Task UnpublishingRendersNothingOnDependentPagesAndSaysSo()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var result = await _bench.Resolve<IReusableContentService>().UnpublishAsync(
@@ -199,10 +202,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         result.Value!.Impact.AffectedPageCount.Should().Be(3);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingAReferencedItemIsRefusedWithTheWhereUsedList()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (item, pages) = await ArrangeFooterOnThreePagesAsync(cancellationToken);
 
         var refused = await _bench.Resolve<IReusableContentService>().DeleteAsync(
@@ -233,10 +236,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnItemNothingPlacesIsDeletedAndStopsResolving()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var item = await _bench.AddReusableAsync("Orphan banner", cancellationToken);
         var filled = await _bench.SetReusableHtmlAsync(item, "<p>Nobody wants me</p>", cancellationToken);
 
@@ -259,10 +262,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         resolved.Status.Should().Be(ReusableResolutionStatus.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task AnItemThatPlacesItselfIsRefusedAtWriteTime()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var nestable = await AddNestableBlockTypeAsync(cancellationToken);
         var item = await _bench.AddReusableAsync("Footer", cancellationToken, nestable.Id);
 
@@ -280,10 +283,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         result.Diagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == ReusableCodes.Cycle);
     }
 
-    [Fact]
+    [Test]
     public async Task AnItemThatPlacesItselfThroughAnotherItemIsAlsoRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var nestable = await AddNestableBlockTypeAsync(cancellationToken);
         var reusable = _bench.Resolve<IReusableContentService>();
 
@@ -313,10 +316,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         closed.Diagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == ReusableCodes.Cycle);
     }
 
-    [Fact]
+    [Test]
     public async Task AnItemPlacedInsideAnotherItemCountsThePagesShowingTheOuterOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var nestable = await AddNestableBlockTypeAsync(cancellationToken);
         var reusable = _bench.Resolve<IReusableContentService>();
 
@@ -358,10 +361,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
         impact.AffectedReusableItems.Single().Id.Should().Be(footer.Summary.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingAPageThatPlacesADeletedItemIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "with-footer",
             cancellationToken,
@@ -388,10 +391,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .IsSuccess.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APlacementOfTheWrongShapeIsRefusedAtPublish()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var nestable = await AddNestableBlockTypeAsync(cancellationToken);
 
         // The zone accepts banner-shaped items only, and the placement is a nestable-shaped one.
@@ -417,10 +420,10 @@ public class ReusableContentTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain(diagnostic => diagnostic.Code == FieldValidationCodes.NotAllowed);
     }
 
-    [Fact]
+    [Test]
     public async Task ReusableContentNeedsTheSamePermissionsPagesDo()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var author = await PageWorkbench.CreateAsync(
             fixture,

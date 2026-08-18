@@ -21,14 +21,14 @@ public class FieldConfigurationValidatorTests
 {
     private readonly IFieldConfigurationValidator _validator = Validator();
 
-    [Fact]
+    [Test]
     public void NoConfigurationIsValid()
     {
         _validator.Validate(FieldTypeKeys.PlainText, null).IsValid.Should().BeTrue();
         _validator.Validate(FieldTypeKeys.PlainText, "   ").IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeThatIsNotRegisteredIsRefused()
     {
         var result = _validator.Validate("markdownTable", """{ "maxLength": 10 }""");
@@ -38,7 +38,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.UnknownFieldType);
     }
 
-    [Fact]
+    [Test]
     public void MalformedJsonIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, "{ not json");
@@ -46,7 +46,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.Malformed);
     }
 
-    [Fact]
+    [Test]
     public void ConfigurationThatIsNotAnObjectIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """[ "maxLength" ]""");
@@ -54,7 +54,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public void AValidConfigurationPassesWithNothingReported()
     {
         var result = _validator.Validate(
@@ -64,7 +64,7 @@ public class FieldConfigurationValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ASettingTheFieldTypeDoesNotDeclareIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "allowedBlockTypes": ["hero"] }""");
@@ -73,7 +73,7 @@ public class FieldConfigurationValidatorTests
         result.Paths().Should().Equal("allowedBlockTypes");
     }
 
-    [Fact]
+    [Test]
     public void AMistypedSettingNamesTheOneThatWasMeant()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "maxlength": 60 }""");
@@ -84,7 +84,7 @@ public class FieldConfigurationValidatorTests
         result.Diagnostics[0].Message.Should().Contain("maxLength");
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeTakingNoConfigurationSaysSo()
     {
         var result = _validator.Validate(FieldTypeKeys.Boolean, """{ "maxLength": 4 }""");
@@ -92,7 +92,7 @@ public class FieldConfigurationValidatorTests
         result.Diagnostics[0].Message.Should().Contain("takes no configuration");
     }
 
-    [Fact]
+    [Test]
     public void RequiredBelongsToTheZoneNotTheConfiguration()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "required": true }""");
@@ -100,7 +100,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.RequiredReserved);
     }
 
-    [Fact]
+    [Test]
     public void ASettingOfTheWrongTypeIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "maxLength": "sixty" }""");
@@ -108,7 +108,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingType);
     }
 
-    [Fact]
+    [Test]
     public void AFractionalWholeNumberIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "maxLength": 60.5 }""");
@@ -117,7 +117,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingType);
     }
 
-    [Fact]
+    [Test]
     public void ANullSettingReadsAsAnAbsentOne()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "maxLength": null }""");
@@ -125,7 +125,7 @@ public class FieldConfigurationValidatorTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ASettingBelowItsMinimumIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "maxLength": 0 }""");
@@ -133,7 +133,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingRange);
     }
 
-    [Fact]
+    [Test]
     public void AStepOfZeroIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.Number, """{ "step": 0 }""");
@@ -143,7 +143,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingRange);
     }
 
-    [Fact]
+    [Test]
     public void APatternThatDoesNotCompileIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.PlainText, """{ "pattern": "([a-z" }""");
@@ -151,7 +151,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingFormat);
     }
 
-    [Fact]
+    [Test]
     public void ABoundInTheWrongDateSyntaxIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.Date, """{ "min": "13/08/2026" }""");
@@ -161,7 +161,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingFormat);
     }
 
-    [Fact]
+    [Test]
     public void AnInstantWithNoOffsetIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.DateTime, """{ "max": "2026-08-13T09:30:00" }""");
@@ -169,7 +169,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingFormat);
     }
 
-    [Fact]
+    [Test]
     public void APaletteEntryThatIsNotAHexColourIsRefusedByPosition()
     {
         var result = _validator.Validate(
@@ -180,7 +180,7 @@ public class FieldConfigurationValidatorTests
         result.Paths().Should().Equal("palette[1]");
     }
 
-    [Fact]
+    [Test]
     public void AProfileOutsideTheClosedSetIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.RichText, """{ "profile": "developer" }""");
@@ -189,7 +189,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingValue);
     }
 
-    [Fact]
+    [Test]
     public void AMinimumAboveItsMaximumIsRefused()
     {
         var result = _validator.Validate(FieldTypeKeys.Blocks, """{ "min": 5, "max": 2 }""");
@@ -199,13 +199,13 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.RangeInverted);
     }
 
-    [Fact]
+    [Test]
     public void EqualBoundsAreAllowed()
     {
         _validator.Validate(FieldTypeKeys.Blocks, """{ "min": 3, "max": 3 }""").IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnInvertedDateRangeIsRefused()
     {
         var result = _validator.Validate(
@@ -215,7 +215,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.RangeInverted);
     }
 
-    [Fact]
+    [Test]
     public void ARangeIsNotReportedTwiceWhenABoundIsAlreadyInvalid()
     {
         var result = _validator.Validate(FieldTypeKeys.Blocks, """{ "min": "five", "max": 2 }""");
@@ -223,7 +223,7 @@ public class FieldConfigurationValidatorTests
         result.Codes().Should().Equal(FieldConfigurationCodes.SettingType);
     }
 
-    [Fact]
+    [Test]
     public void ASettingWhoseEnforcingPhaseHasNotShippedIsStoredWithAWarning()
     {
         var result = _validator.Validate(
@@ -242,7 +242,7 @@ public class FieldConfigurationValidatorTests
     /// publish path (task P5-19). Asserted here so that the day one of them is quietly moved back
     /// behind <c>notEnforcedUntil</c>, something says so.
     /// </remarks>
-    [Fact]
+    [Test]
     public void TheMediaPickerSettingsAreStoredWithNothingReportedAtAll()
     {
         var result = _validator.Validate(
@@ -252,7 +252,7 @@ public class FieldConfigurationValidatorTests
         result.Diagnostics.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void EverythingWrongIsReportedAtOnce()
     {
         var result = _validator.Validate(

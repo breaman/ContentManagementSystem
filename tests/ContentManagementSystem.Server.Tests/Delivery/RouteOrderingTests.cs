@@ -19,20 +19,23 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// reach the endpoints that own them, whatever anybody does to <c>Program.cs</c> later.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class RouteOrderingTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task TheManagementApiStillAnswersAsAnApi()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClientAs("Developer");
         using var response = await client.GetAsync($"{CmsApiEndpoints.BasePath}/templates", cancellationToken);
@@ -45,10 +48,10 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Content.Headers.ContentType!.MediaType.Should().Be("application/json");
     }
 
-    [Fact]
+    [Test]
     public async Task AnApiPathThatDoesNotExistIs404FromTheApiAndNotAnHtmlPage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClientAs("Developer");
         using var response = await client.GetAsync($"{CmsApiEndpoints.BasePath}/no-such-resource", cancellationToken);
@@ -60,12 +63,12 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Content.Headers.ContentType?.MediaType.Should().NotBe("text/html");
     }
 
-    [Theory]
-    [InlineData("/health")]
-    [InlineData("/alive")]
+    [Test]
+    [Arguments("/health")]
+    [Arguments("/alive")]
     public async Task TheHealthEndpointsAreNotShadowed(string path)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync(path, cancellationToken);
@@ -77,12 +80,12 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         (await response.Content.ReadAsStringAsync(cancellationToken)).Should().Be("Healthy");
     }
 
-    [Theory]
-    [InlineData("/admin/pages")]
-    [InlineData("/admin/structure/templates")]
+    [Test]
+    [Arguments("/admin/pages")]
+    [Arguments("/admin/structure/templates")]
     public async Task TheBackofficeIsNotShadowed(string path)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // Signed in, because these pages carry [Authorize] and an anonymous request is refused
         // before routing has anything to say. The question here is which endpoint owns the path, and
@@ -100,10 +103,10 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         html.Should().NotContain("cms-delivery");
     }
 
-    [Fact]
+    [Test]
     public async Task TheSignInPageIsNotShadowed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync("/Account/Login", cancellationToken);
@@ -115,10 +118,10 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         html.Should().Contain("blazor.web.js").And.NotContain("cms-delivery");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnmatchedPathUnderAReservedPrefixIsABare404AndNotTheSites404Page()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync("/admin/no-such-screen", cancellationToken);
@@ -130,10 +133,10 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         (await response.Content.ReadAsStringAsync(cancellationToken)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task TheBlazorFrameworkFilesAreNotShadowed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync("/_framework/blazor.web.js", cancellationToken);
@@ -142,10 +145,10 @@ public class RouteOrderingTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Content.Headers.ContentType!.MediaType.Should().NotBe("text/html");
     }
 
-    [Fact]
+    [Test]
     public async Task AnOrdinaryContentUrlDoesReachTheCatchAll()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _factory.CreateClient();
         using var response = await client.GetAsync("/some/page/nobody/published", cancellationToken);

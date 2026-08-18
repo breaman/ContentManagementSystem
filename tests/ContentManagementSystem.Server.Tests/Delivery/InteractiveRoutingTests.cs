@@ -21,7 +21,7 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// </remarks>
 public class InteractiveRoutingTests
 {
-    [Fact]
+    [Test]
     public void EveryRoutableComponentWithARenderModeLivesUnderAdmin()
     {
         var offenders = RoutableComponents()
@@ -35,7 +35,7 @@ public class InteractiveRoutingTests
             "page outside /admin is a public URL that cannot be output cached");
     }
 
-    [Fact]
+    [Test]
     public void TheScanFindsTheBackofficePagesItIsSupposedToBeChecking()
     {
         // A test that asserts an empty set passes just as well when the scan finds nothing at all —

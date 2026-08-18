@@ -100,23 +100,23 @@ public class FieldConfigurationContractTests
         [FieldTypeKeys.Tags] = ["""{ "type": "tags", "value": ["release-notes", "v2"] }"""],
     };
 
-    public static TheoryData<string> RegisteredKeys
+    public static IEnumerable<string> RegisteredKeys
     {
         get
         {
-            var data = new TheoryData<string>();
+            var keys = new List<string>();
 
             foreach (var fieldType in Registry().All)
             {
-                data.Add(fieldType.Key);
+                keys.Add(fieldType.Key);
             }
 
-            return data;
+            return keys;
         }
     }
 
-    [Theory]
-    [MemberData(nameof(RegisteredKeys))]
+    [Test]
+    [MethodDataSource(nameof(RegisteredKeys))]
     public async Task EverySettingAFieldTypeReadsIsOneItDeclares(string key)
     {
         var fieldType = Registry().Find(key)!;
@@ -137,12 +137,12 @@ public class FieldConfigurationContractTests
                 FieldTypeTestHarness.Element(json),
                 recording,
                 ValidationMode.Publish,
-                TestContext.Current.CancellationToken);
+                TestContext.Current!.Execution.CancellationToken);
 
             await fieldType.SanitizeAsync(
                 FieldTypeTestHarness.Element(json),
                 recording,
-                TestContext.Current.CancellationToken);
+                TestContext.Current!.Execution.CancellationToken);
         }
 
         var declared = fieldType.ConfigurationSchema.Settings.Select(setting => setting.Name);
@@ -152,8 +152,8 @@ public class FieldConfigurationContractTests
         recording.Names.Should().BeSubsetOf(declared);
     }
 
-    [Theory]
-    [MemberData(nameof(RegisteredKeys))]
+    [Test]
+    [MethodDataSource(nameof(RegisteredKeys))]
     public void EverySettingAFieldTypeDeclaresCanBeConfigured(string key)
     {
         var fieldType = Registry().Find(key)!;

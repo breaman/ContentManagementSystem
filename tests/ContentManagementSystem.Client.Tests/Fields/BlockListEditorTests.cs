@@ -44,7 +44,7 @@ public class BlockListEditorTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ABlockIsAddedByChoosingItsTypeFromThePicker()
     {
         var editor = Render();
@@ -70,7 +70,7 @@ public class BlockListEditorTests : IDisposable
         Guid.TryParse(items[0]["id"]!.GetValue<string>(), out _).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void OnlyTheBlockTypesThePropertyAllowsAreOffered()
     {
         var editor = Render(configuration:
@@ -83,7 +83,7 @@ public class BlockListEditorTests : IDisposable
             .Should().ContainSingle().Which.Should().Contain("Feature grid");
     }
 
-    [Fact]
+    [Test]
     public void BlocksAreReorderedByButtonAndKeepTheirIdentity()
     {
         var editor = Render(TwoBlocks);
@@ -99,7 +99,7 @@ public class BlockListEditorTests : IDisposable
             "a block that moved has to keep its id, or the version diff reports it as removed and added");
     }
 
-    [Fact]
+    [Test]
     public void TheFirstBlockCannotBeMovedUpAndTheLastCannotBeMovedDown()
     {
         var editor = Render(TwoBlocks);
@@ -110,7 +110,7 @@ public class BlockListEditorTests : IDisposable
         cards[1].QuerySelector("button[aria-label*='down']")!.HasAttribute("disabled").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void DuplicatingCopiesTheContentAndGivesTheCopyItsOwnIdentity()
     {
         var editor = Render(TwoBlocks);
@@ -127,7 +127,7 @@ public class BlockListEditorTests : IDisposable
         items[1]["id"]!.GetValue<string>().Should().NotBe(items[0]["id"]!.GetValue<string>());
     }
 
-    [Fact]
+    [Test]
     public void DeletingIsOfferedBackBeforeItIsFinal()
     {
         var editor = Render(TwoBlocks);
@@ -150,7 +150,7 @@ public class BlockListEditorTests : IDisposable
             "undo has to restore the order as well as the block");
     }
 
-    [Fact]
+    [Test]
     public void ACollapsedBlockIsSummarisedByItsOwnContentRatherThanByItsType()
     {
         var editor = Render(TwoBlocks);
@@ -161,7 +161,7 @@ public class BlockListEditorTests : IDisposable
             .Should().Be("What our plans cost");
     }
 
-    [Fact]
+    [Test]
     public void ABlockWithNothingInTheSummaryFallsBackToItsTypeName()
     {
         var editor = Render(EmptyBlock);
@@ -169,7 +169,7 @@ public class BlockListEditorTests : IDisposable
         editor.Find(".cms-block__summary").TextContent.Trim().Should().Be("Hero banner");
     }
 
-    [Fact]
+    [Test]
     public void CollapsingHidesTheBodyAndSaysSo()
     {
         var editor = Render(TwoBlocks);
@@ -184,7 +184,7 @@ public class BlockListEditorTests : IDisposable
         editor.FindAll(".cms-block__body")[0].HasAttribute("hidden").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ABlockPropertyIsDrawnByTheSameEditorAZoneWouldGet()
     {
         var editor = Render(TwoBlocks);
@@ -196,7 +196,7 @@ public class BlockListEditorTests : IDisposable
         input.GetAttribute("value").Should().Be("What our plans cost");
     }
 
-    [Fact]
+    [Test]
     public void EditingAPropertyRewritesOnlyThatBlocksProperty()
     {
         var editor = Render(TwoBlocks);
@@ -209,7 +209,7 @@ public class BlockListEditorTests : IDisposable
         items[1]["properties"]!["headline"]!["value"]!.GetValue<string>().Should().Be("Every feature");
     }
 
-    [Fact]
+    [Test]
     public void AValidationProblemIsBadgedOnTheBlockItNames()
     {
         var diagnostics = new ZoneDiagnostics(
@@ -229,7 +229,7 @@ public class BlockListEditorTests : IDisposable
         badges.Last()!.TextContent.Trim().Should().Be("1 problem");
     }
 
-    [Fact]
+    [Test]
     public void ABlockTypeThisBuildNoLongerHasCanStillBeMovedAndRemoved()
     {
         var editor = Render(UnknownBlock);
@@ -238,7 +238,7 @@ public class BlockListEditorTests : IDisposable
         editor.Find("button[aria-label*='Remove']").HasAttribute("disabled").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AFullListWillNotTakeAnother()
     {
         var editor = Render(TwoBlocks, configuration: $$"""{ "{{FieldSettingNames.Max}}": 2 }""");
@@ -248,7 +248,7 @@ public class BlockListEditorTests : IDisposable
             button => button.HasAttribute("disabled").Should().BeTrue());
     }
 
-    [Fact]
+    [Test]
     public void AReadOnlyFormOffersNoneOfTheControls()
     {
         var editor = Render(TwoBlocks, disabled: true);

@@ -19,7 +19,7 @@ public class MarkdownRendererTests
 {
     private readonly IMarkdownRenderer _renderer = new MarkdownRenderer(new SanitizationService());
 
-    [Fact]
+    [Test]
     public void CommonMarkRendersAsExpected()
     {
         var html = _renderer.ToHtml(
@@ -41,7 +41,7 @@ public class MarkdownRendererTests
             "h2", "p", "strong", "em", "ul", "li", "li", "blockquote", "p", "p", "a");
     }
 
-    [Fact]
+    [Test]
     public void PipeTablesRenderUnderExtended()
     {
         var html = _renderer.ToHtml(
@@ -55,7 +55,7 @@ public class MarkdownRendererTests
         SanitizationAssertions.TagNames(html).Should().Contain(["table", "thead", "tbody", "tr", "th", "td"]);
     }
 
-    [Fact]
+    [Test]
     public void ABareUrlIsAutoLinked()
     {
         var html = _renderer.ToHtml("Visit https://example.test/x today.", SanitizationProfile.Basic);
@@ -63,7 +63,7 @@ public class MarkdownRendererTests
         html.Should().Contain("<a href=\"https://example.test/x\"");
     }
 
-    [Fact]
+    [Test]
     public void ATopLevelHeadingIsUnwrappedRatherThanKept()
     {
         var html = _renderer.ToHtml("# Page title", SanitizationProfile.Basic);
@@ -76,7 +76,7 @@ public class MarkdownRendererTests
         html.Should().Contain("Page title");
     }
 
-    [Fact]
+    [Test]
     public void RawHtmlInMarkdownIsSanitized()
     {
         var html = _renderer.ToHtml(
@@ -95,7 +95,7 @@ public class MarkdownRendererTests
         html.Should().NotContain("alert");
     }
 
-    [Fact]
+    [Test]
     public void AnHtmlBlockInMarkdownIsSanitizedToo()
     {
         // A block-level HTML chunk takes a different path through Markdig than an inline one, and
@@ -111,10 +111,10 @@ public class MarkdownRendererTests
         SanitizationAssertions.AssertNeutralized(html, SanitizationProfile.Developer);
     }
 
-    [Theory]
-    [InlineData(SanitizationProfile.Basic)]
-    [InlineData(SanitizationProfile.Extended)]
-    [InlineData(SanitizationProfile.Developer)]
+    [Test]
+    [Arguments(SanitizationProfile.Basic)]
+    [Arguments(SanitizationProfile.Extended)]
+    [Arguments(SanitizationProfile.Developer)]
     public void EveryXssCorpusPayloadIsNeutralizedThroughTheMarkdownPathToo(SanitizationProfile profile)
     {
         // The corpus is aimed at the HTML path, but markdown is a second way into the same renderer
@@ -127,7 +127,7 @@ public class MarkdownRendererTests
         }
     }
 
-    [Fact]
+    [Test]
     public void MarkdownLinkSyntaxCannotSmuggleAScheme()
     {
         var html = _renderer.ToHtml("[click](javascript:alert('XSS'))", SanitizationProfile.Basic);
@@ -135,7 +135,7 @@ public class MarkdownRendererTests
         html.Should().NotContain("javascript:");
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewPathAndTheDeliveryPathProduceIdenticalHtml()
     {
         // Acceptance criterion P1 #7. There is one implementation, so the risk is not two pipelines
@@ -154,7 +154,7 @@ public class MarkdownRendererTests
         }
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewReportsWhatDeliveryWillStrip()
     {
         var result = _renderer.ToHtmlWithReport(
@@ -166,9 +166,9 @@ public class MarkdownRendererTests
         result.Removals.Should().Contain(removal => removal.Name == "iframe");
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
     public void EmptySourceRendersToEmptyHtml(string? markdown)
     {
         _renderer.ToHtml(markdown, SanitizationProfile.Basic).Should().BeEmpty();

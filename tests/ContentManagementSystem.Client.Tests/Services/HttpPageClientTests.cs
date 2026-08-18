@@ -20,7 +20,7 @@ namespace ContentManagementSystem.Client.Tests.Services;
 /// </remarks>
 public class HttpPageClientTests
 {
-    [Fact]
+    [Test]
     public async Task AConflictHandsBackTheDraftThatWon()
     {
         var client = Client(request => request.Method == HttpMethod.Put
@@ -41,7 +41,7 @@ public class HttpPageClientTests
         var result = await client.SaveDraftAsync(
             4,
             new SaveDraftRequest("""{"mine":true}""", "rv-1"),
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         result.IsSuccess.Should().BeFalse("a refusal that carries state is still a refusal");
         result.Errors.Should().ContainSingle().Which.Code.Should().Be(PageCodes.ConcurrentChange);
@@ -52,7 +52,7 @@ public class HttpPageClientTests
         result.Value.Draft.ContentJson.Should().Contain("theirs");
     }
 
-    [Fact]
+    [Test]
     public async Task ARefusalWithNothingButWarningsKeepsTheWarnings()
     {
         var client = Client(request => request.Method == HttpMethod.Post
@@ -67,7 +67,7 @@ public class HttpPageClientTests
 
         var result = await client.PublishAsync(
             4,
-            cancellationToken: TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
         // A publish stopped only by warnings answers 422 with an empty errors array and the warnings
         // in it, waiting to be acknowledged (spec section 22.2). Reading the errors alone turned
@@ -79,7 +79,7 @@ public class HttpPageClientTests
             .Which.Message.Should().Contain("no meta description");
     }
 
-    [Fact]
+    [Test]
     public async Task ARefusalWithNoDiagnosticsAtAllStillSaysSomething()
     {
         var client = Client(request => request.Method == HttpMethod.Post
@@ -88,7 +88,7 @@ public class HttpPageClientTests
 
         var result = await client.PublishAsync(
             4,
-            cancellationToken: TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
         result.IsSuccess.Should().BeFalse();
         result.Errors.Should().ContainSingle().Which.Code.Should().Be(

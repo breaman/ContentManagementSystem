@@ -11,7 +11,7 @@ public class FieldTypeBaseTests
 {
     private readonly PlainTextFieldType _fieldType = new();
 
-    [Fact]
+    [Test]
     public async Task AnAbsentPropertyIsValidWhenNothingIsRequired()
     {
         var result = await _fieldType.ValidateAsync(FieldTypeTestHarness.Absent);
@@ -19,7 +19,7 @@ public class FieldTypeBaseTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnExplicitlyClearedPropertyIsValidWhenNothingIsRequired()
     {
         // Null and absent are distinct in storage (spec section 6.2) but neither is filled in, and
@@ -29,7 +29,7 @@ public class FieldTypeBaseTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyRequiredValueSavesAsADraft()
     {
         var result = await _fieldType.ValidateAsync(
@@ -40,7 +40,7 @@ public class FieldTypeBaseTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyRequiredValueDoesNotPublish()
     {
         var result = await _fieldType.ValidateAsync(
@@ -52,7 +52,7 @@ public class FieldTypeBaseTests
         result.HasErrors.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnAbsentRequiredPropertyDoesNotPublish()
     {
         var result = await _fieldType.ValidateAsync(
@@ -63,7 +63,7 @@ public class FieldTypeBaseTests
         result.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task WhitespaceDoesNotSatisfyARequiredTextValue()
     {
         var result = await _fieldType.ValidateAsync(
@@ -76,7 +76,7 @@ public class FieldTypeBaseTests
         result.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task AValueStoredByADifferentFieldTypeIsReportedAsAMismatch()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "richText", "value": "hello" }""");
@@ -86,7 +86,7 @@ public class FieldTypeBaseTests
         result.Codes().Should().Equal(FieldValidationCodes.TypeMismatch);
     }
 
-    [Fact]
+    [Test]
     public async Task AValueWithNoTypeDiscriminatorIsValidatedAgainstTheSchema()
     {
         // The discriminator is a redundancy in the payload; the schema is what decides which field
@@ -96,7 +96,7 @@ public class FieldTypeBaseTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APropertyThatIsNotAnObjectIsAShapeError()
     {
         var result = await _fieldType.ValidateAsync("\"hello\"");
@@ -104,7 +104,7 @@ public class FieldTypeBaseTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task AnObjectWithNoValueMemberIsTreatedAsUnfilled()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "plainText" }""");
@@ -112,7 +112,7 @@ public class FieldTypeBaseTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task SanitizingAValueFieldTypeReturnsItUnchanged()
     {
         var property = FieldTypeTestHarness.Element("""{ "type": "plainText", "value": "a < b" }""");
@@ -120,14 +120,14 @@ public class FieldTypeBaseTests
         var sanitized = await _fieldType.SanitizeAsync(
             property,
             FieldConfiguration.Empty,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         // plainText is encoded at render, never stripped at write: an author who types "a < b"
         // keeps it.
         sanitized.GetRawText().Should().Be(property.GetRawText());
     }
 
-    [Fact]
+    [Test]
     public void AValueFieldTypeReportsNoReferences()
     {
         var property = FieldTypeTestHarness.Element("""{ "type": "plainText", "value": "hello" }""");
@@ -135,7 +135,7 @@ public class FieldTypeBaseTests
         _fieldType.ExtractReferences(property).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void ComponentsComeFromTheHostingLayer()
     {
         // Core sits below Rendering and Client in the reference graph, so a built-in field type
@@ -144,7 +144,7 @@ public class FieldTypeBaseTests
         _fieldType.RendererComponent.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ValidationObservesCancellation()
     {
         using var cancellation = new CancellationTokenSource();

@@ -17,7 +17,7 @@ public class BlocksFieldTypeTests
         new MediaFieldType(),
         new LinkFieldType());
 
-    [Fact]
+    [Test]
     public async Task AWellFormedBlockListIsAccepted()
     {
         var result = await _fieldType.ValidateAsync(
@@ -31,7 +31,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockWithNoStableIdIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -43,7 +43,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[0].id");
     }
 
-    [Fact]
+    [Test]
     public async Task AnIdThatIsNotAGuidIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -52,7 +52,7 @@ public class BlocksFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.BlockId);
     }
 
-    [Fact]
+    [Test]
     public async Task TwoBlocksSharingAnIdAreRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -67,7 +67,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[1].id");
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockNamingNoBlockTypeIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -76,7 +76,7 @@ public class BlocksFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.BlockTypeKey);
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockTypeOutsideTheAllowlistIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -87,7 +87,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[0].blockTypeKey");
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyAllowlistAcceptsAnyBlockType()
     {
         var result = await _fieldType.ValidateAsync(
@@ -96,7 +96,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockTypeThatIsNotRegisteredIsStillSavable()
     {
         var result = await _fieldType.ValidateAsync(
@@ -107,7 +107,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ACapturedRevisionThatIsNotARevisionIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -120,7 +120,7 @@ public class BlocksFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.BlockRevision);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAbsentCapturedRevisionIsTolerated()
     {
         var result = await _fieldType.ValidateAsync(
@@ -129,7 +129,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task PropertiesThatAreNotAnObjectAreAShapeError()
     {
         var result = await _fieldType.ValidateAsync(
@@ -143,7 +143,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[0].properties");
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockPropertyValueIsNotCheckedHere()
     {
         var result = await _fieldType.ValidateAsync(
@@ -160,7 +160,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task NestedBlocksAreRejectedWhereTheyAreNotAllowed()
     {
         var result = await _fieldType.ValidateAsync(NestedPayload());
@@ -169,7 +169,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[0].properties.rows");
     }
 
-    [Fact]
+    [Test]
     public async Task OneLevelOfNestingIsAcceptedWhenConfigured()
     {
         var result = await _fieldType.ValidateAsync(NestedPayload(), """{ "allowNesting": true }""");
@@ -177,7 +177,7 @@ public class BlocksFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ASecondLevelOfNestingIsRefusedEvenWhenNestingIsAllowed()
     {
         var result = await _fieldType.ValidateAsync(
@@ -200,7 +200,7 @@ public class BlocksFieldTypeTests
         result.Paths().Should().Equal("items[0].properties.rows.items[0].properties.cells");
     }
 
-    [Fact]
+    [Test]
     public async Task MoreBlocksThanTheMaximumAreRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -215,7 +215,7 @@ public class BlocksFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxItems);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyZoneDoesNotSatisfyAMinimumOnPublish()
     {
         var draft = await _fieldType.ValidateAsync("""{ "type": "blocks", "items": [] }""", """{ "min": 1 }""");
@@ -228,7 +228,7 @@ public class BlocksFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.MinItems);
     }
 
-    [Fact]
+    [Test]
     public void ReferencesInsideBlocksAreReportedWithTheirPath()
     {
         var references = _fieldType.ExtractReferences(
@@ -248,7 +248,7 @@ public class BlocksFieldTypeTests
         ]);
     }
 
-    [Fact]
+    [Test]
     public void ReferencesNestedOneLevelDeeperAreStillReported()
     {
         var references = _fieldType.ExtractReferences(
@@ -274,7 +274,7 @@ public class BlocksFieldTypeTests
                 "items[0].properties.rows.items[0].properties.image"));
     }
 
-    [Fact]
+    [Test]
     public void APathReportedByANestedFieldTypeIsKept()
     {
         var fieldType = FieldTypeTestHarness.Blocks(new MediaListFieldType());
@@ -293,7 +293,7 @@ public class BlocksFieldTypeTests
             "items[0].properties.images.items[1]");
     }
 
-    [Fact]
+    [Test]
     public void APropertyWrittenByAFieldTypeThisBuildDoesNotHaveIsSkipped()
     {
         var fieldType = FieldTypeTestHarness.Blocks(new MediaFieldType());
@@ -314,7 +314,7 @@ public class BlocksFieldTypeTests
             .Which.TargetId.Should().Be(812);
     }
 
-    [Fact]
+    [Test]
     public void APropertyWithNoTypeDiscriminatorIsSkipped()
     {
         var references = _fieldType.ExtractReferences(
@@ -330,7 +330,7 @@ public class BlocksFieldTypeTests
         references.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TextInsideBlocksIsIndexedInDocumentOrder()
     {
         var text = _fieldType.ExtractSearchText(FieldTypeTestHarness.Element(
@@ -350,7 +350,7 @@ public class BlocksFieldTypeTests
         text.Should().Be("Ship faster Get started");
     }
 
-    [Fact]
+    [Test]
     public void AnUnfilledZoneReportsNothing()
     {
         _fieldType.ExtractReferences("""{ "type": "blocks" }""").Should().BeEmpty();
@@ -358,7 +358,7 @@ public class BlocksFieldTypeTests
             .Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void APayloadNestedDeeperThanTheWalkGuardIsTruncatedRatherThanThrowing()
     {
         // Twelve levels: past the walk's guard, and still inside the depth System.Text.Json will

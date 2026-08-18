@@ -8,7 +8,7 @@ namespace ContentManagementSystem.Core.Tests.Fields.Configuration;
 /// </summary>
 public class FieldConfigurationSchemaTests
 {
-    [Fact]
+    [Test]
     public void RequiredCannotBeDeclaredAsASetting()
     {
         var declare = () => new FieldConfigurationSchema(
@@ -19,7 +19,7 @@ public class FieldConfigurationSchemaTests
         declare.Should().Throw<ArgumentException>().WithMessage("*IsRequired*");
     }
 
-    [Fact]
+    [Test]
     public void ASettingCannotBeDeclaredTwice()
     {
         var declare = () => new FieldConfigurationSchema(
@@ -31,7 +31,7 @@ public class FieldConfigurationSchemaTests
         declare.Should().Throw<ArgumentException>().WithMessage("*declared twice*");
     }
 
-    [Fact]
+    [Test]
     public void ARangeCannotNameASettingThatIsNotDeclared()
     {
         var declare = () => new FieldConfigurationSchema(
@@ -43,7 +43,7 @@ public class FieldConfigurationSchemaTests
         declare.Should().Throw<ArgumentException>().WithMessage("*not declared*");
     }
 
-    [Fact]
+    [Test]
     public void ExtendingAddsToWhatTheBaseAccepts()
     {
         var extended = Counts.Extend([FieldConfigurationSetting.Boolean("allowNesting", "Nesting.")]);
@@ -53,7 +53,7 @@ public class FieldConfigurationSchemaTests
         Counts.Find("allowNesting").Should().BeNull("Extend returns a new schema rather than mutating");
     }
 
-    [Fact]
+    [Test]
     public void RedeclaringASettingReplacesItWhereItAlreadySat()
     {
         var extended = Counts.Extend(

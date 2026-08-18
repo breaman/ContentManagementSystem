@@ -25,27 +25,30 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// and a count assertion becomes a race against whatever else the suite is doing.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PublishTelemetryTests(SqlServerFixture fixture)
 {
     private FailingSaveInterceptor _interceptor = null!;
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync()
     {
         _interceptor = new FailingSaveInterceptor();
         _bench = await PageWorkbench.CreateAsync(
             fixture,
-            cancellationToken: TestContext.Current.CancellationToken,
+            cancellationToken: TestContext.Current!.Execution.CancellationToken,
             interceptor: _interceptor);
     }
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ASuccessfulPublishCountsOnceAndRecordsHowLongItTook()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var recorder = Recorder(_bench);
         var page = await ReadyToPublishAsync("telemetry-ok", cancellationToken);
 
@@ -63,10 +66,10 @@ public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Should().BeGreaterThanOrEqualTo(0);
     }
 
-    [Fact]
+    [Test]
     public async Task ARefusedPublishIsCountedAsRefusedAndNotAsAFailure()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var recorder = Recorder(_bench);
         var page = await ReadyToPublishAsync("telemetry-refused", cancellationToken, fill: false);
 
@@ -83,10 +86,10 @@ public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
         recorder.Counts(CmsTelemetry.PublishResults.Published).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task APublishAgainstNoSuchPageIsCountedAsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var recorder = Recorder(_bench);
 
         var result = await _bench.Resolve<IPublishingService>().PublishAsync(
@@ -97,10 +100,10 @@ public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
         recorder.Counts(CmsTelemetry.PublishResults.NotFound).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task APublishTheCallerMayNotMakeIsCountedAsForbidden()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // Its own host, because a workbench's permissions are fixed when it is built — and this is
         // the one outcome that is decided before the service touches the database at all.
@@ -117,10 +120,10 @@ public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
         recorder.Counts(CmsTelemetry.PublishResults.Forbidden).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task APublishThatThrowsIsStillCountedAndIsCountedAsFailed()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await ReadyToPublishAsync("telemetry-failed", cancellationToken);
 
         using var recorder = Recorder(_bench);
@@ -142,10 +145,10 @@ public class PublishTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
         recorder.Durations(CmsTelemetry.PublishResults.Failed).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task EveryPublishStartsASpanCarryingThePageAndTheOutcome()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var spans = new List<Activity>();
 
         using var listener = new ActivityListener

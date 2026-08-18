@@ -36,7 +36,7 @@ public class HtmlFieldEditorTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void WhatWillBeStrippedIsSaidWhileTheAuthorIsStillWriting()
     {
         _preview.Removals = [new SanitizationRemoval(SanitizationRemovalKind.Tag, "script")];
@@ -55,7 +55,7 @@ public class HtmlFieldEditorTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void TheWarningIsALiveRegionSoItIsHeardAndNotOnlySeen()
     {
         var editor = Render(Markup);
@@ -66,7 +66,7 @@ public class HtmlFieldEditorTests : IDisposable
         warning.GetAttribute("aria-live").Should().Be("polite");
     }
 
-    [Fact]
+    [Test]
     public void TheCheckAsksTheServerUnderTheProfileTheFieldTypeActuallyUses()
     {
         var editor = Render(Markup);
@@ -85,7 +85,7 @@ public class HtmlFieldEditorTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void ThePermittedElementsAreListedBeforeAnythingIsPastedIn()
     {
         var editor = Render(string.Empty);
@@ -98,7 +98,7 @@ public class HtmlFieldEditorTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void NothingToWarnAboutMeansNoWarning()
     {
         var editor = Render(Markup);

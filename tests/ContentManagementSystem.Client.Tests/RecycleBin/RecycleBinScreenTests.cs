@@ -44,7 +44,7 @@ public class RecycleBinScreenTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void OnlyTheSubtreeRootsAreListedAndTheirDescendantsAreCounted()
     {
         var screen = _bunit.Render<RecycleBinScreen>();
@@ -62,7 +62,7 @@ public class RecycleBinScreenTests : IDisposable
             "it is restored by restoring the section it was deleted with");
     }
 
-    [Fact]
+    [Test]
     public void RestoringASectionSaysHowMuchCameBackAndAsWhat()
     {
         var screen = _bunit.Render<RecycleBinScreen>();
@@ -76,7 +76,7 @@ public class RecycleBinScreenTests : IDisposable
                 .Contain("2 page(s) beneath it were restored as drafts"));
     }
 
-    [Fact]
+    [Test]
     public void ARestoreThatCameBackAtTheRootSaysSo()
     {
         _client.RestoreWarning = new SubtreeResult(
@@ -95,7 +95,7 @@ public class RecycleBinScreenTests : IDisposable
             screen.Markup.Should().Contain("still in the recycle bin"));
     }
 
-    [Fact]
+    [Test]
     public void PermanentDeletionIsRefusedUntilTheNameIsTyped()
     {
         var screen = _bunit.Render<RecycleBinScreen>();
@@ -123,7 +123,7 @@ public class RecycleBinScreenTests : IDisposable
         screen.WaitForAssertion(() => _client.Purged.Should().Equal(51));
     }
 
-    [Fact]
+    [Test]
     public void TheFilterNarrowsTheListByTitleSlugOrId()
     {
         var screen = _bunit.Render<RecycleBinScreen>();

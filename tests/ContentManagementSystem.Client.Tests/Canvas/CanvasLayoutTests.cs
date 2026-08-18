@@ -14,14 +14,14 @@ namespace ContentManagementSystem.Client.Tests.Canvas;
 /// </remarks>
 public class CanvasLayoutTests
 {
-    [Fact]
+    [Test]
     public void NoZonesIsNoGroupsRatherThanOneEmptyOne()
     {
         CanvasLayout.Build(null).Should().BeEmpty();
         CanvasLayout.Build([]).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void UngroupedZonesAreOneRunWithNoHeading()
     {
         var groups = CanvasLayout.Build([Zone("hero", 0), Zone("body", 1)]);
@@ -32,7 +32,7 @@ public class CanvasLayoutTests
         group.Zones.Select(zone => zone.Key).Should().Equal("hero", "body");
     }
 
-    [Fact]
+    [Test]
     public void ZonesSharingAGroupAreDrawnTogetherEvenWhenTheirSortOrdersAreNot()
     {
         var groups = CanvasLayout.Build(
@@ -48,7 +48,7 @@ public class CanvasLayoutTests
         groups[0].Zones.Select(zone => zone.Key).Should().Equal("metaTitle", "metaDescription");
     }
 
-    [Fact]
+    [Test]
     public void AnUngroupedZoneStaysWhereItWasNumberedRatherThanJoiningTheOthers()
     {
         var groups = CanvasLayout.Build(
@@ -66,7 +66,7 @@ public class CanvasLayoutTests
         groups[2].Zones.Should().ContainSingle().Which.Key.Should().Be("footer");
     }
 
-    [Fact]
+    [Test]
     public void ZonesKeepTheirOwnSortOrderInsideAGroup()
     {
         var groups = CanvasLayout.Build(
@@ -79,7 +79,7 @@ public class CanvasLayoutTests
             .Select(zone => zone.Key).Should().Equal("first", "second");
     }
 
-    [Fact]
+    [Test]
     public void TwoZonesWithTheSameSortOrderAreOrderedByKeyRatherThanByChance()
     {
         var groups = CanvasLayout.Build([Zone("b", 0), Zone("a", 0)]);
@@ -89,7 +89,7 @@ public class CanvasLayoutTests
             .Select(zone => zone.Key).Should().Equal("a", "b");
     }
 
-    [Fact]
+    [Test]
     public void AGroupNameThatDiffersOnlyInWhitespaceIsOneGroup()
     {
         var groups = CanvasLayout.Build(
@@ -103,7 +103,7 @@ public class CanvasLayoutTests
         groups.Should().ContainSingle().Which.Zones.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public void AGroupOfWhitespaceIsNoGroupAtAll()
     {
         var groups = CanvasLayout.Build([Zone("hero", 0, group: "   ")]);

@@ -21,20 +21,23 @@ namespace ContentManagementSystem.Server.Tests.Routing;
 /// before a target moved still points at the right place afterwards, and nothing had to rewrite the
 /// payload. That is acceptance criterion P3 #7, and it is what these assert.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class LinkResolutionTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AStoredPageIdResolvesToThatPagesCurrentUrlAfterItHasMovedTwice()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var target = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
 
@@ -64,10 +67,10 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
         resolved[target.Summary.Id].Title.Should().Be("Pricing");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnpublishedTargetResolvesToNothingPubliclyAndToItsDraftInPreview()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var draft = await _bench.AddPageAsync(template, "Unreleased", cancellationToken);
 
@@ -91,10 +94,10 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
         inPreview[draft.Summary.Id].IsPublished.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AnIdNamingNoPageIsAbsentFromTheResultRatherThanAnError()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var resolved = await _bench.Resolve<ILinkResolver>()
             .ResolveAsync([4242], cancellationToken: cancellationToken);
@@ -104,10 +107,10 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
         resolved.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkOfAKindThePropertyForbidsIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var zone = new Zone
         {
@@ -132,10 +135,10 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
             .Contain(diagnostic => diagnostic.Code == FieldValidationCodes.LinkKind);
     }
 
-    [Fact]
+    [Test]
     public async Task APageReferenceToATemplateThePropertyForbidsBlocksThePublish()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var zone = new Zone
         {
@@ -177,10 +180,10 @@ public class LinkResolutionTests(SqlServerFixture fixture) : IAsyncLifetime
             .Contain(diagnostic => diagnostic.Code == FieldValidationCodes.NotAllowed);
     }
 
-    [Fact]
+    [Test]
     public async Task APageReferenceToAnAllowedTemplatePublishes()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var zone = new Zone
         {

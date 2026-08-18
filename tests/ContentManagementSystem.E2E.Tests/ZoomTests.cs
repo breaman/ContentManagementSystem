@@ -28,8 +28,8 @@ public class ZoomTests
     /// <summary>The height a 1024-pixel display reports at the same zoom.</summary>
     private const int ZoomedHeight = 512;
 
-    [Theory]
-    [MemberData(nameof(PageScreenAccessibilityTests.Screens), MemberType = typeof(PageScreenAccessibilityTests))]
+    [Test]
+    [MethodDataSource(typeof(PageScreenAccessibilityTests), nameof(PageScreenAccessibilityTests.Screens))]
     public async Task ABackofficeScreenReflowsAtTwoHundredPercentZoom(
         string description,
         Type component,
@@ -64,7 +64,7 @@ public class ZoomTests
             overflow);
     }
 
-    [Fact]
+    [Test]
     public async Task TheMeasurementItselfCatchesSomethingTooWide()
     {
         // A negative control. The assertion above is the kind that passes for the wrong reason — a

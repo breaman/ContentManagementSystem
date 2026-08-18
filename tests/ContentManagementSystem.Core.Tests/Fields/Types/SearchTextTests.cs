@@ -10,32 +10,32 @@ public class SearchTextTests
 {
     private readonly HtmlFieldType _fieldType = new(new RecordingSanitizer());
 
-    [Fact]
+    [Test]
     public void TagsBecomeWordBoundaries()
     {
         // Stripping tags without leaving a separator indexes "onetwo", which matches neither word.
         Extract("<p>one</p><p>two</p>").Should().Be("one two");
     }
 
-    [Fact]
+    [Test]
     public void EntitiesAreDecoded()
     {
         Extract("<p>Ship &amp; save &lt;fast&gt;</p>").Should().Be("Ship & save <fast>");
     }
 
-    [Fact]
+    [Test]
     public void ScriptBodiesAreDroppedRatherThanIndexed()
     {
         Extract("<p>Ship</p><script>var track = 1;</script>").Should().Be("Ship");
     }
 
-    [Fact]
+    [Test]
     public void StyleBodiesAreDroppedRatherThanIndexed()
     {
         Extract("<style>.hero { color: red }</style><p>Ship</p>").Should().Be("Ship");
     }
 
-    [Fact]
+    [Test]
     public void AnUnclosedScriptDoesNotSwallowTheRestOfTheDocument()
     {
         // Truncated markup is exactly what an import or a hand-written value produces, and the
@@ -43,19 +43,19 @@ public class SearchTextTests
         Extract("<p>Ship</p><script>var track = 1;").Should().Be("Ship");
     }
 
-    [Fact]
+    [Test]
     public void ProseContainingALessThanSignSurvives()
     {
         Extract("a < b and c > d").Should().Be("a < b and c > d");
     }
 
-    [Fact]
+    [Test]
     public void WhitespaceIsCollapsed()
     {
         Extract("<p>  Ship\n\n   faster  </p>").Should().Be("Ship faster");
     }
 
-    [Fact]
+    [Test]
     public void MarkupWithNoTextIndexesNothing()
     {
         Extract("<hr /><br />").Should().BeEmpty();

@@ -30,24 +30,27 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// would pass just as happily if the delivery endpoint resolved a fresh lock registry per request,
 /// which is the mistake that turns the semaphore into decoration (ADR 0007).
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class MediaRenditionTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class MediaRenditionTests(SqlServerFixture fixture)
 {
     /// <summary>How many requests arrive at once. The number acceptance criterion P5 #9 names.</summary>
     private const int ConcurrentRequests = 20;
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
     /// <remarks>Acceptance criterion P5 #9.</remarks>
-    [Fact]
+    [Test]
     public async Task TwentyConcurrentColdRequestsForOneRenditionProduceExactlyOneEncode()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var item = await UploadAsync(cancellationToken);
 
         var url = SignedUrl(item, width: 640, height: 480);
@@ -93,10 +96,10 @@ public class MediaRenditionTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ARenditionUrlWithATamperedWidthIsRefusedWithoutEncodingAnything()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var item = await UploadAsync(cancellationToken);
 
         // Signed for 640 and asked for at 1280. The signature covers every parameter that changes
@@ -119,10 +122,10 @@ public class MediaRenditionTests(SqlServerFixture fixture) : IAsyncLifetime
     /// different string after a library edit, which is what busts browser and CDN caches with no
     /// purge to run — and the URL signed before the edit no longer validates.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ALibraryEditChangesTheRenditionUrlAndRetiresTheOldOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var item = await UploadAsync(cancellationToken);
 
         var before = SignedUrl(item, width: 640, height: 480);

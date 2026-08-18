@@ -39,7 +39,7 @@ public class MediaPictureRendererTests : IDisposable
     }
 
     /// <remarks>Acceptance criterion P5 #10.</remarks>
-    [Fact]
+    [Test]
     public void APlacedImageIsAPictureWithAWebpSourceAnAccurateSrcsetAndExplicitDimensions()
     {
         var markup = _harness.Render("""{"type":"media","mediaId":812}""");
@@ -57,7 +57,7 @@ public class MediaPictureRendererTests : IDisposable
     }
 
     /// <remarks>Acceptance criterion P5 #10 — the AVIF half.</remarks>
-    [Fact]
+    [Test]
     public void NoSourceEverOffersAvifBecauseNothingCouldProduceIt()
     {
         var markup = _harness.Render("""{"type":"media","mediaId":812}""");
@@ -67,7 +67,7 @@ public class MediaPictureRendererTests : IDisposable
         markup.Should().NotContain("avif");
     }
 
-    [Fact]
+    [Test]
     public void EveryCandidateUrlIsSignedByThisDeployment()
     {
         var markup = _harness.Render("""{"type":"media","mediaId":812}""");
@@ -78,7 +78,7 @@ public class MediaPictureRendererTests : IDisposable
         urls.Should().OnlyContain(url => url.Contains("&amp;s=", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Test]
     public void AnImageIsNeverEnlargedPastTheOriginalItWasUploadedAt()
     {
         _harness.Media.Add(500, width: 400, height: 300);
@@ -95,7 +95,7 @@ public class MediaPictureRendererTests : IDisposable
     /// Spec section 13.6 asks for eager loading and high fetch priority on the first image in the
     /// first zone, and lazy loading everywhere else.
     /// </remarks>
-    [Fact]
+    [Test]
     public void TheFirstImageOnThePageIsEagerAndHighPriorityAndEveryLaterOneIsLazy()
     {
         _harness.Media.Add(813, width: 1200, height: 800);
@@ -117,7 +117,7 @@ public class MediaPictureRendererTests : IDisposable
         body.Should().NotContain("fetchpriority");
     }
 
-    [Fact]
+    [Test]
     public void ALibraryRotationChangesTheDimensionsTheMarkupReserves()
     {
         // The whole reason the renderer cannot emit the row's own width and height: a quarter turn
@@ -131,7 +131,7 @@ public class MediaPictureRendererTests : IDisposable
     }
 
     /// <remarks>Acceptance criterion P5 #7, at the renderer.</remarks>
-    [Fact]
+    [Test]
     public void AUsageCropChangesOnlyTheUrlsOfThePlacementThatCarriesIt()
     {
         var context = RenderingHarness.Context(RenderingHarness.Payload(
@@ -149,7 +149,7 @@ public class MediaPictureRendererTests : IDisposable
         Urls(cropped).Should().NotIntersectWith(Urls(whole));
     }
 
-    [Fact]
+    [Test]
     public void TheSizesAttributeComesFromTheSlotConfigurationAndDefaultsToTheFullViewport()
     {
         _harness.Render("""{"type":"media","mediaId":812}""")
@@ -161,7 +161,7 @@ public class MediaPictureRendererTests : IDisposable
             .Should().Contain("sizes=\"(max-width: 768px) 100vw, 800px\"");
     }
 
-    [Fact]
+    [Test]
     public void ADecorativeImageRendersAnEmptyAltAndAPlacementMayOverrideTheLibrarysWords()
     {
         _harness.Media.Add(815, width: 800, height: 600, altText: null, isDecorative: true);
@@ -172,7 +172,7 @@ public class MediaPictureRendererTests : IDisposable
             .Should().Contain("alt=\"The same street at dusk\"");
     }
 
-    [Fact]
+    [Test]
     public void AnUndescribedImageRendersAnEmptyAltAndSaysSoInTheLog()
     {
         // Publishing this fails validation (task P5-21), so reaching it means the content predates
@@ -186,7 +186,7 @@ public class MediaPictureRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("816"));
     }
 
-    [Fact]
+    [Test]
     public void AFormatWithNoRenditionPipelineIsShownAtItsSignedOriginal()
     {
         // SkiaSharp has no SVG rasterizer, and an animated GIF through a still-image encoder comes
@@ -199,7 +199,7 @@ public class MediaPictureRendererTests : IDisposable
         markup.Should().Contain("alt=\"A logo\"");
     }
 
-    [Fact]
+    [Test]
     public void ADocumentIsALinkRatherThanABrokenImage()
     {
         _harness.Media.Add(
@@ -216,7 +216,7 @@ public class MediaPictureRendererTests : IDisposable
         markup.Should().NotContain("<img");
     }
 
-    [Fact]
+    [Test]
     public void AGalleryRendersEveryItemThroughTheSinglePictureRenderer()
     {
         _harness.Media.Add(813, width: 1200, height: 800);

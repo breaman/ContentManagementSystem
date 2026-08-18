@@ -29,7 +29,7 @@ public class FieldRendererTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void PlainTextIsEncodedRatherThanStripped()
     {
         // The field type stores what the author typed, angle brackets included, which leaves the
@@ -39,7 +39,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("a &lt; b &amp; c").And.NotContain("<b");
     }
 
-    [Fact]
+    [Test]
     public void MultilineTextKeepsItsLineBreaksAsMarkup()
     {
         var markup = _harness.Render("""{"type":"multilineText","value":"First\r\nSecond\nThird"}""");
@@ -49,7 +49,7 @@ public class FieldRendererTests : IDisposable
             "a Windows line ending is one break, not two");
     }
 
-    [Fact]
+    [Test]
     public void MarkdownRichTextIsConvertedAndSanitizedOnTheWayOut()
     {
         // richText stores markdown exactly as authored and never sanitizes it on write, so this is
@@ -60,7 +60,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("<strong>Ship</strong>").And.NotContain("<script");
     }
 
-    [Fact]
+    [Test]
     public void HtmlRichTextIsSanitizedAgainOnRender()
     {
         // A row that reached the database through an import or a restore never passed the write-time
@@ -71,7 +71,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("Hi").And.NotContain("onclick");
     }
 
-    [Fact]
+    [Test]
     public void RichTextWithNoReadableFormatRendersNothingAndLogs()
     {
         // Guessing is not available: markdown rendered as HTML shows its source, and HTML rendered
@@ -82,7 +82,7 @@ public class FieldRendererTests : IDisposable
         _harness.Logs.Entries.Should().Contain(entry => entry.Level == LogLevel.Warning);
     }
 
-    [Fact]
+    [Test]
     public void TheConfiguredProfileWidensWhatRichTextMayRender()
     {
         // Extended is Basic plus tables, images, and layout containers; a figure is on that list
@@ -96,7 +96,7 @@ public class FieldRendererTests : IDisposable
             .Should().Contain("<figure");
     }
 
-    [Fact]
+    [Test]
     public void AnUnrecognisedProfileFallsBackToTheMostRestrictiveOne()
     {
         // A mistyped setting may only ever strip more than intended, never less.
@@ -107,7 +107,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().NotContain("<figure").And.Contain("Diagram");
     }
 
-    [Fact]
+    [Test]
     public void RawHtmlIsSanitizedUnderTheDeveloperProfile()
     {
         // The role that lets someone author this widens the allowlist; it does not remove it.
@@ -117,7 +117,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("Widget").And.NotContain("<script");
     }
 
-    [Fact]
+    [Test]
     public void ANumberIsEmittedExactlyAsStored()
     {
         // Precision the author chose survives, and nothing here depends on the server's culture.
@@ -126,7 +126,7 @@ public class FieldRendererTests : IDisposable
             .And.NotContain(",");
     }
 
-    [Fact]
+    [Test]
     public void FalseRendersAndRendersDifferentlyFromAbsent()
     {
         // The field type treats a deliberate "off" as a filled value; a renderer that emitted
@@ -136,7 +136,7 @@ public class FieldRendererTests : IDisposable
         _harness.Render("""{"type":"boolean"}""").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void ADateCarriesBothTheMachineValueAndTheReadableOne()
     {
         var markup = _harness.Render("""{"type":"date","value":"2026-08-12"}""");
@@ -144,7 +144,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("datetime=\"2026-08-12\"").And.Contain("August 12, 2026");
     }
 
-    [Fact]
+    [Test]
     public void ADateIsNeverShiftedByATimeZone()
     {
         // "The 12th" means the 12th wherever it is read. Converting it is how a "published on" date
@@ -153,7 +153,7 @@ public class FieldRendererTests : IDisposable
         _harness.Render("""{"type":"date","value":"2026-12-31"}""").Should().Contain("December 31, 2026");
     }
 
-    [Fact]
+    [Test]
     public void ADateThatIsNotStoredInTheOneAcceptedFormRendersNothingAndLogs()
     {
         var markup = _harness.Render("""{"type":"date","value":"12/08/2026"}""");
@@ -162,7 +162,7 @@ public class FieldRendererTests : IDisposable
         _harness.Logs.Entries.Should().Contain(entry => entry.Level == LogLevel.Warning);
     }
 
-    [Fact]
+    [Test]
     public void AnInstantIsShownInUtcAndSaysSo()
     {
         // A time shown without naming its zone is the one presentation that is actively wrong.
@@ -173,7 +173,7 @@ public class FieldRendererTests : IDisposable
                 "the stored offset still reaches the browser");
     }
 
-    [Fact]
+    [Test]
     public void AChoiceRendersTheShapeThatWasStoredRatherThanTheOneConfigured()
     {
         // A property narrowed from multiple to single still has pages holding arrays.
@@ -184,7 +184,7 @@ public class FieldRendererTests : IDisposable
         multiple.Should().Contain("<ul").And.Contain("wide").And.Contain("boxed");
     }
 
-    [Fact]
+    [Test]
     public void AColourIsCarriedAsDataRatherThanAsAnInlineStyle()
     {
         // Emitting style="" from stored content is the one place the CSP would have to be relaxed
@@ -194,7 +194,7 @@ public class FieldRendererTests : IDisposable
         markup.Should().Contain("data-color=\"#1f6feb\"").And.NotContain("style=");
     }
 
-    [Fact]
+    [Test]
     public void JsonRendersNothingAndSaysNothingAboutIt()
     {
         // The empty render is the feature: json is data for a block's markup to read, and printing
@@ -205,7 +205,7 @@ public class FieldRendererTests : IDisposable
         _harness.Logs.Entries.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TagsRenderAsAListInTheOrderTheyWereAuthored()
     {
         var markup = _harness.Render("""{"type":"tags","value":["release-notes","v2"]}""");
@@ -215,7 +215,7 @@ public class FieldRendererTests : IDisposable
             .BeLessThan(markup.IndexOf("v2", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Test]
     public void EveryValueShapedFieldTypeSurvivesAValueOfTheWrongKind()
     {
         // One assertion said many ways, and the one that matters most: a payload that disagrees with

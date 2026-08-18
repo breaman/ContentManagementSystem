@@ -15,7 +15,7 @@ public class ChoiceFieldTypeTests
 
     private readonly ChoiceFieldType _fieldType = new();
 
-    [Fact]
+    [Test]
     public async Task AConfiguredOptionIsAccepted()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "choice", "value": "wide" }""", Options);
@@ -23,7 +23,7 @@ public class ChoiceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AValueOutsideTheOptionListIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -33,7 +33,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ChoiceUnknownOption);
     }
 
-    [Fact]
+    [Test]
     public async Task OptionKeysAreMatchedExactly()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "choice", "value": "Wide" }""", Options);
@@ -43,7 +43,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ChoiceUnknownOption);
     }
 
-    [Fact]
+    [Test]
     public async Task AnyValueIsAcceptedWhenNoOptionsAreConfigured()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "choice", "value": "from-a-lookup" }""");
@@ -53,7 +53,7 @@ public class ChoiceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AListIsRefusedWhereASingleValueIsConfigured()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "choice", "value": ["wide"] }""", Options);
@@ -61,7 +61,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task ASingleValueIsRefusedWhereAListIsConfigured()
     {
         var result = await _fieldType.ValidateAsync(
@@ -71,7 +71,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task SeveralConfiguredOptionsAreAccepted()
     {
         var result = await _fieldType.ValidateAsync(
@@ -81,7 +81,7 @@ public class ChoiceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task TheOffendingItemIsNamedByItsPosition()
     {
         var result = await _fieldType.ValidateAsync(
@@ -94,7 +94,7 @@ public class ChoiceFieldTypeTests
             .Which.RelativePath.Should().Be("value[1]");
     }
 
-    [Fact]
+    [Test]
     public async Task RepeatingASelectionIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -104,7 +104,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Duplicate);
     }
 
-    [Fact]
+    [Test]
     public async Task FewerSelectionsThanTheMinimumAreRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -114,7 +114,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MinItems);
     }
 
-    [Fact]
+    [Test]
     public async Task MoreSelectionsThanTheMaximumAreRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -124,7 +124,7 @@ public class ChoiceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxItems);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptySelectionListSavesAsADraftButDoesNotPublishWhenRequired()
     {
         var draft = await _fieldType.ValidateAsync(
@@ -141,7 +141,7 @@ public class ChoiceFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task ANumberInTheSelectionListIsAShapeError()
     {
         var result = await _fieldType.ValidateAsync(

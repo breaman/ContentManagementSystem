@@ -27,7 +27,7 @@ public class MediaUrlSignerTests
     private static MediaUrlSigner Signer(MediaSigningOptions options, FakeTimeProvider? clock = null) =>
         new(options, clock ?? new FakeTimeProvider(), NullLogger<MediaUrlSigner>.Instance);
 
-    [Fact]
+    [Test]
     public void ASignatureThisSignerProducedValidates()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -35,7 +35,7 @@ public class MediaUrlSignerTests
         signer.Validate(Spec, signer.Sign(Spec)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnUnsignedRequestIsRefused()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -44,9 +44,9 @@ public class MediaUrlSignerTests
         signer.Validate(Spec, string.Empty).Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(2560)]
-    [InlineData(320)]
+    [Test]
+    [Arguments(2560)]
+    [Arguments(320)]
     public void ATamperedWidthIsRefused(int width)
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -57,7 +57,7 @@ public class MediaUrlSignerTests
         signer.Validate(Spec with { Width = width }, signature).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ATamperedQualityIsRefused()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -65,7 +65,7 @@ public class MediaUrlSignerTests
         signer.Validate(Spec with { Quality = 95 }, signer.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ATamperedCropIsRefused()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -74,7 +74,7 @@ public class MediaUrlSignerTests
             Spec with { Crop = new NormalizedRect(0, 0, 0.5, 0.5) }, signer.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ASignatureFromAnotherSiteIsRefused()
     {
         var mine = Signer(new MediaSigningOptions { Key = Key });
@@ -83,7 +83,7 @@ public class MediaUrlSignerTests
         mine.Validate(Spec, theirs.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AnEditBumpChangesTheSignature()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -92,7 +92,7 @@ public class MediaUrlSignerTests
         signer.Validate(Spec with { EditsVersion = 4 }, signer.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void TheRetiredKeyStillValidatesDuringTheGracePeriod()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-16T10:00:00Z"));
@@ -112,7 +112,7 @@ public class MediaUrlSignerTests
         rotated.Validate(Spec, old.Sign(Spec)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void TheRetiredKeyStopsValidatingWhenTheGracePeriodEnds()
     {
         var clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-08-16T10:00:00Z"));
@@ -133,7 +133,7 @@ public class MediaUrlSignerTests
         rotated.Validate(Spec, signature).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AKeyTooShortToBeOneIsIgnoredRatherThanUsed()
     {
         // A four-byte "key" from a mistaken configuration must not become the site's signing secret.
@@ -144,7 +144,7 @@ public class MediaUrlSignerTests
         signer.Validate(Spec, other.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ABuiltUrlParsesBackToTheSpecItCameFrom()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -172,7 +172,7 @@ public class MediaUrlSignerTests
         signer.Validate(parsed.Spec!, query["s"]).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnAvifRequestIsRefusedAtTheParsingLayer()
     {
         var parsed = RenditionRequestParser.TryParse(
@@ -184,30 +184,30 @@ public class MediaUrlSignerTests
         parsed.FailureCode.Should().Be(MediaCodes.AvifNotSupported);
     }
 
-    [Theory]
-    [InlineData("1281x720", "crop", "hero.webp")]
-    [InlineData("1280x720", "squish", "hero.webp")]
-    [InlineData("1280x720", "crop", "hero.tiff")]
-    [InlineData("1280x-720", "crop", "hero.webp")]
-    [InlineData("x720", "crop", "hero.webp")]
-    [InlineData("1280x720", "crop", "hero")]
+    [Test]
+    [Arguments("1281x720", "crop", "hero.webp")]
+    [Arguments("1280x720", "squish", "hero.webp")]
+    [Arguments("1280x720", "crop", "hero.tiff")]
+    [Arguments("1280x-720", "crop", "hero.webp")]
+    [Arguments("x720", "crop", "hero.webp")]
+    [Arguments("1280x720", "crop", "hero")]
     public void ARenditionThisSiteDoesNotServeIsRefused(string size, string mode, string name) =>
         RenditionRequestParser.TryParse(new RenditionRequest(812, size, mode, name))
             .IsSuccess.Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void MalformedGeometryIsRefused() =>
         RenditionRequestParser.TryParse(
                 new RenditionRequest(812, "1280x720", "crop", "hero.webp", FocalPoint: "0.5"))
             .IsSuccess.Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void GeometryOutsideTheImageIsRefused() =>
         RenditionRequestParser.TryParse(
                 new RenditionRequest(812, "1280x720", "crop", "hero.webp", FocalPoint: "1.5,0.5"))
             .IsSuccess.Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void AnOriginalSignatureCannotBeReplayedAsARendition()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });
@@ -218,7 +218,7 @@ public class MediaUrlSignerTests
         signer.ValidateOriginal(Spec.MediaItemId, Spec.EditsVersion, signer.Sign(Spec)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AnOriginalSignatureIsBoundToTheEditsVersion()
     {
         var signer = Signer(new MediaSigningOptions { Key = Key });

@@ -12,23 +12,23 @@ namespace ContentManagementSystem.Core.Tests.Structure;
 /// </remarks>
 public class SchemaSyncReportTests
 {
-    [Fact]
+    [Test]
     public void AnEmptyReportHasNothingToDoAndNothingWrong()
     {
         SchemaSyncReport.Empty.HasPendingWork.Should().BeFalse();
         SchemaSyncReport.Empty.HasProblems.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(SchemaChangeKind.Created)]
-    [InlineData(SchemaChangeKind.SlotAdded)]
-    [InlineData(SchemaChangeKind.SlotUpdated)]
+    [Test]
+    [Arguments(SchemaChangeKind.Created)]
+    [Arguments(SchemaChangeKind.SlotAdded)]
+    [Arguments(SchemaChangeKind.SlotUpdated)]
     public void AChangeThatWouldTouchTheDatabaseIsPendingWork(SchemaChangeKind kind)
     {
         Report(kind).HasPendingWork.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AKeptUnlistedSlotIsNotPendingWork()
     {
         // It describes what the sync is deliberately *not* doing. A deployment whose only finding is
@@ -40,7 +40,7 @@ public class SchemaSyncReportTests
         report.HasProblems.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ARefusalIsAProblemButNotPendingWork()
     {
         var report = Report(SchemaChangeKind.Refused);
@@ -52,7 +52,7 @@ public class SchemaSyncReportTests
         report.HasProblems.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnUnreadableFileIsAProblem()
     {
         new SchemaSyncReport([], 1, ["template.broken.json: unexpected character"])

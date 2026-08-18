@@ -14,7 +14,7 @@ public class HtmlFieldTypeTests
 
     public HtmlFieldTypeTests() => _fieldType = new HtmlFieldType(_sanitizer);
 
-    [Fact]
+    [Test]
     public async Task MarkupIsAccepted()
     {
         var result = await _fieldType.ValidateAsync(
@@ -23,7 +23,7 @@ public class HtmlFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task LongerThanMaxLengthIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -33,7 +33,7 @@ public class HtmlFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxLength);
     }
 
-    [Fact]
+    [Test]
     public async Task TheDeveloperAllowlistIsApplied()
     {
         _sanitizer.Transform = _ => "<iframe src=\"https://example.test/embed\"></iframe>";
@@ -45,7 +45,7 @@ public class HtmlFieldTypeTests
             .Which.Profile.Should().Be(SanitizationProfile.Developer);
     }
 
-    [Fact]
+    [Test]
     public async Task MarkupIsStillSanitizedDespiteTheRoleRestriction()
     {
         _sanitizer.Transform = _ => "<p>clean</p>";
@@ -58,7 +58,7 @@ public class HtmlFieldTypeTests
         sanitized.GetProperty("value").GetString().Should().Be("<p>clean</p>");
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyValueIsNotHandedToTheSanitizer()
     {
         await _fieldType.SanitizeAsync("""{ "type": "html", "value": "" }""");
@@ -66,7 +66,7 @@ public class HtmlFieldTypeTests
         _sanitizer.Calls.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void SearchTextDropsScriptAndStyleBodiesRatherThanIndexingThem()
     {
         var property = FieldTypeTestHarness.Element(
@@ -75,7 +75,7 @@ public class HtmlFieldTypeTests
         _fieldType.ExtractSearchText(property).Should().Be("Ship");
     }
 
-    [Fact]
+    [Test]
     public void HtmlIsRestrictedToDevelopers()
     {
         _fieldType.Capabilities.Should().HaveFlag(FieldTypeCapabilities.DeveloperOnly);

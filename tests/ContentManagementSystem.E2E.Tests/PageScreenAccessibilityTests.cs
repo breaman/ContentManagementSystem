@@ -50,65 +50,66 @@ public class PageScreenAccessibilityTests
     /// so a renderer that did not wait would hand axe a page reading "Loading page…" — no tables, no
     /// forms, and no violations, with the gate going green having checked nothing.
     /// </remarks>
-    public static TheoryData<string, Type, Dictionary<string, object?>, string> Screens => new()
-    {
-        { "page list", typeof(PageList), [], "Enterprise" },
-        {
+    public static IEnumerable<(string Description, Type Component,
+        Dictionary<string, object?> Parameters, string Expected)> Screens =>
+    [
+        ("page list", typeof(PageList), [], "Enterprise"),
+        (
             "page editor",
             typeof(PageEditor),
             new() { ["Id"] = FakePageClient.Id },
             "What our plans cost"
-        },
-        {
+        ),
+        (
             "version history",
             typeof(PageVersions),
             new() { ["Id"] = FakePageClient.Id },
             "before the big rewrite"
-        },
-        {
+        ),
+        (
             "preview links",
             typeof(PagePreviewLinks),
             new() { ["Id"] = FakePageClient.Id },
             "Sent to the agency"
-        },
-        { "reusable content library", typeof(ReusableLibrary), [], "Spring banner" },
-        {
+        ),
+        ("reusable content library", typeof(ReusableLibrary), [], "Spring banner"),
+        (
             "reusable content editor",
             typeof(ReusableEditor),
             new() { ["Id"] = FakeReusableClient.Id },
             // The where-used panel, which is the part of this screen with the most for axe to judge:
             // a table of affected pages, three badge states, and a nested list of items.
             "Enterprise"
-        },
+        ),
 
         // The media screens are the ones where an accessibility gate has the most to say, because
         // they are the ones full of images: every tile in the grid carries an alt attribute whose
         // value comes from editorial data, and the fixture deliberately includes an item nobody has
         // described (tasks P5-19 and P5-22).
-        { "media library", typeof(MediaLibrary), [], "team-photo.jpg" },
-        {
+        ("media library", typeof(MediaLibrary), [], "team-photo.jpg"),
+        (
             "media item",
             typeof(MediaItemEditor),
             new() { ["Id"] = FakeMediaClient.PlacedId },
             "Team photograph"
-        },
+        ),
 
         // The screens Phase 6 added (tasks P6-24 to P6-28). The dashboard is the one with the most
         // for axe to judge — four cards of nested lists, each row a link with a second line — and the
         // recycle bin is the one where getting it wrong matters most, since its buttons destroy
         // things and are told apart only by the page name inside them.
-        { "dashboard", typeof(DashboardScreen), [], "Needs attention" },
-        {
+        ("dashboard", typeof(DashboardScreen), [], "Needs attention"),
+        (
             "dashboard tile",
             typeof(DashboardTileScreen),
             new() { ["Tile"] = "NeedsAttention" },
             "Past its review date"
-        },
-        { "recycle bin", typeof(RecycleBinScreen), [], "Autumn campaign" },
-    };
+        ),
+        ("recycle bin", typeof(RecycleBinScreen), [], "Autumn campaign"),
+    ];
 
-    [Theory]
-    [MemberData(nameof(Screens))]
+    [Test]
+    [MethodDataSource(nameof(Screens))]
     public async Task APageScreenHasNoAccessibilityViolations(
         string description,
         Type component,
@@ -163,7 +164,7 @@ public class PageScreenAccessibilityTests
     /// every one of those is the kind of thing that is right for the row the developer had on screen.
     /// </para>
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task TheContentTreePaneHasNoAccessibilityViolations()
     {
         var html = await BackofficeScreens.RenderAsync(typeof(ContentTree), []);
@@ -200,7 +201,7 @@ public class PageScreenAccessibilityTests
         results.Passes.Should().NotBeEmpty("axe must actually have run against rendered markup");
     }
 
-    [Fact]
+    [Test]
     public async Task TheDiffViewerDistinguishesAMovedBlockWithoutRelyingOnColour()
     {
         var html = await BackofficeScreens.RenderAsync(
@@ -213,7 +214,7 @@ public class PageScreenAccessibilityTests
             FakePageClient.Id,
             FakePageClient.PublishedVersionId,
             FakePageClient.DraftVersionId,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         var rendered = await BackofficeScreens.RenderAsync(
             typeof(ContentDiffView),

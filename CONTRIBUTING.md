@@ -114,16 +114,27 @@ new behaviour there rather than through a container.
 
 ## Tests
 
-- xUnit v3, FluentAssertions, NSubstitute. Tests are written without `// Arrange` / `// Act` /
-  `// Assert` comments; match the naming and capitalisation of nearby test methods.
-- Pass `TestContext.Current.CancellationToken` to anything that accepts one — the analyzer enforces
-  it, and the build runs warnings-as-errors.
+- **TUnit is the test framework — use it for every new test.** FluentAssertions and NSubstitute
+  round it out. Tests are written without `// Arrange` / `// Act` / `// Assert` comments; match the
+  naming and capitalisation of nearby test methods.
+- `[Test]` for every test, `[Arguments(...)]` for inline cases, `[MethodDataSource(nameof(Member))]`
+  for computed ones. Per-test setup and teardown are `[Before(HookType.Test)]` and
+  `[After(HookType.Test)]` methods rather than a lifecycle interface.
+- Pass `TestContext.Current!.Execution.CancellationToken` to anything that accepts one. The build
+  runs warnings-as-errors, and `Current` is nullable, hence the `!`.
+- TUnit runs on Microsoft.Testing.Platform, so a test project *is* its own runner: `dotnet run` in
+  the project directory executes the suite, and `dotnet test` still works with runner flags placed
+  after `--`. Never add `Microsoft.NET.Test.Sdk` or `coverlet.collector` — either one takes over the
+  entry point and discovery then finds nothing.
 - Data and API tests run against a real SQL Server container, never the in-memory provider. The
   behaviour that matters here — filtered unique indexes, `rowversion` conflicts, query filters — has
-  no faithful in-memory equivalent. Use `SqlServerFixture` and the per-assembly
-  `[CollectionDefinition]`.
-- xUnit requires `[CollectionDefinition]` to live in the same assembly as the tests that use it, so
-  each suite declares its own; only the name is shared, from `SqlServerCollectionNames`.
+  no faithful in-memory equivalent. Take the container with
+  `[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]` and accept it as a
+  primary-constructor parameter.
+- TUnit parallelises tests *inside* a class as well as across classes, which xUnit did not. One
+  container cannot serve every suite at once, so each of those classes also carries
+  `[NotInParallel(SqlServerConstraint.Key)]` — the shared constraint key that queues them
+  behind one another.
 
 ### Package licensing
 

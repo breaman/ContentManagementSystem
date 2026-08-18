@@ -40,7 +40,7 @@ public class ContentTreeTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void TheRootLevelIsFetchedOnceAndRenderedAsATree()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -53,7 +53,7 @@ public class ContentTreeTests : IDisposable
             "the root level is one fetch with no parent, not one per node");
     }
 
-    [Fact]
+    [Test]
     public void ChildrenAreNotFetchedUntilTheirParentIsOpened()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -66,7 +66,7 @@ public class ContentTreeTests : IDisposable
         tree.Markup.Should().Contain("Widgets");
     }
 
-    [Fact]
+    [Test]
     public void AReopenedNodeIsNotFetchedASecondTime()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -81,7 +81,7 @@ public class ContentTreeTests : IDisposable
             "flicker for nothing");
     }
 
-    [Fact]
+    [Test]
     public void AnExpandedNodeReportsItsPositionAndDepthToAScreenReader()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -101,7 +101,7 @@ public class ContentTreeTests : IDisposable
         child.GetAttribute("aria-setsize").Should().Be("2");
     }
 
-    [Fact]
+    [Test]
     public void ALeafCarriesNoExpandedStateAtAll()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -113,7 +113,7 @@ public class ContentTreeTests : IDisposable
             "does nothing");
     }
 
-    [Fact]
+    [Test]
     public void ExactlyOneRowHoldsTheTreesTabStop()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -129,7 +129,7 @@ public class ContentTreeTests : IDisposable
             "a roving tabindex is what stops Tab walking through five thousand pages");
     }
 
-    [Fact]
+    [Test]
     public void ActivatingARowReportsThePageToTheHost()
     {
         PageSummary? activated = null;
@@ -143,7 +143,7 @@ public class ContentTreeTests : IDisposable
         activated!.Title.Should().Be("About");
     }
 
-    [Fact]
+    [Test]
     public void ClickingAnExpanderDoesNotAlsoOpenThePage()
     {
         var activations = 0;
@@ -159,7 +159,7 @@ public class ContentTreeTests : IDisposable
             "away from the page an editor was only trying to look inside");
     }
 
-    [Fact]
+    [Test]
     public void EveryStateIsWrittenAsAWordAndNotOnlyAsAColour()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -171,14 +171,14 @@ public class ContentTreeTests : IDisposable
         tree.Markup.Should().Contain("Scheduled").And.Contain("Open in the editor by Elena");
     }
 
-    [Theory]
-    [InlineData("Draft", 1, false, null, PageTreeStatus.Published)]
-    [InlineData("Draft", 1, true, null, PageTreeStatus.UnpublishedChanges)]
-    [InlineData("Draft", null, false, null, PageTreeStatus.NotPublished)]
-    [InlineData("InReview", 1, true, null, PageTreeStatus.InReview)]
-    [InlineData("Rejected", 1, true, null, PageTreeStatus.Rejected)]
-    [InlineData("Draft", 1, true, "future", PageTreeStatus.Scheduled)]
-    [InlineData("Draft", 1, true, "past", PageTreeStatus.UnpublishedChanges)]
+    [Test]
+    [Arguments("Draft", 1, false, null, PageTreeStatus.Published)]
+    [Arguments("Draft", 1, true, null, PageTreeStatus.UnpublishedChanges)]
+    [Arguments("Draft", null, false, null, PageTreeStatus.NotPublished)]
+    [Arguments("InReview", 1, true, null, PageTreeStatus.InReview)]
+    [Arguments("Rejected", 1, true, null, PageTreeStatus.Rejected)]
+    [Arguments("Draft", 1, true, "future", PageTreeStatus.Scheduled)]
+    [Arguments("Draft", 1, true, "past", PageTreeStatus.UnpublishedChanges)]
     public void TheStatusPrecedenceIsWhatTheEditorNeedsToKnowNext(
         string status,
         int? published,

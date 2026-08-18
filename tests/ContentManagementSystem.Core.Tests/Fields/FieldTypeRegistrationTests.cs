@@ -13,7 +13,7 @@ namespace ContentManagementSystem.Core.Tests.Fields;
 /// </summary>
 public class FieldTypeRegistrationTests
 {
-    [Fact]
+    [Test]
     public void AddCmsFieldTypeMakesTheFieldTypeResolvable()
     {
         using var provider = new ServiceCollection()
@@ -25,7 +25,7 @@ public class FieldTypeRegistrationTests
         registry.Find("sample").Should().BeOfType<SampleFieldType>();
     }
 
-    [Fact]
+    [Test]
     public void RegisteringTheSameFieldTypeTwiceDoesNotTripTheDuplicateKeyGuard()
     {
         // The built-in scan and an explicit registration can name the same type. That is a
@@ -41,7 +41,7 @@ public class FieldTypeRegistrationTests
         registry.All.Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void FieldTypesAreSingletons()
     {
         using var provider = new ServiceCollection()
@@ -57,7 +57,7 @@ public class FieldTypeRegistrationTests
         first.Find("sample").Should().BeSameAs(second.Find("sample"));
     }
 
-    [Fact]
+    [Test]
     public void ScanningAnAssemblyPicksUpItsPublicFieldTypes()
     {
         using var provider = new ServiceCollection()
@@ -69,7 +69,7 @@ public class FieldTypeRegistrationTests
         registry.Find("discoverable").Should().BeOfType<DiscoverableFieldType>();
     }
 
-    [Fact]
+    [Test]
     public void ScanningSkipsNonPublicImplementations()
     {
         using var provider = new ServiceCollection()

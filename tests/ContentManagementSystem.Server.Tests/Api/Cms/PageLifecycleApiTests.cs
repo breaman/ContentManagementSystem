@@ -18,20 +18,23 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// acceptance criteria were left at <c>[~]</c> waiting for exactly these endpoints: P2 #8's
 /// <c>409</c> is in the draft suite, and P2 #11's <c>422</c> is here.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageLifecycleApiTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task PublishingWithAnUnfilledRequiredZoneAnswers422NamingThatZone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(
             client,
@@ -58,10 +61,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
             error.Property != null && error.Property.Contains("headline", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Test]
     public async Task ValidatingRunsTheSameChecksWithoutPublishing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(
             client,
@@ -95,10 +98,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         reread!.Summary.PublishedVersionNumber.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingCreatesANewVersionAndLeavesTheDraftEditable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lifecycle-publish", cancellationToken);
         var page = await CreatePageAsync(client, template, "Publishable", cancellationToken);
@@ -128,10 +131,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         live!.ContentJson.Should().Contain("Live words").And.NotContain("Draft words");
     }
 
-    [Fact]
+    [Test]
     public async Task UnpublishingRetiresTheLiveVersionAndSaysWhichOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lifecycle-unpublish", cancellationToken);
         var page = await CreatePageAsync(client, template, "Retirable", cancellationToken);
@@ -154,10 +157,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(again, cancellationToken)).Should().Contain(PageCodes.AlreadyUnpublished);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAuthorMayEditButNotPublish()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(administrator, "lifecycle-author", cancellationToken);
 
@@ -177,10 +180,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         delete.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task DuplicatingAPageAnswers201WithTheCopy()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lifecycle-duplicate", cancellationToken);
         var original = await CreatePageAsync(client, template, "Campaign", cancellationToken);
@@ -210,10 +213,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         children.Should().ContainSingle().Which.Page.Title.Should().Be("Landing");
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingTakesTheSubtreeToTheRecycleBinAndRestoringBringsItBackAsDrafts()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lifecycle-bin", cancellationToken);
         var parent = await CreatePageAsync(client, template, "Section", cancellationToken);
@@ -256,10 +259,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
         back!.Summary.PublishedVersionNumber.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task APermanentDeleteNeedsUserManagementAndAnEmptiedSubtree()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "lifecycle-purge", cancellationToken);
         var page = await CreatePageAsync(client, template, "Disposable", cancellationToken);
@@ -287,10 +290,10 @@ public class PageLifecycleApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .VersionsRemoved.Should().BeGreaterThan(0);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEditorMayListTheRecycleBinAndAViewerMayNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var editor = await ClientAsync(_factory, cancellationToken, CmsRoles.Editor);
         using var viewer = await ClientAsync(_factory, cancellationToken, CmsRoles.Viewer);
 

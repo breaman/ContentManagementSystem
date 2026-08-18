@@ -24,21 +24,24 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// database boundary, inside the real transaction.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PublishTransactionTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PublishTransactionTests(SqlServerFixture fixture)
 {
     private FailingSaveInterceptor _interceptor = null!;
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync()
     {
         _interceptor = new FailingSaveInterceptor();
         _bench = await PageWorkbench.CreateAsync(
             fixture,
-            cancellationToken: TestContext.Current.CancellationToken,
+            cancellationToken: TestContext.Current!.Execution.CancellationToken,
             interceptor: _interceptor);
     }
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
     /// <summary>
@@ -49,14 +52,14 @@ public class PublishTransactionTests(SqlServerFixture fixture) : IAsyncLifetime
     /// page; project the reference rows; and the placeholder for the cache-invalidation outbox row
     /// that arrives in P8. Failing at any of them has to leave the page exactly as it was.
     /// </remarks>
-    [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(4)]
+    [Test]
+    [Arguments(1)]
+    [Arguments(2)]
+    [Arguments(3)]
+    [Arguments(4)]
     public async Task AFailureAtAnyStepOfAPublishLeavesNothingBehind(int failingStep)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -102,10 +105,10 @@ public class PublishTransactionTests(SqlServerFixture fixture) : IAsyncLifetime
         after.Should().BeEquivalentTo(before, "the whole publish rolls back or none of it does");
     }
 
-    [Fact]
+    [Test]
     public async Task APublishThatSucceedsLeavesEveryStepApplied()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,

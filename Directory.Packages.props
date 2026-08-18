@@ -83,7 +83,6 @@
     -->
   <ItemGroup Label="Testing">
     <PackageVersion Include="bunit" Version="2.9.0" />
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
     <PackageVersion Include="Deque.AxeCore.Playwright" Version="4.13.0" />
     <PackageVersion Include="FluentAssertions" Version="7.2.2" />
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
@@ -93,7 +92,6 @@
       whether some other package happened to pull the assembly in.
       -->
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.9.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.62.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <!--
@@ -105,8 +103,19 @@
       -->
     <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.v3.extensibility.core" Version="3.2.2" />
+    <!--
+      The test framework. TUnit is a Microsoft.Testing.Platform framework rather than a VSTest one,
+      so the runner lives in the test executable itself: there is no Microsoft.NET.Test.Sdk and no
+      coverlet.collector, and both would in fact break discovery if reintroduced. The meta-package
+      already carries the TRX reporter and the code-coverage extension, which is what the
+      report-trx and coverage switches in CI resolve against.
+      -->
+    <PackageVersion Include="TUnit" Version="1.65.0" />
+    <!--
+      TestSupport is a helper library, not a suite, so it takes TUnit.Core on its own: that is where
+      IAsyncInitializer and the data-source attributes live. Referencing the TUnit meta-package there
+      would turn the library into a test executable and have the runner try to discover tests in it.
+      -->
+    <PackageVersion Include="TUnit.Core" Version="1.65.0" />
   </ItemGroup>
 </Project>

@@ -14,21 +14,21 @@ namespace ContentManagementSystem.Core.Tests.Routing;
 /// </remarks>
 public class SiteUrlsTests
 {
-    [Theory]
-    [InlineData("/about", "/about")]
-    [InlineData("/About", "/about")]
-    [InlineData("/about/", "/about")]
-    [InlineData("about", "/about")]
-    [InlineData("  /about  ", "/about")]
-    [InlineData("/PRODUCTS/Widget/", "/products/widget")]
-    [InlineData("/", "/")]
-    [InlineData("", "/")]
-    [InlineData(null, "/")]
-    [InlineData("///", "/")]
+    [Test]
+    [Arguments("/about", "/about")]
+    [Arguments("/About", "/about")]
+    [Arguments("/about/", "/about")]
+    [Arguments("about", "/about")]
+    [Arguments("  /about  ", "/about")]
+    [Arguments("/PRODUCTS/Widget/", "/products/widget")]
+    [Arguments("/", "/")]
+    [Arguments("", "/")]
+    [Arguments(null, "/")]
+    [Arguments("///", "/")]
     public void NormalizeProducesOneFormPerAddress(string? supplied, string expected) =>
         SiteUrls.Normalize(supplied).Should().Be(expected);
 
-    [Fact]
+    [Test]
     public void NormalizeDecodesPercentEscapesSoATypedUrlMatchesARequestPath()
     {
         // A request path reaches the application already decoded; a URL typed into the redirect
@@ -37,7 +37,7 @@ public class SiteUrlsTests
         SiteUrls.Normalize("/caf%C3%A9").Should().Be("/café");
     }
 
-    [Fact]
+    [Test]
     public void NormalizeKeepsAQueryStringBecauseARedirectAuthorMayHaveMeantIt()
     {
         // Stripping it would silently accept a redirect row whose author meant the query to matter.
@@ -45,42 +45,42 @@ public class SiteUrlsTests
         SiteUrls.Normalize("/search?q=widgets").Should().Be("/search?q=widgets");
     }
 
-    [Theory]
-    [InlineData("/about", "/About/")]
-    [InlineData("/products/widget", "products/Widget")]
-    [InlineData("/", "")]
+    [Test]
+    [Arguments("/about", "/About/")]
+    [Arguments("/products/widget", "products/Widget")]
+    [Arguments("/", "")]
     public void TwoSpellingsOfOneAddressHashTheSame(string first, string second) =>
         SiteUrls.Hash(first).Should().Equal(SiteUrls.Hash(second));
 
-    [Fact]
+    [Test]
     public void DifferentAddressesHashDifferently() =>
         SiteUrls.Hash("/about").Should().NotEqual(SiteUrls.Hash("/about-us"));
 
-    [Fact]
+    [Test]
     public void AHashIsTheWidthTheColumnDeclares() =>
         SiteUrls.Hash("/anything").Should().HaveCount(SiteUrls.HashLength);
 
-    [Theory]
-    [InlineData(null, "products", "/products")]
-    [InlineData("/", "products", "/products")]
-    [InlineData("/products", "widget", "/products/widget")]
-    [InlineData("/products/", "widget", "/products/widget")]
-    [InlineData("/products", "Widget", "/products/widget")]
+    [Test]
+    [Arguments(null, "products", "/products")]
+    [Arguments("/", "products", "/products")]
+    [Arguments("/products", "widget", "/products/widget")]
+    [Arguments("/products/", "widget", "/products/widget")]
+    [Arguments("/products", "Widget", "/products/widget")]
     public void CombineJoinsAnAncestorUrlToASlug(string? parent, string slug, string expected) =>
         SiteUrls.Combine(parent, slug).Should().Be(expected);
 
-    [Theory]
-    [InlineData("/products", "/products", true)]
-    [InlineData("/products", "/products/widget", true)]
-    [InlineData("/", "/anything", true)]
-    [InlineData("/products", "/services", false)]
+    [Test]
+    [Arguments("/products", "/products", true)]
+    [Arguments("/products", "/products/widget", true)]
+    [Arguments("/", "/anything", true)]
+    [Arguments("/products", "/services", false)]
     public void IsSelfOrDescendantAnswersTheContainmentQuestion(
         string ancestor,
         string url,
         bool expected) =>
         SiteUrls.IsSelfOrDescendant(ancestor, url).Should().Be(expected);
 
-    [Fact]
+    [Test]
     public void ContainmentIsSegmentAwareRatherThanAPlainPrefixTest()
     {
         // The case a naive StartsWith gets wrong. On a redirect loop check it is the difference

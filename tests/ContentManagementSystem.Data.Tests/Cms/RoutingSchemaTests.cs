@@ -19,13 +19,14 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// directly. Asserted against real SQL Server because a filtered unique index has no faithful
 /// in-memory equivalent — and the filter is exactly what makes a draft route legal beside a live one.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class RoutingSchemaTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task TwoPublishedRoutesCannotShareAUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var first = await CreatePageAsync(context, "one", cancellationToken);
@@ -40,10 +41,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftRouteMaySitAtAUrlAPublishedRouteAlreadyHolds()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var live = await CreatePageAsync(context, "live", cancellationToken);
@@ -61,10 +62,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
             .Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingAPageTakesItsRoutesAndItsPreviewTokens()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "temporary", cancellationToken);
@@ -101,10 +102,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
         (await context.PageRoutes.CountAsync(cancellationToken)).Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task TwoRedirectsCannotShareASourceUrlEvenWhenOneIsDisabled()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         context.Redirects.Add(Redirect("/legacy", "/current", isEnabled: false));
@@ -118,10 +119,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ARedirectPointingAtAPageBlocksThatPagesDeletion()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "target", cancellationToken);
@@ -152,10 +153,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
         await purge.Should().ThrowAsync<SqlException>();
     }
 
-    [Fact]
+    [Test]
     public async Task OneUrlProducesOneNotFoundRow()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
@@ -186,10 +187,10 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TwoPreviewTokensCannotShareAHash()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "draft", cancellationToken);

@@ -27,7 +27,7 @@ public class EditingCanvasTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void CardsAreDrawnInSortOrderUnderTheirGroupHeadings()
     {
         var canvas = Render(
@@ -49,7 +49,7 @@ public class EditingCanvasTests : IDisposable
                 "an unnamed run of cards is a section with no heading to name it");
     }
 
-    [Fact]
+    [Test]
     public void ACardIsAddressableSoAPublishDialogCanSendAnEditorToIt()
     {
         var canvas = Render([Zone("hero", "Hero", 0)]);
@@ -62,7 +62,7 @@ public class EditingCanvasTests : IDisposable
         ZoneCard.AnchorFor("hero").Should().Be("zone-hero");
     }
 
-    [Fact]
+    [Test]
     public void TheCardsHeadingNamesTheControlInsideIt()
     {
         var canvas = Render([Zone("hero", "Hero", 0)]);
@@ -74,7 +74,7 @@ public class EditingCanvasTests : IDisposable
             "a label pointing at one control would be a lie for the field types that are several");
     }
 
-    [Fact]
+    [Test]
     public void HelpTextIsAnnouncedAndNotOnlyDrawn()
     {
         var canvas = Render([Zone("hero", "Hero", 0, description: "Shown above the fold.")]);
@@ -85,7 +85,7 @@ public class EditingCanvasTests : IDisposable
         canvas.Find("[data-editor]").GetAttribute("aria-describedby").Should().Be(help.Id);
     }
 
-    [Fact]
+    [Test]
     public void AZoneWithNoHelpTextDescribesTheControlByNothingAtAll()
     {
         var canvas = Render([Zone("hero", "Hero", 0)]);
@@ -95,7 +95,7 @@ public class EditingCanvasTests : IDisposable
             "an aria-describedby pointing at an element that is not there describes nothing");
     }
 
-    [Fact]
+    [Test]
     public void ARequiredZoneSaysSoInWordsAndNotOnlyWithAnAsterisk()
     {
         var canvas = Render([Zone("hero", "Hero", 0, required: true)]);
@@ -105,7 +105,7 @@ public class EditingCanvasTests : IDisposable
             .Should().Be("(required to publish)");
     }
 
-    [Fact]
+    [Test]
     public void AZoneWithProblemsCountsThemOnItsBadgeAndMarksItsControlInvalid()
     {
         var canvas = Render(
@@ -120,7 +120,7 @@ public class EditingCanvasTests : IDisposable
         canvas.Find("[data-editor]").GetAttribute("aria-invalid").Should().Be("true");
     }
 
-    [Fact]
+    [Test]
     public void AHealthyZoneCarriesNoBadgeAndIsNotMarkedInvalid()
     {
         var canvas = Render([Zone("hero", "Hero", 0)]);
@@ -129,7 +129,7 @@ public class EditingCanvasTests : IDisposable
         canvas.Find("[data-editor]").HasAttribute("aria-invalid").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticFoundInsideABlockSaysWhereWithoutRepeatingTheZone()
     {
         var canvas = Render(
@@ -142,7 +142,7 @@ public class EditingCanvasTests : IDisposable
             .Should().Be("items[0].properties.headline");
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticThatBelongsToNoCardIsReportedAboveThem()
     {
         var canvas = Render(
@@ -157,7 +157,7 @@ public class EditingCanvasTests : IDisposable
             "has to be shown somewhere else");
     }
 
-    [Fact]
+    [Test]
     public void TheActionBarCountsTheProblemsAndHoldsTheHostsButtons()
     {
         var canvas = _bunit.Render<EditingCanvas>(parameters => parameters
@@ -175,7 +175,7 @@ public class EditingCanvasTests : IDisposable
         bar.QuerySelector("button")!.TextContent.Should().Be("Publish");
     }
 
-    [Fact]
+    [Test]
     public void AnUncheckedPageWithNothingToSayHasNoActionBar()
     {
         var canvas = Render([Zone("hero", "Hero", 0)]);
@@ -183,7 +183,7 @@ public class EditingCanvasTests : IDisposable
         canvas.FindAll(".cms-canvas__actions").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void ATemplateRevisionThatCapturedNoZonesSaysSoRatherThanRenderingNothing()
     {
         var canvas = _bunit.Render<EditingCanvas>(parameters => parameters
@@ -194,7 +194,7 @@ public class EditingCanvasTests : IDisposable
         canvas.FindAll(".cms-canvas__zone").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void ADisabledCanvasPassesThatOnToEveryCardBody()
     {
         var canvas = _bunit.Render<EditingCanvas>(parameters => parameters

@@ -19,12 +19,12 @@ public class SvgSanitizerTests
 {
     private static async Task<string> Sanitize(string svg)
     {
-        var result = await SvgSanitizer.SanitizeAsync(svg, TestContext.Current.CancellationToken);
+        var result = await SvgSanitizer.SanitizeAsync(svg, TestContext.Current!.Execution.CancellationToken);
 
         return result.Svg ?? string.Empty;
     }
 
-    [Fact]
+    [Test]
     public async Task ADrawingSurvives()
     {
         var output = await Sanitize(
@@ -33,7 +33,7 @@ public class SvgSanitizerTests
         output.Should().Contain("<rect").And.Contain("fill=\"#f00\"");
     }
 
-    [Fact]
+    [Test]
     public async Task AScriptIsRemovedWithItsContents()
     {
         var output = await Sanitize("""<svg><script>alert(1)</script><rect width="1" height="1"/></svg>""");
@@ -43,7 +43,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("script").And.NotContain("alert");
     }
 
-    [Fact]
+    [Test]
     public async Task AnEventHandlerIsRemoved()
     {
         var output = await Sanitize("""<svg onload="alert(1)"><rect onclick="alert(2)" width="1" height="1"/></svg>""");
@@ -51,7 +51,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("onload").And.NotContain("onclick").And.NotContain("alert");
     }
 
-    [Fact]
+    [Test]
     public async Task AForeignObjectIsRemovedWithTheHtmlInsideIt()
     {
         var output = await Sanitize(
@@ -60,7 +60,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("foreignObject").And.NotContain("onerror").And.NotContain("<img");
     }
 
-    [Fact]
+    [Test]
     public async Task AnExternalReferenceIsRemoved()
     {
         var output = await Sanitize(
@@ -69,7 +69,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("evil.test").And.NotContain("<image").And.NotContain("<use");
     }
 
-    [Fact]
+    [Test]
     public async Task AnXlinkHrefIsRemovedDespiteItsPrefix()
     {
         var output = await Sanitize(
@@ -80,7 +80,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("javascript:").And.NotContain("href");
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnimateElementIsRemoved()
     {
         var output = await Sanitize(
@@ -91,7 +91,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("animate").And.NotContain("javascript:");
     }
 
-    [Fact]
+    [Test]
     public async Task AStyleElementIsRemoved()
     {
         var output = await Sanitize(
@@ -100,7 +100,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("style").And.NotContain("evil.test");
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnchorIsRemoved()
     {
         var output = await Sanitize("""<svg><a href="javascript:alert(1)"><rect width="1" height="1"/></a></svg>""");
@@ -108,7 +108,7 @@ public class SvgSanitizerTests
         output.Should().NotContain("javascript:");
     }
 
-    [Fact]
+    [Test]
     public async Task AScriptNestedInsideAnUnknownWrapperIsRemoved()
     {
         var output = await Sanitize(
@@ -119,32 +119,32 @@ public class SvgSanitizerTests
         output.Should().NotContain("script").And.NotContain("alert");
     }
 
-    [Fact]
+    [Test]
     public async Task ADocumentWhoseOnlyContentWasHostileIsRefusedOutright()
     {
         var result = await SvgSanitizer.SanitizeAsync(
-            """<svg><script>alert(1)</script></svg>""", TestContext.Current.CancellationToken);
+            """<svg><script>alert(1)</script></svg>""", TestContext.Current!.Execution.CancellationToken);
 
         // Storing an empty <svg> would be storing nothing while telling the editor their logo
         // uploaded successfully.
         result.Svg.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task SomethingThatIsNotAnSvgIsRefused()
     {
         var result = await SvgSanitizer.SanitizeAsync(
-            "<html><body>hello</body></html>", TestContext.Current.CancellationToken);
+            "<html><body>hello</body></html>", TestContext.Current!.Execution.CancellationToken);
 
         result.Svg.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task RemovalsAreReported()
     {
         var result = await SvgSanitizer.SanitizeAsync(
             """<svg onload="x()"><script>y()</script><rect width="1" height="1"/></svg>""",
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         result.RemovedElements.Should().Contain("script");
         result.RemovedAttributes.Should().Contain("onload");

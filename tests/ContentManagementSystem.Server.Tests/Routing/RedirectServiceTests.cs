@@ -14,20 +14,23 @@ namespace ContentManagementSystem.Server.Tests.Routing;
 /// Redirect creation, chain flattening, loop refusal, hit counting, and CSV round trips
 /// (tasks P3-05, P3-06, and P3-22, spec section 10.5).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class RedirectServiceTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ARedirectSendsItsSourceToItsDestination()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         var created = await redirects.CreateAsync(
@@ -44,10 +47,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         match.StatusCode.Should().Be(301);
     }
 
-    [Fact]
+    [Test]
     public async Task ASourceIsNormalizedSoOneRuleCoversEverySpellingOfTheUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         await redirects.CreateAsync(new CreateRedirectRequest("/Old-News/", ToUrl: "/news"), cancellationToken);
@@ -59,10 +62,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task AChainIsFlattenedOnWriteRatherThanWalkedOnEveryRequest()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         await redirects.CreateAsync(new CreateRedirectRequest("/a", ToUrl: "/b"), cancellationToken);
@@ -81,10 +84,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await redirects.ResolveAsync("/a", cancellationToken))!.TargetUrl.Should().Be("/c");
     }
 
-    [Fact]
+    [Test]
     public async Task ARedirectToItselfIsRefusedAtWriteTime()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var refused = await _bench.Resolve<IRedirectService>().CreateAsync(
             new CreateRedirectRequest("/loop", ToUrl: "/loop"),
@@ -94,10 +97,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         refused.Diagnostics.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(RoutingCodes.Loop);
     }
 
-    [Fact]
+    [Test]
     public async Task AChainThatWouldCloseIsRefusedAtWriteTime()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         await redirects.CreateAsync(new CreateRedirectRequest("/a", ToUrl: "/b"), cancellationToken);
@@ -113,10 +116,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         refused.Diagnostics.Diagnostics.Should().ContainSingle().Which.Code.Should().Be(RoutingCodes.Loop);
     }
 
-    [Fact]
+    [Test]
     public async Task AManualRedirectSurvivesATreeMoveThatWouldOtherwiseOverwriteIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Careers", cancellationToken);
 
@@ -140,10 +143,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await redirects.ResolveAsync("/jobs", cancellationToken))!.TargetUrl.Should().Be("/external-careers");
     }
 
-    [Fact]
+    [Test]
     public async Task ADisabledRedirectIsNotServedButStillHoldsItsSourceUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         var created = await redirects.CreateAsync(
@@ -164,10 +167,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await _bench.Context.Redirects.CountAsync(cancellationToken)).Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task FollowingARedirectCountsAHit()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         var created = await redirects.CreateAsync(
@@ -189,10 +192,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.LastHitOn.Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ADestinationExpressedAsAPageIsReportedAsThatPagesCurrentUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Support", cancellationToken);
 
@@ -212,17 +215,17 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         created.Value.ResolvedToUrl.Should().Be("/support");
     }
 
-    [Theory]
-    [InlineData(null, "/somewhere", "redirect.source-invalid")]
-    [InlineData("/", "/somewhere", "redirect.source-invalid")]
-    [InlineData("/from", null, "redirect.destination-invalid")]
-    [InlineData("/from", "/to", "redirect.status-invalid")]
+    [Test]
+    [Arguments(null, "/somewhere", "redirect.source-invalid")]
+    [Arguments("/", "/somewhere", "redirect.source-invalid")]
+    [Arguments("/from", null, "redirect.destination-invalid")]
+    [Arguments("/from", "/to", "redirect.status-invalid")]
     public async Task AnUnusableRedirectIsRefusedWithTheCodeThatNamesTheRemedy(
         string? from,
         string? to,
         string expectedCode)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // The status case reuses the valid pair and supplies a status no browser treats as a
         // redirect, which is the only way to reach that code from this table.
@@ -236,10 +239,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         refused.Diagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.Code == expectedCode);
     }
 
-    [Fact]
+    [Test]
     public async Task NamingBothAPageAndAUrlIsRefusedRatherThanResolvedByPrecedence()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
         var page = await _bench.AddPageAsync(template, "Somewhere", cancellationToken);
 
@@ -254,10 +257,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Contain(diagnostic => diagnostic.Code == RoutingCodes.DestinationInvalid);
     }
 
-    [Fact]
+    [Test]
     public async Task ACsvImportCreatesRedirectsAndWarnsAboutTheRowsItSkipped()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         const string csv = """
             from,to,status,notes
@@ -291,10 +294,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         (await redirects.ResolveAsync("/legacy/three", cancellationToken)).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task AnExportCanBeImportedBackUnchanged()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var redirects = _bench.Resolve<IRedirectService>();
 
         await redirects.CreateAsync(
@@ -328,10 +331,10 @@ public class RedirectServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         stored[1].StatusCode.Should().Be(302);
     }
 
-    [Fact]
+    [Test]
     public async Task ImportIsCaseAndSlashInsensitiveAboutSourcesItHasAlreadySeen()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         const string csv = """
             /Legacy/Page/,/target

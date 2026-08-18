@@ -2,6 +2,7 @@ using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
+using ContentManagementSystem.TestSupport;
 
 using FluentAssertions;
 
@@ -26,7 +27,7 @@ public class SaveInterceptorTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    [Fact]
+    [Test]
     public void RemovingASoftDeletableEntityBecomesAFlagUpdate()
     {
         using var context = Context();
@@ -42,7 +43,7 @@ public class SaveInterceptorTests
         page.DeletedBy.Should().Be(42);
     }
 
-    [Fact]
+    [Test]
     public void RemovingAnAlreadyDeletedEntityStaysADelete()
     {
         using var context = Context();
@@ -57,7 +58,7 @@ public class SaveInterceptorTests
         context.Entry(page).State.Should().Be(EntityState.Deleted);
     }
 
-    [Fact]
+    [Test]
     public void AnInsertIsStampedWithBothCreationAndModification()
     {
         using var context = Context();
@@ -72,7 +73,7 @@ public class SaveInterceptorTests
         page.ModifiedOn.Should().Be(Now);
     }
 
-    [Fact]
+    [Test]
     public void AnUpdateIsStampedWithoutDisturbingTheCreationAttribution()
     {
         using var context = Context();
@@ -89,7 +90,7 @@ public class SaveInterceptorTests
         page.ModifiedOn.Should().Be(Now);
     }
 
-    [Fact]
+    [Test]
     public void AnUntouchedEntityIsNotStamped()
     {
         using var context = Context();
@@ -101,7 +102,7 @@ public class SaveInterceptorTests
         context.Entry(page).State.Should().Be(EntityState.Unchanged);
     }
 
-    [Fact]
+    [Test]
     public void AnInsertIsCapturedAsACreateCarryingItsNewValues()
     {
         using var context = Context();
@@ -119,7 +120,7 @@ public class SaveInterceptorTests
         audit.OldValues.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void AnUpdateIsCapturedWithOnlyTheColumnsThatChanged()
     {
         using var context = Context();
@@ -135,7 +136,7 @@ public class SaveInterceptorTests
         audit.NewValues.Should().Contain(@"""Slug"":""about""");
     }
 
-    [Fact]
+    [Test]
     public void AnExemptEntityIsNotCaptured()
     {
         using var context = Context();
@@ -154,7 +155,7 @@ public class SaveInterceptorTests
         Audits(context).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AuditRowsAreNotThemselvesAudited()
     {
         using var context = Context();
@@ -166,7 +167,7 @@ public class SaveInterceptorTests
         Audits(context).Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void TheInterceptorsRunInTheOrderThatMakesASoftDeleteReadAsAnUpdate()
     {
         using var context = Context();
@@ -210,9 +211,17 @@ public class SaveInterceptorTests
     }
 
     /// <summary>A context with a built model and no connection behind it.</summary>
+    /// <summary>A context that never opens a connection, holding the same model as every other.</summary>
+    /// <remarks>
+    /// The connection string is deliberately unreachable — nothing here saves. The application
+    /// service provider is not optional even so: a context built without it has a different Identity
+    /// schema, and one of those in the process is enough to fail every suite that migrates. See
+    /// <see cref="IdentityModelServices"/>.
+    /// </remarks>
     private static ApplicationDbContext Context() =>
         new(new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer("Server=none;Database=none;Trusted_Connection=False")
+            .UseApplicationServiceProvider(IdentityModelServices.Instance)
             .Options);
 
     /// <summary>A page the context believes it read from the database.</summary>

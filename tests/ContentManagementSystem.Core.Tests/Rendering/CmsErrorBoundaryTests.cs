@@ -52,10 +52,10 @@ public class CmsErrorBoundaryTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Theory]
-    [InlineData("throwsOnParameters")]
-    [InlineData("throwsWhileBuilding")]
-    [InlineData("throwsAfterAwait")]
+    [Test]
+    [Arguments("throwsOnParameters")]
+    [Arguments("throwsWhileBuilding")]
+    [Arguments("throwsAfterAwait")]
     public void AZoneWhoseRendererThrowsLosesOnlyThatZone(string failingFieldTypeKey)
     {
         var page = RenderPage(
@@ -75,7 +75,7 @@ public class CmsErrorBoundaryTests : IDisposable
         page.Markup.Should().Contain("Still here");
     }
 
-    [Fact]
+    [Test]
     public void AHalfWrittenSubtreeDoesNotReachThePage()
     {
         var markup = Render(("first", """{"type":"throwsWhileBuilding","value":"boom"}"""));
@@ -86,7 +86,7 @@ public class CmsErrorBoundaryTests : IDisposable
         markup.Should().NotContain("half-written");
     }
 
-    [Fact]
+    [Test]
     public void TheFailureIsLoggedWithThePageZoneAndVersion()
     {
         Render(("first", """{"type":"throwsOnParameters","value":"boom"}"""));
@@ -103,7 +103,7 @@ public class CmsErrorBoundaryTests : IDisposable
             entry.Message.Contains("1004"));
     }
 
-    [Fact]
+    [Test]
     public void ABlockThatThrowsLosesOnlyThatBlockAndItsSiblingsStillRender()
     {
         var markup = Render(("first", $$"""
@@ -127,7 +127,7 @@ public class CmsErrorBoundaryTests : IDisposable
         markup.Should().Contain("data-cms-block=\"22222222-2222-4222-8222-222222222222\"");
     }
 
-    [Fact]
+    [Test]
     public void ABlockFailureNamesTheBlockAndItsTypeInTheLog()
     {
         Render(("first", """
@@ -147,7 +147,7 @@ public class CmsErrorBoundaryTests : IDisposable
             entry.Message.Contains("throwing-block"));
     }
 
-    [Fact]
+    [Test]
     public async Task TheDeliveryRenderPathSeesTheBoundaryMarkerToo()
     {
         // The delivery path is HtmlRenderer-to-string, not bUnit, and the difference matters for

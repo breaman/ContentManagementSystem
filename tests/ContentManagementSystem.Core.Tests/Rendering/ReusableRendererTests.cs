@@ -34,7 +34,7 @@ public class ReusableRendererTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ALateBoundPlacementRendersWhicheverVersionIsPublishedNow()
     {
         _harness.Reusable.Add(
@@ -50,7 +50,7 @@ public class ReusableRendererTests : IDisposable
         markup.Should().Contain("February banner").And.NotContain("January banner");
     }
 
-    [Fact]
+    [Test]
     public void APinnedPlacementRendersTheVersionItNamesRatherThanTheLatest()
     {
         _harness.Reusable.Add(
@@ -66,7 +66,7 @@ public class ReusableRendererTests : IDisposable
         markup.Should().Contain("January banner").And.NotContain("February banner");
     }
 
-    [Fact]
+    [Test]
     public void APlacementOfAnUnpublishedItemRendersNothingAndSaysWhy()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>Draft banner</p>"))], publishedVersionId: null);
@@ -81,7 +81,7 @@ public class ReusableRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("is not published"));
     }
 
-    [Fact]
+    [Test]
     public void AnUnpublishedItemStillRendersInPreviewSoAnEditorCanSeeIt()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>Draft banner</p>"))], publishedVersionId: null);
@@ -95,7 +95,7 @@ public class ReusableRendererTests : IDisposable
         markup.Should().Contain("Draft banner");
     }
 
-    [Fact]
+    [Test]
     public void APlacementIsBadgedInPreviewAndNotOnThePublicSite()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>Footer</p>"))], publishedVersionId: 101);
@@ -111,7 +111,7 @@ public class ReusableRendererTests : IDisposable
         preview.Should().Contain("cms-reusable-badge");
     }
 
-    [Fact]
+    [Test]
     public void AStalePinIsMarkedForTheUpdateToLatestAction()
     {
         _harness.Reusable.Add(
@@ -132,7 +132,7 @@ public class ReusableRendererTests : IDisposable
         preview.Should().Contain("""data-cms-reusable-latest="2" """.TrimEnd());
     }
 
-    [Fact]
+    [Test]
     public void APinToTheVersionThatIsCurrentIsNotStale()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>v1</p>"))], publishedVersionId: 101);
@@ -146,7 +146,7 @@ public class ReusableRendererTests : IDisposable
         preview.Should().Contain("""data-cms-reusable-stale="false" """.TrimEnd());
     }
 
-    [Fact]
+    [Test]
     public void APinToAVersionThatIsGoneRendersNothingAndPointsAtTheRemedy()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>v1</p>"))], publishedVersionId: 101);
@@ -162,7 +162,7 @@ public class ReusableRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("update to latest"));
     }
 
-    [Fact]
+    [Test]
     public void ANestedPlacementRendersThroughTheSameDispatch()
     {
         // Item 4 is a footer whose own content places item 3, the banner.
@@ -180,7 +180,7 @@ public class ReusableRendererTests : IDisposable
         markup.Should().Contain("Outer footer").And.Contain("Inner banner");
     }
 
-    [Fact]
+    [Test]
     public void AnItemThatPlacesItselfRendersOnceAndStops()
     {
         // A cycle is refused when content is written, so this payload could only have arrived by an
@@ -200,7 +200,7 @@ public class ReusableRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("closes a loop"));
     }
 
-    [Fact]
+    [Test]
     public void NestingDeeperThanTheCeilingIsTruncatedRatherThanFollowed()
     {
         // A chain of items, each placing the next, longer than the delivery path will follow. Built
@@ -230,7 +230,7 @@ public class ReusableRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("nests deeper"));
     }
 
-    [Fact]
+    [Test]
     public void EveryOutcomeStillDeclaresTheDependency()
     {
         _harness.Reusable.Add(3, RawHtml, [(101, Fragment("<p>Footer</p>"))], publishedVersionId: 101);
@@ -244,7 +244,7 @@ public class ReusableRendererTests : IDisposable
         missing.CacheTags.Contains(CacheTags.Reusable(9)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void TheTagNamesTheItemEvenWhenThePlacementPinsAVersion()
     {
         _harness.Reusable.Add(

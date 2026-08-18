@@ -45,7 +45,7 @@ internal static class FieldTypeTestHarness
             Element(propertyJson),
             FieldConfiguration.Parse(configurationJson, isRequired),
             mode,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
     /// <summary>Validates an element directly, for the absent and null cases.</summary>
     /// <param name="fieldType">The field type under test.</param>
@@ -63,7 +63,7 @@ internal static class FieldTypeTestHarness
             property,
             FieldConfiguration.Parse(configurationJson, isRequired),
             mode,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
     /// <summary>Sanitizes a stored property written as JSON text.</summary>
     /// <param name="fieldType">The field type under test.</param>
@@ -76,7 +76,7 @@ internal static class FieldTypeTestHarness
         fieldType.SanitizeAsync(
             Element(propertyJson),
             FieldConfiguration.Parse(configurationJson),
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
     /// <summary>The codes reported, for asserting on without pinning message wording.</summary>
     /// <param name="result">The validation result.</param>

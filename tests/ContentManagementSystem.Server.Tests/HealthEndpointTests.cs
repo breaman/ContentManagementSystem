@@ -12,13 +12,14 @@ namespace ContentManagementSystem.Server.Tests;
 /// broken host configuration surfaces as one obvious failure rather than as a wall of unrelated
 /// endpoint failures.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class HealthEndpointTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task HealthReportsHealthy()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var factory = await CmsApplicationFactory.CreateAsync(fixture, cancellationToken);
         using var client = factory.CreateClient();
 
@@ -28,10 +29,10 @@ public class HealthEndpointTests(SqlServerFixture fixture)
         (await response.Content.ReadAsStringAsync(cancellationToken)).Should().Be("Healthy");
     }
 
-    [Fact]
+    [Test]
     public async Task AliveReportsHealthy()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var factory = await CmsApplicationFactory.CreateAsync(fixture, cancellationToken);
         using var client = factory.CreateClient();
 

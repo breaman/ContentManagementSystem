@@ -29,7 +29,7 @@ public class ReferenceFieldRendererTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AnInternalLinkResolvesToTheTargetsCurrentUrl()
     {
         // Decision D6's whole payoff: the payload holds an id, and the URL is looked up now.
@@ -38,7 +38,7 @@ public class ReferenceFieldRendererTests : IDisposable
         markup.Should().Contain("href=\"/about\"").And.Contain("Get started");
     }
 
-    [Fact]
+    [Test]
     public void AResolvedInternalLinkTagsTheTargetPage()
     {
         // Without this, renaming the target leaves its old URL cached on every page linking to it.
@@ -47,14 +47,14 @@ public class ReferenceFieldRendererTests : IDisposable
         context.CacheTags.Contains(CacheTags.Page(44)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnInternalLinkWithNoTextFallsBackToTheTargetsCurrentTitle()
     {
         // The current title, not the one it had when the link was authored.
         _harness.Render("""{"type":"link","kind":"page","pageId":44}""").Should().Contain("About us");
     }
 
-    [Fact]
+    [Test]
     public void AnUnpublishedTargetIsInvisibleToTheLiveSiteAndBadgedInPreview()
     {
         // The central promise of spec section 12.3, applied to one link.
@@ -67,7 +67,7 @@ public class ReferenceFieldRendererTests : IDisposable
         preview.Should().Contain("href=\"/drafts/unreleased\"").And.Contain("cms-link-draft");
     }
 
-    [Fact]
+    [Test]
     public void ADraftTargetIsBadgedWithVisibleTextRatherThanOnlyAClass()
     {
         // Task P3-20. The framed page is styled by the *site's* stylesheet, written by whoever built
@@ -81,7 +81,7 @@ public class ReferenceFieldRendererTests : IDisposable
         preview.Should().Contain("cms-draft-badge").And.Contain(">draft<");
     }
 
-    [Fact]
+    [Test]
     public void APublishedTargetIsNotBadgedInPreview()
     {
         // The other half, and the one that fails silently: a badge on everything says nothing, and a
@@ -95,7 +95,7 @@ public class ReferenceFieldRendererTests : IDisposable
             .And.NotContain("cms-link-draft");
     }
 
-    [Fact]
+    [Test]
     public void APageReferenceListBadgesOnlyItsUnpublishedEntries()
     {
         // The same rule one level up. A list is where the mistake actually gets made: a reviewer
@@ -110,7 +110,7 @@ public class ReferenceFieldRendererTests : IDisposable
             .Should().HaveCount(1, "only the unpublished entry is a draft");
     }
 
-    [Fact]
+    [Test]
     public void ALinkToAPageThatNoLongerExistsRendersItsTextAndLogs()
     {
         // A dead href puts a 404 in front of a reader; rendering nothing removes a sentence's words.
@@ -120,7 +120,7 @@ public class ReferenceFieldRendererTests : IDisposable
         _harness.Logs.Entries.Should().Contain(entry => entry.Level == LogLevel.Warning);
     }
 
-    [Fact]
+    [Test]
     public void AnExternalLinkIsCheckedAgainstTheSchemeAllowlistOnTheWayOut()
     {
         // Rows written before the write-time check existed are not covered by it, and
@@ -134,7 +134,7 @@ public class ReferenceFieldRendererTests : IDisposable
             .Should().Contain("href=\"https://example.test\"");
     }
 
-    [Fact]
+    [Test]
     public void AnExternalLinkCarriesNoopenerAndKeepsWhateverTheAuthorStored()
     {
         var markup = _harness.Render(
@@ -143,7 +143,7 @@ public class ReferenceFieldRendererTests : IDisposable
         markup.Should().Contain("nofollow").And.Contain("noopener").And.Contain("noreferrer");
     }
 
-    [Fact]
+    [Test]
     public void ATargetTheStoredValueInventedIsDropped()
     {
         var markup = _harness.Render(
@@ -152,7 +152,7 @@ public class ReferenceFieldRendererTests : IDisposable
         markup.Should().NotContain("_everywhere");
     }
 
-    [Fact]
+    [Test]
     public void AnchorAndEmailLinksAreBuiltFromTheirOwnMembers()
     {
         _harness.Render("""{"type":"link","kind":"anchor","anchor":"#pricing","text":"Pricing"}""")
@@ -162,7 +162,7 @@ public class ReferenceFieldRendererTests : IDisposable
             .Should().Contain("href=\"mailto:hi@example.test\"");
     }
 
-    [Fact]
+    [Test]
     public void AMediaLinkDeclaresItsDependencyEvenThoughTheLibraryIsNotBuiltYet()
     {
         // The tag has to be on every page that ever rendered the link, or the pages published before
@@ -172,7 +172,7 @@ public class ReferenceFieldRendererTests : IDisposable
         context.CacheTags.Contains(CacheTags.Media(812)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ASinglePageReferenceIsABareAnchorAndSeveralAreAList()
     {
         // A "related article" placed in a sentence must not drag a <ul> into it.
@@ -183,7 +183,7 @@ public class ReferenceFieldRendererTests : IDisposable
             .Should().Contain("<ul").And.Contain("About us").And.Contain("Launch day");
     }
 
-    [Fact]
+    [Test]
     public void APageReferenceThatResolvesToNothingIsOmittedAndTheRestSurvive()
     {
         var markup = _harness.Render("""{"type":"pageReference","value":[44,999,45]}""");
@@ -193,7 +193,7 @@ public class ReferenceFieldRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("999"));
     }
 
-    [Fact]
+    [Test]
     public void EveryReferencedPageIsTaggedIncludingTheOnesThatDidNotResolve()
     {
         // A reference to a page that is not published yet must re-render when it is, so the tag
@@ -204,7 +204,7 @@ public class ReferenceFieldRendererTests : IDisposable
         context.CacheTags.Contains(CacheTags.Page(999)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnUnresolvableMediaItemRendersThePlaceholderWithItsAltTextAndTagsTheItem()
     {
         // Spec section 15.3's answer for an item that has been deleted out from under a page: the
@@ -217,7 +217,7 @@ public class ReferenceFieldRendererTests : IDisposable
         context.CacheTags.Contains(CacheTags.Media(812)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AMediaListTagsEveryItemItRenders()
     {
         var context = RenderTagged(
@@ -227,7 +227,7 @@ public class ReferenceFieldRendererTests : IDisposable
         context.CacheTags.Contains(CacheTags.Media(813)).Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnUnresolvableReusablePlacementRendersNothingButStillDeclaresTheDependency()
     {
         // Nothing is registered in the resolver, so item 3 does not exist — which renders nothing

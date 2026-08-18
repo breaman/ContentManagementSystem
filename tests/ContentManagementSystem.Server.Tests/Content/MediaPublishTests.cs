@@ -31,21 +31,24 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// test pass with dimensions no decoder ever agreed to.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class MediaPublishTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
     /// <remarks>Acceptance criterion P5 #11.</remarks>
-    [Fact]
+    [Test]
     public async Task PublishingAPageWhoseImageHasNeitherAltTextNorADecorativeFlagFailsValidation()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken);
 
         // Uploaded with the upload-time check relaxed, which is the state a migrated library is in:
@@ -66,10 +69,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
             diagnostic.Severity == ValidationSeverity.Error);
     }
 
-    [Fact]
+    [Test]
     public async Task ThePlacementsOwnDescriptionSatisfiesTheRuleWithoutChangingTheLibrary()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken);
         var image = await _bench.AddImageAsync(1200, 800, cancellationToken, altText: null);
 
@@ -90,10 +93,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         published.IsSuccess.Should().BeTrue(Because(published));
     }
 
-    [Fact]
+    [Test]
     public async Task ADecorativeImageIsPublishableWithNothingWrittenAboutItAnywhere()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken);
 
         var divider = await _bench.AddImageAsync(
@@ -117,10 +120,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// of undescribed pictures at once, and a rule that made every one of those pages unpublishable
     /// would be turned off wholesale rather than worked through.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ADeploymentMayDowngradeTheAltTextRuleToAWarningAndStillPublish()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         _bench.Resolve<MediaValidationOptions>().MissingAltTextSeverity = ValidationSeverity.Warning;
 
@@ -138,10 +141,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         published.Value!.Warnings.Should().Contain(warning => warning.Code == MediaCodes.AltTextRequired);
     }
 
-    [Fact]
+    [Test]
     public async Task APlacementOfAnImageInTheRecycleBinIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken);
         var image = await _bench.AddImageAsync(1200, 800, cancellationToken);
 
@@ -165,10 +168,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// The <c>minWidth</c> half of task P5-19, and the reason the check measures the picture as
     /// placed: the same photograph passes and fails depending on how much of it this page uses.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AMinimumWidthIsJudgedAgainstThePictureAfterThePlacementsOwnCrop()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken, """{"minWidth":1000}""");
         var image = await _bench.AddImageAsync(1200, 800, cancellationToken);
 
@@ -204,10 +207,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// picture the page will show. Cropping to fit is how an editor satisfies it, which is what makes
     /// the setting usable rather than a demand to re-upload.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AnAspectRatioIsSatisfiedByCroppingRatherThanByReUploading()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken, """{"aspectRatio":"16:9"}""");
 
         // 4:3, which is not 16:9 by any tolerance.
@@ -246,10 +249,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// through markup that was designed for the other thing, and the failure surfaces on the public
     /// site rather than here.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ASlotRestrictedToImagesTakesAPhotographAndRefusesADocument()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken, """{"allowedTypes":["Image"]}""");
         var image = await _bench.AddImageAsync(800, 600, cancellationToken);
 
@@ -275,10 +278,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// Acceptance criterion P5 #7. Two pages showing one picture, cropped differently — the proof
     /// that a usage-scope edit is stored on the placement and not on the item (spec section 13.4).
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AUsageLevelCropAffectsOnlyThatPageAndLeavesTheOtherUsageUntouched()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("gallery", cancellationToken, MediaZone("hero"));
         var cropped = await _bench.AddPageAsync(template, "Cropped", cancellationToken);
         var whole = await _bench.AddPageAsync(template, "Whole", cancellationToken);
@@ -329,10 +332,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// visible to <em>every</em> page showing the item, because none of them stored anything about
     /// its geometry in the first place.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task RotatingAnImageInTheLibraryChangesWhatEveryPageShowingItResolvesTo()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("gallery", cancellationToken, MediaZone("hero"));
         var first = await _bench.AddPageAsync(template, "First", cancellationToken);
         var second = await _bench.AddPageAsync(template, "Second", cancellationToken);
@@ -378,10 +381,10 @@ public class MediaPublishTests(SqlServerFixture fixture) : IAsyncLifetime
     /// exactly the <c>ContentReference</c> row the purge guard reads, and the where-used endpoint
     /// names the page that caused the refusal (spec section 13.8).
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task PermanentDeletionOfAPlacedImageIsRefusedAndTheWhereUsedListNamesThePage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PageWithImageZoneAsync(cancellationToken);
         var image = await _bench.AddImageAsync(1200, 800, cancellationToken);
 

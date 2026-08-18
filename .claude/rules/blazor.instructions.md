@@ -148,7 +148,7 @@ Key rules:
 ## Testing and Debugging in Visual Studio
 
 - All unit testing and integration testing should be done in Visual Studio Enterprise.
-- Test Blazor components and services using xUnit, NUnit, or MSTest.
+- Test Blazor components and services with TUnit and bUnit — TUnit is this repository's test framework, and no test should introduce another.
 - Use Moq or NSubstitute for mocking dependencies during tests.
 - Debug Blazor UI issues using browser developer tools and Visual Studio's debugging tools for backend and server-side issues.
 - For performance profiling and optimization, rely on Visual Studio's diagnostics tools.

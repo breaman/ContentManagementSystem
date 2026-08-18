@@ -19,36 +19,36 @@ namespace ContentManagementSystem.Server.Tests.Services;
 /// </remarks>
 public class PrerenderGateTests
 {
-    [Fact]
+    [Test]
     public async Task OverlappingOperationsRunOneAtATime()
     {
         var gate = new PrerenderGate();
         var monitor = new OverlapMonitor();
 
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
-            gate.RunAsync(_ => monitor.RunAsync(), TestContext.Current.CancellationToken)));
+            gate.RunAsync(_ => monitor.RunAsync(), TestContext.Current!.Execution.CancellationToken)));
 
         monitor.Overlaps.Should().Be(0);
         monitor.Calls.Should().Be(8);
     }
 
-    [Fact]
+    [Test]
     public async Task AFailedOperationLeavesTheGateOpen()
     {
         var gate = new PrerenderGate();
 
         var failing = async () => await gate.RunAsync<int>(
             _ => Task.FromException<int>(new InvalidOperationException("boom")),
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         await failing.Should().ThrowAsync<InvalidOperationException>();
 
-        var after = await gate.RunAsync(_ => Task.FromResult(7), TestContext.Current.CancellationToken);
+        var after = await gate.RunAsync(_ => Task.FromResult(7), TestContext.Current!.Execution.CancellationToken);
 
         after.Should().Be(7);
     }
 
-    [Fact]
+    [Test]
     public async Task ComponentsInitializingTogetherDoNotOverlapInsideTheStructureShim()
     {
         var monitor = new OverlapMonitor();
@@ -69,7 +69,7 @@ public class PrerenderGateTests
             new PrerenderGate());
 
         await Task.WhenAll(Enumerable.Range(0, 8).Select(_ =>
-            client.GetBlockTypesAsync(TestContext.Current.CancellationToken)));
+            client.GetBlockTypesAsync(TestContext.Current!.Execution.CancellationToken)));
 
         monitor.Overlaps.Should().Be(0);
         monitor.Calls.Should().Be(8);

@@ -11,7 +11,7 @@ public class TemporalFieldTypeTests
     private readonly DateFieldType _date = new();
     private readonly DateTimeFieldType _dateTime = new();
 
-    [Fact]
+    [Test]
     public async Task AnIsoDateIsAccepted()
     {
         var result = await _date.ValidateAsync("""{ "type": "date", "value": "2026-08-12" }""");
@@ -19,12 +19,12 @@ public class TemporalFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("08/12/2026")]
-    [InlineData("12 August 2026")]
-    [InlineData("2026-8-12")]
-    [InlineData("2026-02-30")]
-    [InlineData("2026-08-12T00:00:00Z")]
+    [Test]
+    [Arguments("08/12/2026")]
+    [Arguments("12 August 2026")]
+    [Arguments("2026-8-12")]
+    [Arguments("2026-02-30")]
+    [Arguments("2026-08-12T00:00:00Z")]
     public async Task OtherDateNotationsAreRefused(string value)
     {
         var result = await _date.ValidateAsync($$"""{ "type": "date", "value": "{{value}}" }""");
@@ -34,7 +34,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.DateFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task ADateBeforeMinIsRejected()
     {
         var result = await _date.ValidateAsync(
@@ -44,7 +44,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Min);
     }
 
-    [Fact]
+    [Test]
     public async Task ADateAfterMaxIsRejected()
     {
         var result = await _date.ValidateAsync(
@@ -54,10 +54,10 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Max);
     }
 
-    [Theory]
-    [InlineData("2026-08-12T09:30:00Z")]
-    [InlineData("2026-08-12T09:30:00+02:00")]
-    [InlineData("2026-08-12T09:30:00.125Z")]
+    [Test]
+    [Arguments("2026-08-12T09:30:00Z")]
+    [Arguments("2026-08-12T09:30:00+02:00")]
+    [Arguments("2026-08-12T09:30:00.125Z")]
     public async Task AnInstantWithAnOffsetIsAccepted(string value)
     {
         var result = await _dateTime.ValidateAsync($$"""{ "type": "dateTime", "value": "{{value}}" }""");
@@ -65,7 +65,7 @@ public class TemporalFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnInstantWithNoOffsetIsRejected()
     {
         var result = await _dateTime.ValidateAsync(
@@ -76,7 +76,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.DateTimeOffset);
     }
 
-    [Fact]
+    [Test]
     public async Task ADateOnlyValueIsNotAnInstant()
     {
         var result = await _dateTime.ValidateAsync("""{ "type": "dateTime", "value": "2026-08-12" }""");
@@ -84,7 +84,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.DateTimeOffset);
     }
 
-    [Fact]
+    [Test]
     public async Task NonsenseIsReportedAsAFormatProblem()
     {
         var result = await _dateTime.ValidateAsync("""{ "type": "dateTime", "value": "tomorrow" }""");
@@ -92,7 +92,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.DateTimeFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task BoundsAreComparedAsInstantsRatherThanAsText()
     {
         var result = await _dateTime.ValidateAsync(
@@ -103,7 +103,7 @@ public class TemporalFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Min);
     }
 
-    [Fact]
+    [Test]
     public async Task AnInstantAfterMaxIsRejected()
     {
         var result = await _dateTime.ValidateAsync(

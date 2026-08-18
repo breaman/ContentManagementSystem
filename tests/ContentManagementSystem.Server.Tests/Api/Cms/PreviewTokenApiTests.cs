@@ -17,23 +17,26 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// ever carries the secret</em>. A leak through the list endpoint would be invisible to the service
 /// tests, because the service is not what serializes it.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PreviewTokenApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PreviewTokenApiTests(SqlServerFixture fixture)
 {
     /// <summary>Route of the preview-token collection.</summary>
     private const string Tokens = $"{CmsApiEndpoints.BasePath}/preview-tokens";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ALinkIsIssuedListedAndRevoked()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var page = await PageAsync(client, "issued", cancellationToken);
@@ -70,10 +73,10 @@ public class PreviewTokenApiTests(SqlServerFixture fixture) : IAsyncLifetime
             token => token.RevokedOn != null && !token.IsActive);
     }
 
-    [Fact]
+    [Test]
     public async Task NoResponseButTheCreatingOneEverCarriesTheSecret()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var page = await PageAsync(client, "secret", cancellationToken);
@@ -101,10 +104,10 @@ public class PreviewTokenApiTests(SqlServerFixture fixture) : IAsyncLifetime
         listed.Should().NotContain("tokenHash").And.NotContain("TokenHash");
     }
 
-    [Fact]
+    [Test]
     public async Task AnAuthorMayShareTheirOwnWorkAndAViewerMayNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var page = await PageAsync(administrator, "permissions", cancellationToken);
@@ -130,10 +133,10 @@ public class PreviewTokenApiTests(SqlServerFixture fixture) : IAsyncLifetime
         listed.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [Test]
     public async Task AnImpossibleExpiryIsRefusedWithTheProblemShapeTheClientSwitchesOn()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var page = await PageAsync(client, "expiry", cancellationToken);
@@ -149,10 +152,10 @@ public class PreviewTokenApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain(PreviewCodes.ExpiryInvalid);
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkForAPageThatDoesNotExistIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var refused = await client.PostAsJsonAsync(

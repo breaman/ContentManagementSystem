@@ -14,7 +14,7 @@ namespace ContentManagementSystem.Core.Tests.Rendering;
 /// </summary>
 public class FieldRendererCatalogTests
 {
-    [Fact]
+    [Test]
     public void EveryFieldTypeARealDeploymentRegistersResolvesToARenderer()
     {
         // The acceptance the task exists for. Adding a field type without a renderer fails here, by
@@ -25,7 +25,7 @@ public class FieldRendererCatalogTests
         catalog.FieldTypeKeys.Should().HaveCount(FieldRendererHarness.Registry.All.Count);
     }
 
-    [Fact]
+    [Test]
     public void TheCatalogDescribesTheDeploymentRatherThanTheBuiltInTable()
     {
         // A field type that was removed from the deployment must have no renderer, or content
@@ -36,7 +36,7 @@ public class FieldRendererCatalogTests
         catalog.TryGetRenderer("richText", out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeThatNamesItsOwnRendererIsTakenAtItsWord()
     {
         // The extension author's path: a field type shipped above Rendering in the reference graph
@@ -48,7 +48,7 @@ public class FieldRendererCatalogTests
         renderer.Should().Be<AlternateFieldRenderer>();
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeWithNoRendererFromEitherSourceIsReportedRatherThanThrown()
     {
         // Reported, because the pages using it still render everything else and every other page on
@@ -60,7 +60,7 @@ public class FieldRendererCatalogTests
         catalog.TryGetRenderer("nobodysFieldType", out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ARendererThatIsNotAComponentIsRefusedAtStartup()
     {
         // Same rule CmsComponentCatalog applies to a template declaration on a non-component:
@@ -71,7 +71,7 @@ public class FieldRendererCatalogTests
             .WithMessage("*is not a Razor component*");
     }
 
-    [Fact]
+    [Test]
     public void AnUnknownKeyResolvesToNothingRatherThanThrowing()
     {
         // The key comes out of a stored payload, where anything is possible and nothing may throw on
@@ -82,7 +82,7 @@ public class FieldRendererCatalogTests
         catalog.TryGetRenderer(string.Empty, out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void EveryBuiltInRendererIsARazorComponent()
     {
         BuiltInFieldRenderers.ByFieldTypeKey.Values.Should()

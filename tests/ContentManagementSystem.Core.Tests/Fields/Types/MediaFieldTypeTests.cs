@@ -12,7 +12,7 @@ public class MediaFieldTypeTests
 
     private readonly MediaListFieldType _list = new();
 
-    [Fact]
+    [Test]
     public async Task APickedItemIsAccepted()
     {
         var result = await _media.ValidateAsync(
@@ -25,7 +25,7 @@ public class MediaFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APropertyWithNoPickedItemIsUnfilledRatherThanMalformed()
     {
         var draft = await _media.ValidateAsync("""{ "type": "media" }""", isRequired: true);
@@ -38,7 +38,7 @@ public class MediaFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task GeometryWithoutAPickedItemIsStillUnfilled()
     {
         var result = await _media.ValidateAsync(
@@ -51,7 +51,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task AnIdThatCouldNotBelongToAnEntityIsRejected()
     {
         var result = await _media.ValidateAsync("""{ "type": "media", "mediaId": 0 }""");
@@ -59,7 +59,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ReferenceId);
     }
 
-    [Fact]
+    [Test]
     public async Task AnIdStoredAsTextIsRejected()
     {
         var result = await _media.ValidateAsync("""{ "type": "media", "mediaId": "812" }""");
@@ -67,7 +67,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ReferenceId);
     }
 
-    [Fact]
+    [Test]
     public async Task AFocalPointOutsideTheImageIsRejected()
     {
         var result = await _media.ValidateAsync(
@@ -77,7 +77,7 @@ public class MediaFieldTypeTests
         result.Paths().Should().Equal("focalPoint");
     }
 
-    [Fact]
+    [Test]
     public async Task ACropRunningOffTheEdgeIsRejected()
     {
         var result = await _media.ValidateAsync(
@@ -87,7 +87,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MediaCrop);
     }
 
-    [Fact]
+    [Test]
     public async Task ACropWithNoAreaIsRejected()
     {
         var result = await _media.ValidateAsync(
@@ -96,7 +96,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MediaCrop);
     }
 
-    [Fact]
+    [Test]
     public async Task AClearedCropIsNotAMalformedOne()
     {
         var result = await _media.ValidateAsync(
@@ -105,7 +105,7 @@ public class MediaFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AltTextThatIsNotTextIsRejected()
     {
         var result = await _media.ValidateAsync("""{ "type": "media", "mediaId": 812, "altOverride": 7 }""");
@@ -113,7 +113,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public void APickedItemIsReportedAsAReference()
     {
         var references = _media.ExtractReferences("""{ "type": "media", "mediaId": 812 }""");
@@ -122,13 +122,13 @@ public class MediaFieldTypeTests
             .Which.Should().Be(new ContentReference(ContentReferenceTargetType.Media, 812));
     }
 
-    [Fact]
+    [Test]
     public void AnEmptyPickerReportsNothing()
     {
         _media.ExtractReferences("""{ "type": "media", "mediaId": null }""").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task AGalleryOfPickedItemsIsAccepted()
     {
         var result = await _list.ValidateAsync(
@@ -137,7 +137,7 @@ public class MediaFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task TheOffendingGalleryItemIsNamedByItsPosition()
     {
         var result = await _list.ValidateAsync(
@@ -146,7 +146,7 @@ public class MediaFieldTypeTests
         result.Paths().Should().Equal("items[1].mediaId");
     }
 
-    [Fact]
+    [Test]
     public async Task AGalleryLongerThanTheMaximumIsRejected()
     {
         var result = await _list.ValidateAsync(
@@ -156,7 +156,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxItems);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyGallerySavesAsADraftButDoesNotSatisfyAMinimumOnPublish()
     {
         var draft = await _list.ValidateAsync("""{ "type": "mediaList", "items": [] }""", """{ "min": 1 }""");
@@ -171,7 +171,7 @@ public class MediaFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.MinItems);
     }
 
-    [Fact]
+    [Test]
     public async Task AGalleryThatIsNotAListIsAShapeError()
     {
         var result = await _list.ValidateAsync("""{ "type": "mediaList", "items": { "mediaId": 1 } }""");
@@ -179,7 +179,7 @@ public class MediaFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public void EveryGalleryItemIsReportedAtItsOwnPosition()
     {
         var references = _list.ExtractReferences(
@@ -190,7 +190,7 @@ public class MediaFieldTypeTests
             new ContentReference(ContentReferenceTargetType.Media, 813, "items[1]"));
     }
 
-    [Fact]
+    [Test]
     public void ARepeatedImageIsReportedTwice()
     {
         var references = _list.ExtractReferences(

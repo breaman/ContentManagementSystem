@@ -14,7 +14,7 @@ public class ReferenceIndexerTests
     private static IReadOnlyList<ContentReference> Extract(string payloadJson) =>
         ContentEngineHarness.Indexer().Extract(ContentEngineHarness.Payload(payloadJson));
 
-    [Fact]
+    [Test]
     public void AZoneLevelReferenceIsReportedWithItsZonePath()
     {
         var references = Extract(
@@ -27,7 +27,7 @@ public class ReferenceIndexerTests
             new ContentReference(ContentReferenceTargetType.Media, 812, "zones.image"));
     }
 
-    [Fact]
+    [Test]
     public void EveryReferenceInsideABlockZoneIsReported()
     {
         var references = Extract(
@@ -48,7 +48,7 @@ public class ReferenceIndexerTests
                 ContentReferenceTargetType.Page, 44, "zones.hero.items[0].properties.cta"));
     }
 
-    [Fact]
+    [Test]
     public void AReferenceTwoBlockLevelsDownIsReported()
     {
         var references = Extract(
@@ -72,7 +72,7 @@ public class ReferenceIndexerTests
                 "zones.sidebar.items[0].properties.children.items[0].properties.portrait"));
     }
 
-    [Fact]
+    [Test]
     public void ThePathOfAnIndexedReferenceReadsAsOneExpression()
     {
         var references = Extract(
@@ -85,7 +85,7 @@ public class ReferenceIndexerTests
             .Equal("zones.related.value[0]", "zones.related.value[1]");
     }
 
-    [Fact]
+    [Test]
     public void TheSameTargetReferencedTwiceIsReportedTwice()
     {
         var references = Extract(
@@ -101,7 +101,7 @@ public class ReferenceIndexerTests
         references.Select(reference => reference.TargetId).Should().AllBeEquivalentTo(812);
     }
 
-    [Fact]
+    [Test]
     public void AZoneTheTemplateNoLongerDefinesStillReportsItsReferences()
     {
         var references = Extract(
@@ -117,7 +117,7 @@ public class ReferenceIndexerTests
             new ContentReference(ContentReferenceTargetType.ReusableContent, 3, "zones.removedZone"));
     }
 
-    [Fact]
+    [Test]
     public void APayloadWhoseTemplateRevisionIsUnknownStillReportsItsReferences()
     {
         // Nothing here consults a schema catalog at all. A schema-driven walk would find no zones to
@@ -131,7 +131,7 @@ public class ReferenceIndexerTests
         references.Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void AValueWrittenByAFieldTypeThisBuildNoLongerHasIsSkipped()
     {
         var references = Extract(
@@ -145,7 +145,7 @@ public class ReferenceIndexerTests
         references.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AValueThatPointsAtNothingContributesNothing()
     {
         var references = Extract(
@@ -159,14 +159,14 @@ public class ReferenceIndexerTests
         references.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void APayloadWithNoZonesContributesNothing()
     {
         Extract("""{ "schemaVersion": 1, "templateKey": "t", "templateRevision": 1 }""")
             .Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void EveryExtractedReferenceCarriesAUsableTarget()
     {
         var references = Extract(

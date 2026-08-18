@@ -7,7 +7,7 @@ namespace ContentManagementSystem.Core.Tests.Fields;
 /// </summary>
 public class ValidationResultTests
 {
-    [Fact]
+    [Test]
     public void SuccessReportsNothing()
     {
         ValidationResult.Success.IsValid.Should().BeTrue();
@@ -15,7 +15,7 @@ public class ValidationResultTests
         ValidationResult.Success.Diagnostics.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AnErrorBlocksTheOperation()
     {
         var result = ValidationResult.Error("field.maxLength", "Value is 158 characters; the maximum is 120.");
@@ -26,7 +26,7 @@ public class ValidationResultTests
             .Which.Code.Should().Be("field.maxLength");
     }
 
-    [Fact]
+    [Test]
     public void AWarningIsReportedWithoutBlocking()
     {
         // This distinction is what makes "removing a zone keeps its data" implementable rather than
@@ -37,7 +37,7 @@ public class ValidationResultTests
         result.HasErrors.Should().BeFalse("a warning does not block the save");
     }
 
-    [Fact]
+    [Test]
     public void AMixedResultBlocksOnItsError()
     {
         var result = ValidationResult.From(
@@ -50,13 +50,13 @@ public class ValidationResultTests
         result.Diagnostics.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public void AnEmptyDiagnosticSequenceCollapsesToSuccess()
     {
         ValidationResult.From([]).Should().BeSameAs(ValidationResult.Success);
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticDefaultsToBlocking()
     {
         // The safe default: a field type that forgets to state severity stops the publish rather
@@ -65,7 +65,7 @@ public class ValidationResultTests
             .Severity.Should().Be(ValidationSeverity.Error);
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticCanPointInsideTheValueItCameFrom()
     {
         var result = ValidationResult.Error("field.link.pageId", "An internal link must carry 'pageId'.", "cta");

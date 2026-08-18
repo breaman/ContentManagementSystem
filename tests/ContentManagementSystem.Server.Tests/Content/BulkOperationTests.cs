@@ -18,20 +18,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// the dialog is the number that happens; and a failure is one item's, not the batch's, so thirty-
 /// nine pages publishing is not undone by the fortieth having an empty required zone.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class BulkOperationTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task TheImpactResolvesABranchIntoEveryPageBeneathItAndPublishesNone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-branch", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var child = await _bench.AddPageAsync(template, "Widgets", cancellationToken, section.Summary.Id);
@@ -61,10 +64,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Be(0, "describing a batch must not run any of it");
     }
 
-    [Fact]
+    [Test]
     public async Task APartialFailureLeavesTheSuccessfulPagesPublishedAndReportsTheRestIndividually()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "bulk-partial",
             cancellationToken,
@@ -112,10 +115,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
         published.Should().NotContain(empty.Summary.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task ADeleteShowsTheWholeSubtreeAndQueuesOnlyTheSelectedRoots()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-delete", cancellationToken, PageWorkbench.TextZone("hero"));
         var section = await _bench.AddPageAsync(template, "Products", cancellationToken);
         await _bench.AddPageAsync(template, "Widgets", cancellationToken, section.Summary.Id);
@@ -145,10 +148,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
         (await _bench.Context.Pages.CountAsync(cancellationToken)).Should().Be(0, "all three are in the bin");
     }
 
-    [Fact]
+    [Test]
     public async Task APageThatHasGoneSinceTheSelectionWasMadeIsWarnedAboutRatherThanFailingTheBatch()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-stale", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Products", cancellationToken);
 
@@ -169,10 +172,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Be(new DateOnly(2027, 1, 31));
     }
 
-    [Fact]
+    [Test]
     public async Task SettingAReviewDateAcrossASelectionLeavesEverythingElseOnThosePagesAlone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-review", cancellationToken, PageWorkbench.TextZone("hero"));
         var first = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var second = await _bench.AddPageAsync(template, "About", cancellationToken);
@@ -201,10 +204,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain("Our best plans yet");
     }
 
-    [Fact]
+    [Test]
     public async Task AnOwnerWhoDoesNotExistFailsEachPageWithTheReasonRatherThanTheBatch()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-owner", cancellationToken, PageWorkbench.TextZone("hero"));
         var first = await _bench.AddPageAsync(template, "Products", cancellationToken);
         var second = await _bench.AddPageAsync(template, "About", cancellationToken);
@@ -225,10 +228,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().OnlyContain(diagnostic => diagnostic.Code == PageCodes.OwnerNotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task ABatchOverTheThresholdIsAcceptedAndRunsAfterTheRequestHasBeenAnswered()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("bulk-many", cancellationToken, PageWorkbench.TextZone("hero"));
         var ids = new List<int>();
 
@@ -278,7 +281,7 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Be(ids.Count);
     }
 
-    [Fact]
+    [Test]
     public async Task PollingAJobThisProcessNeverRanIsANotFoundRatherThanAnEmptyReport()
     {
         var missing = _bench.Resolve<IBulkOperationService>().Get(Guid.NewGuid());
@@ -290,10 +293,10 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
         await Task.CompletedTask;
     }
 
-    [Fact]
+    [Test]
     public async Task AnEditorWhoMayNotPublishIsRefusedOnceRatherThanPerPage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var bench = await PageWorkbench.CreateAsync(
             fixture,
@@ -311,12 +314,12 @@ public class BulkOperationTests(SqlServerFixture fixture) : IAsyncLifetime
                 "a refusal never names what the caller would have needed to hold");
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptySelectionIsRefusedRatherThanRunAsAJobOverNothing()
     {
         var refused = await _bench.Resolve<IBulkOperationService>().StartAsync(
             new BulkOperationRequest(BulkOperation.Publish, new BulkSelection([])),
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
         refused.Outcome.Should().Be(CmsOutcome.Invalid);
         refused.Diagnostics.Diagnostics.Should().ContainSingle()

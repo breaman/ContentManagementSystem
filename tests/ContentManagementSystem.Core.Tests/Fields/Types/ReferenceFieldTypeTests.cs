@@ -14,7 +14,7 @@ public class ReferenceFieldTypeTests
 
     private readonly ReusableFieldType _reusable = new();
 
-    [Fact]
+    [Test]
     public async Task ASinglePageIsAccepted()
     {
         var result = await _pages.ValidateAsync("""{ "type": "pageReference", "value": 44 }""");
@@ -22,7 +22,7 @@ public class ReferenceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AListIsRefusedWhereASinglePageIsConfigured()
     {
         var result = await _pages.ValidateAsync("""{ "type": "pageReference", "value": [44] }""");
@@ -30,7 +30,7 @@ public class ReferenceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task ASinglePageIsRefusedWhereAListIsConfigured()
     {
         var result = await _pages.ValidateAsync("""{ "type": "pageReference", "value": 44 }""", Multiple);
@@ -38,7 +38,7 @@ public class ReferenceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task AValueThatIsNotAnIdentityIsRejected()
     {
         var result = await _pages.ValidateAsync("""{ "type": "pageReference", "value": "/about" }""");
@@ -48,7 +48,7 @@ public class ReferenceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ReferenceId);
     }
 
-    [Fact]
+    [Test]
     public async Task TheSamePageTwiceInAListIsRejected()
     {
         var result = await _pages.ValidateAsync("""{ "type": "pageReference", "value": [44, 44] }""", Multiple);
@@ -57,7 +57,7 @@ public class ReferenceFieldTypeTests
         result.Paths().Should().Equal("value[1]");
     }
 
-    [Fact]
+    [Test]
     public async Task MorePagesThanTheMaximumAreRejected()
     {
         var result = await _pages.ValidateAsync(
@@ -67,7 +67,7 @@ public class ReferenceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxItems);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyListDoesNotSatisfyAMinimumOnPublish()
     {
         var result = await _pages.ValidateAsync(
@@ -78,7 +78,7 @@ public class ReferenceFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MinItems);
     }
 
-    [Fact]
+    [Test]
     public void ASinglePageIsReportedAsOneReference()
     {
         var references = _pages.ExtractReferences("""{ "type": "pageReference", "value": 44 }""");
@@ -87,7 +87,7 @@ public class ReferenceFieldTypeTests
             .Which.Should().Be(new ContentReference(ContentReferenceTargetType.Page, 44));
     }
 
-    [Fact]
+    [Test]
     public void EveryPageInAListIsReportedAtItsOwnPosition()
     {
         var references = _pages.ExtractReferences("""{ "type": "pageReference", "value": [44, 45] }""");
@@ -97,7 +97,7 @@ public class ReferenceFieldTypeTests
             new ContentReference(ContentReferenceTargetType.Page, 45, "value[1]"));
     }
 
-    [Fact]
+    [Test]
     public async Task APlacementOfReusableContentIsAccepted()
     {
         var result = await _reusable.ValidateAsync(
@@ -106,7 +106,7 @@ public class ReferenceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APinnedPlacementIsAccepted()
     {
         var result = await _reusable.ValidateAsync(
@@ -115,7 +115,7 @@ public class ReferenceFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task APinnedVersionThatIsNotAVersionIsRejected()
     {
         var result = await _reusable.ValidateAsync(
@@ -125,7 +125,7 @@ public class ReferenceFieldTypeTests
         result.Paths().Should().Equal("pinnedVersionId");
     }
 
-    [Fact]
+    [Test]
     public async Task APlacementWithNothingPickedIsUnfilledRatherThanMalformed()
     {
         var draft = await _reusable.ValidateAsync("""{ "type": "reusable" }""", isRequired: true);
@@ -138,7 +138,7 @@ public class ReferenceFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public void APinnedPlacementStillReportsTheItemItIsPinnedTo()
     {
         var references = _reusable.ExtractReferences(
@@ -157,7 +157,7 @@ public class ReferenceFieldTypeTests
                 PinnedVersionId: 7));
     }
 
-    [Fact]
+    [Test]
     public void ALateBoundPlacementReportsNoPin()
     {
         var references = _reusable.ExtractReferences(

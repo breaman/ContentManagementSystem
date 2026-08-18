@@ -18,22 +18,25 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// far more than the tests do, and they stay independent by giving every template its own key rather
 /// than by starting from an empty table.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class TemplateApiTests(SqlServerFixture fixture)
 {
     private const string Templates = $"{CmsApiEndpoints.BasePath}/templates";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AnAnonymousCallerIsChallenged()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = _factory.CreateClientAs();
 
         var response = await client.GetAsync(Templates, cancellationToken);
@@ -41,10 +44,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayReadTemplatesButNotCreateOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await ClientAsync(cancellationToken, CmsRoles.Viewer);
 
         var list = await client.GetAsync(Templates, cancellationToken);
@@ -59,10 +62,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         create.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task CreatingATemplateReturnsItWithAnEmptyFirstRevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -93,10 +96,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         reread!.Template.Key.Should().Be("campaign-landing");
     }
 
-    [Fact]
+    [Test]
     public async Task TheFirstRevisionExistsAndCapturesNoZones()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateAsync(client, "revision-baseline", cancellationToken);
 
@@ -120,10 +123,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         revision.Zones.GetArrayLength().Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task ATakenKeyIsRefusedAsAConflict()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         await CreateAsync(client, "duplicate-key", cancellationToken);
 
@@ -136,14 +139,14 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain(StructureCodes.KeyDuplicate);
     }
 
-    [Theory]
-    [InlineData("9lives")]
-    [InlineData("has spaces")]
-    [InlineData("trailing-")]
-    [InlineData("double--hyphen")]
+    [Test]
+    [Arguments("9lives")]
+    [Arguments("has spaces")]
+    [Arguments("trailing-")]
+    [Arguments("double--hyphen")]
     public async Task AKeyOfTheWrongShapeIsRefused(string key)
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -155,10 +158,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain(StructureCodes.KeyFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task EveryBrokenRuleIsReportedAtOnce()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -173,10 +176,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().BeEquivalentTo([StructureCodes.KeyRequired, StructureCodes.NameRequired]);
     }
 
-    [Fact]
+    [Test]
     public async Task RenamingTheDisplayNameSucceeds()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateAsync(client, "renameable", cancellationToken);
 
@@ -198,10 +201,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         updated.Template.CurrentRevision.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ChangingTheKeyIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateAsync(client, "immutable-key", cancellationToken);
 
@@ -220,10 +223,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         reread!.Template.Key.Should().Be("immutable-key");
     }
 
-    [Fact]
+    [Test]
     public async Task AWriteWithoutAnAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         // Deliberately not given a token: the management API is cookie-authenticated, so this is the
         // shape a cross-site request forgery arrives in.
         using var client = _factory.CreateClientAs(CmsRoles.Developer);
@@ -237,10 +240,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain("request.antiforgery");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnknownTemplateOrRevisionIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         var template = await CreateAsync(client, "known-template", cancellationToken);
 
@@ -253,10 +256,10 @@ public class TemplateApiTests(SqlServerFixture fixture) : IAsyncLifetime
         unknownRevision.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task TheListReportsWhatWasCreated()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await DeveloperAsync(cancellationToken);
         await CreateAsync(client, "listed-template", cancellationToken);
 

@@ -47,7 +47,7 @@ public class RichTextFieldEditorTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AMarkdownValueOpensInTheSourceSurfaceAndAnHtmlOneInTheWysiwyg()
     {
         // The surface follows the value's own format, not the property's configuration: a property
@@ -56,7 +56,7 @@ public class RichTextFieldEditorTests : IDisposable
         Render(Html).FindAll(".cms-wysiwyg-editor").Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void AValueWithNoFormatAtAllIsTreatedAsMarkdown()
     {
         var editor = Render("""{ "type": "richText", "value": "Three tiers." }""");
@@ -64,7 +64,7 @@ public class RichTextFieldEditorTests : IDisposable
         editor.FindAll(".cms-source-editor").Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void TheThreeModesAreOneChoiceWithOneAnswer()
     {
         var editor = Render(Markdown);
@@ -78,7 +78,7 @@ public class RichTextFieldEditorTests : IDisposable
         options.Count(option => option.GetAttribute("aria-checked") == "true").Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void WriteModeShowsNoPreviewAndPreviewModeShowsNoEditor()
     {
         var editor = Render(Markdown);
@@ -91,7 +91,7 @@ public class RichTextFieldEditorTests : IDisposable
         editor.FindAll(".cms-field__pane--preview").Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void BothModeShowsTheEditorAndThePreviewTogether()
     {
         var editor = Render(Markdown);
@@ -102,7 +102,7 @@ public class RichTextFieldEditorTests : IDisposable
         editor.FindAll(".cms-field__pane--preview").Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewIsRenderedByTheServerFromTheValuesOwnFormat()
     {
         var editor = Render(Markdown);
@@ -122,7 +122,7 @@ public class RichTextFieldEditorTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewIsAskedForTheProfileTheZoneConfigures()
     {
         var editor = Render(
@@ -135,7 +135,7 @@ public class RichTextFieldEditorTests : IDisposable
             _preview.Requests.Should().NotBeEmpty().And.Subject.Last().Profile.Should().Be("extended"));
     }
 
-    [Fact]
+    [Test]
     public void ThePreviewSaysWhatPublishingWillRemove()
     {
         _preview.Removals =
@@ -155,7 +155,7 @@ public class RichTextFieldEditorTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void TheCountIsOfTheAuthoredSourceAndIsShownInEveryMode()
     {
         var editor = Render(Markdown);
@@ -163,7 +163,7 @@ public class RichTextFieldEditorTests : IDisposable
         editor.Find(".cms-field-count").TextContent.Should().Contain("12 characters");
     }
 
-    [Fact]
+    [Test]
     public void TheEditingSurfaceCarriesNoAriaOfItsOwnUntilTheLibraryMountsIntoIt()
     {
         var editor = Render(Markdown);

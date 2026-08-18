@@ -13,23 +13,26 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// The redirect endpoints and the CSV pair a legacy migration runs through
 /// (tasks P3-05 and P3-06, spec section 10.5).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class RedirectApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class RedirectApiTests(SqlServerFixture fixture)
 {
     /// <summary>Route of the redirect collection.</summary>
     private const string Redirects = $"{CmsApiEndpoints.BasePath}/redirects";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ARedirectIsCreatedListedAndDeleted()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var created = await client.PostAsJsonAsync(
@@ -54,10 +57,10 @@ public class RedirectApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Items.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task ALoopIsRefusedWithTheProblemShapeTheClientSwitchesOn()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var refused = await client.PostAsJsonAsync(
@@ -71,10 +74,10 @@ public class RedirectApiTests(SqlServerFixture fixture) : IAsyncLifetime
         problem.Errors.Should().ContainSingle().Which.Code.Should().Be(RoutingCodes.Loop);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAuthorMayReadRedirectsButNotChangeThem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var author = await PageApiClient.ClientAsync(_factory, cancellationToken, CmsRoles.Author);
 
         // Reading is Content.Read; writing is Content.Publish, because a redirect reaches anonymous
@@ -89,10 +92,10 @@ public class RedirectApiTests(SqlServerFixture fixture) : IAsyncLifetime
         refused.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnonymousCallerReachesNothing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var anonymous = _factory.CreateClient();
 
         var response = await anonymous.GetAsync(Redirects, cancellationToken);
@@ -100,10 +103,10 @@ public class RedirectApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task CsvGoesOutAndComesBackThroughTheEndpoints()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         const string csv = """

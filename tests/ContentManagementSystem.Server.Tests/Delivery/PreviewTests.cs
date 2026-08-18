@@ -29,8 +29,9 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// the reference template rather than the fallback layout.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PreviewTests(SqlServerFixture fixture)
 {
     private const string TemplateKey = "article";
 
@@ -49,17 +50,19 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
     /// </remarks>
     private Template? _template;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
     // ---- Authenticated preview (task P3-16) ---------------------------------------------------
 
-    [Fact]
+    [Test]
     public async Task AnUnpublishedPageRendersInPreviewForAnEditor()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Not for the public yet", cancellationToken);
 
         using var anonymous = _bench.CreateClient();
@@ -79,10 +82,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         html.Should().Contain("Not for the public yet").And.Contain("data-template=\"article\"");
     }
 
-    [Fact]
+    [Test]
     public async Task ThePreviewChromeCarriesTheVersionLabelStatusAndExit()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Work in progress", cancellationToken);
 
         using var editor = _bench.CreateClient(roles: CmsRoles.Editor);
@@ -106,10 +109,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .And.NotContain("Work in progress");
     }
 
-    [Fact]
+    [Test]
     public async Task EveryPreviewResponseIsUnindexableAndUncacheable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Secret", cancellationToken);
 
         using var editor = _bench.CreateClient(roles: CmsRoles.Editor);
@@ -125,10 +128,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task PreviewShowsAnySpecificVersionAndNotOnlyTheDraft()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Offers", "The published words", cancellationToken);
 
         await PublishAsync(page.Summary.Id, cancellationToken);
@@ -154,10 +157,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         published.Should().Contain("The published words").And.NotContain("The draft words");
     }
 
-    [Fact]
+    [Test]
     public async Task AVersionBelongingToAnotherPageIsNotServedUnderThisOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var mine = await DraftPageAsync("Mine", "My words", cancellationToken);
         var theirs = await DraftPageAsync("Theirs", "Their words", cancellationToken);
 
@@ -178,10 +181,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().NotContain("Their words");
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnonymousRequestForAnEditorsPreviewIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Not for the public yet", cancellationToken);
 
         using var anonymous = _bench.CreateClient(followRedirects: false);
@@ -195,10 +198,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().NotContain("Not for the public yet");
     }
 
-    [Fact]
+    [Test]
     public async Task AReaderMayPreviewAndOnlyRolesHoldingContentReadMay()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Not for the public yet", cancellationToken);
 
         using var viewer = _bench.CreateClient(roles: CmsRoles.Viewer);
@@ -216,10 +219,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
 
     // ---- Device widths (task P3-21) ------------------------------------------------------------
 
-    [Fact]
+    [Test]
     public async Task TheFrameIsConstrainedToTheRequestedDeviceWidth()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Work in progress", cancellationToken);
 
         using var editor = _bench.CreateClient(roles: CmsRoles.Editor);
@@ -236,10 +239,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         mobile.Should().Contain($"src=\"/preview/{page.Summary.Id}/content\"");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnreadableDeviceFallsBackRatherThanFailing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "Work in progress", cancellationToken);
 
         using var editor = _bench.CreateClient(roles: CmsRoles.Editor);
@@ -255,10 +258,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
 
     // ---- Draft links inside preview (task P3-20) -----------------------------------------------
 
-    [Fact]
+    [Test]
     public async Task AnInternalLinkToAnUnpublishedPageResolvesToItsDraftInsidePreviewAndIsBadged()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // marketing-landing rather than article, because its `cta` zone is the one the reference set
         // places a `link` in — a zone the deployed component does not render would make every
@@ -295,10 +298,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
 
     // ---- Shared links (tasks P3-17, P3-18, and P3-26) -----------------------------------------
 
-    [Fact]
+    [Test]
     public async Task AShareableLinkRendersForAnAnonymousBrowser()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client to review", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken);
 
@@ -321,10 +324,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().NotContain("Exit preview").And.Contain("Link expires");
     }
 
-    [Fact]
+    [Test]
     public async Task AShareableLinkIsNeverIndexableAndNeverCacheable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken);
 
@@ -339,10 +342,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task AShareableLinkServesExactlyTheVersionItWasIssuedForAndNotThePagesLatest()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Offers", "What the sender saw", cancellationToken);
 
         await PublishAsync(page.Summary.Id, cancellationToken);
@@ -371,10 +374,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         issued.Summary.PageVersionId.Should().Be(sharedVersionId);
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkSharingTheDraftFollowsTheDraftRowBecauseThatRowIsTheMutableOne()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "First pass", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken);
 
@@ -392,10 +395,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         html.Should().Contain("Second pass").And.NotContain("First pass");
     }
 
-    [Fact]
+    [Test]
     public async Task AnExpiredLinkStopsWorkingOnSchedule()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken, expiresInDays: 7);
 
@@ -422,10 +425,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain("expired").And.NotContain("For the client");
     }
 
-    [Fact]
+    [Test]
     public async Task AnExpiryBeyondThirtyDaysIsRefusedRatherThanClamped()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
 
         var result = await _bench.Resolve<IPreviewTokenService>().IssueAsync(
@@ -439,10 +442,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             diagnostic => diagnostic.Code == PreviewCodes.ExpiryInvalid);
     }
 
-    [Fact]
+    [Test]
     public async Task ARevokedLinkStopsWorkingImmediately()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken);
 
@@ -473,10 +476,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.RevokedOn.Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task RevocationInBulkTakesEveryLiveLinkForAPage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
 
         var first = await IssueAsync(page.Summary.Id, cancellationToken);
@@ -503,10 +506,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkIsSpentByViewingTheContentAndNotByTheChromeAroundIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "One look only", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken, maxUses: 1);
 
@@ -526,10 +529,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain("used up").And.NotContain("One look only");
     }
 
-    [Fact]
+    [Test]
     public async Task TheTokenIsNotRecoverableFromTheDatabase()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken);
 
@@ -551,10 +554,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.TokenHash.Should().Equal(expected);
     }
 
-    [Fact]
+    [Test]
     public async Task TheSharedPreviewIsRateLimitedAndTheRestOfTheSiteIsNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var anonymous = _bench.CreateClient();
 
@@ -584,10 +587,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         delivery.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task ATokenThatWasNeverIssuedIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var anonymous = _bench.CreateClient();
 
@@ -600,10 +603,10 @@ public class PreviewTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkToARecycledPageSaysSoRatherThanClaimingToBeInvalid()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await DraftPageAsync("Unreleased", "For the client", cancellationToken);
         var issued = await IssueAsync(page.Summary.Id, cancellationToken, maxUses: 2);
 

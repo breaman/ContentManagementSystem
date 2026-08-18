@@ -27,8 +27,9 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// the endpoints an editor uses have broken.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ReusableContentApiTests(SqlServerFixture fixture)
 {
     /// <summary>Route of the reusable content collection.</summary>
     private const string Reusable = $"{CmsApiEndpoints.BasePath}/reusable";
@@ -38,15 +39,17 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task CreatingAnItemAnswers201WithItsLocationAndAnEmptyDraft()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var blockType = await RawHtmlBlockTypeAsync(client, cancellationToken);
 
@@ -71,10 +74,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         created.ContentJson.Should().Contain(blockType.Key);
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftSaveWithNoPreconditionIsRefusedWith428()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await CreateItemAsync(client, "Unconditional", cancellationToken);
 
@@ -88,10 +91,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.PreconditionRequired);
     }
 
-    [Fact]
+    [Test]
     public async Task TheDraftReadStampsTheTokenTheSaveHasToEchoBack()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await CreateItemAsync(client, "Round trip", cancellationToken);
 
@@ -113,10 +116,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         saved.Headers.ETag.Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingPastAnUnacknowledgedBlastRadiusAnswers422CarryingTheCount()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await PublishedItemOnAPageAsync(client, "Banner", cancellationToken);
 
@@ -142,10 +145,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         problem.Warnings.Should().Contain(warning => warning.Code == ReusableCodes.BlastRadius);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAcknowledgedPublishAnswersWithTheImpactItHad()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await PublishedItemOnAPageAsync(client, "Banner", cancellationToken);
 
@@ -168,10 +171,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         published.Impact.AffectedPageCount.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task TheCheckReportsTheImpactWithoutPublishing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await PublishedItemOnAPageAsync(client, "Banner", cancellationToken);
 
@@ -198,10 +201,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         reread!.Summary.PublishedVersionNumber.Should().Be(2);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingAReferencedItemAnswers409()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await PublishedItemOnAPageAsync(client, "Banner", cancellationToken);
 
@@ -216,10 +219,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         problem.Errors.Should().Contain(error => error.Code == ReusableCodes.StillReferenced);
     }
 
-    [Fact]
+    [Test]
     public async Task TheWhereUsedEndpointAnswersForPagesAndItemsAlike()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await PublishedItemOnAPageAsync(client, "Banner", cancellationToken);
 
@@ -241,10 +244,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         unused!.IsReferenced.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task EveryWriteRouteRefusesACallerWithoutItsPermission()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var item = await CreateItemAsync(administrator, "Guarded", cancellationToken);
 
@@ -264,10 +267,10 @@ public class ReusableContentApiTests(SqlServerFixture fixture) : IAsyncLifetime
         deleted.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AWriteWithoutAnAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var item = await CreateItemAsync(administrator, "Unprotected", cancellationToken);
 

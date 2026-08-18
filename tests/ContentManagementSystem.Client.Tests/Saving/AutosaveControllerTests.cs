@@ -16,7 +16,7 @@ public class AutosaveControllerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 16, 14, 30, 0, TimeSpan.Zero);
 
-    [Fact]
+    [Test]
     public async Task NothingIsSavedUntilTheTypingHasStoppedForTwentySeconds()
     {
         var clock = new FakeTimeProvider(Now);
@@ -42,7 +42,7 @@ public class AutosaveControllerTests
         autosave.Status.SavedOn.Should().Be(clock.GetUtcNow());
     }
 
-    [Fact]
+    [Test]
     public async Task EveryKeystrokeRestartsTheCountdownRatherThanExtendingIt()
     {
         var clock = new FakeTimeProvider(Now);
@@ -71,7 +71,7 @@ public class AutosaveControllerTests
         attempts.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task AScreenNobodyTypesIntoIsNeverSaved()
     {
         var clock = new FakeTimeProvider(Now);
@@ -93,7 +93,7 @@ public class AutosaveControllerTests
             "unpublished changes");
     }
 
-    [Fact]
+    [Test]
     public async Task ATransientFailureIsRetriedAndTheLatestTextIsWhatGetsSaved()
     {
         var clock = new FakeTimeProvider(Now);
@@ -130,7 +130,7 @@ public class AutosaveControllerTests
         saved.Should().Equal("first draft", "second draft");
     }
 
-    [Fact]
+    [Test]
     public async Task AnExceptionFromTheSaveIsTreatedAsTransientRatherThanSwallowed()
     {
         var clock = new FakeTimeProvider(Now);
@@ -150,7 +150,7 @@ public class AutosaveControllerTests
         autosave.Status.Message.Should().Contain("Failed to fetch");
     }
 
-    [Fact]
+    [Test]
     public async Task ARefusalIsReportedAndNotRetried()
     {
         var clock = new FakeTimeProvider(Now);
@@ -180,7 +180,7 @@ public class AutosaveControllerTests
         autosave.Status.Message.Should().Be("Somebody else saved this page first.");
     }
 
-    [Fact]
+    [Test]
     public async Task TypingAgainRetiresARefusalAndReschedules()
     {
         var clock = new FakeTimeProvider(Now);
@@ -211,7 +211,7 @@ public class AutosaveControllerTests
         autosave.Status.Phase.Should().Be(AutosavePhase.Saved);
     }
 
-    [Fact]
+    [Test]
     public async Task LeavingTheScreenSavesWithoutWaitingForTheCountdown()
     {
         var clock = new FakeTimeProvider(Now);
@@ -238,7 +238,7 @@ public class AutosaveControllerTests
         attempts.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task LeavingAScreenWithNothingToSaveWritesNothing()
     {
         var clock = new FakeTimeProvider(Now);
@@ -256,7 +256,7 @@ public class AutosaveControllerTests
         attempts.Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public async Task WorkSavedBySomethingElseCancelsThePendingWrite()
     {
         var clock = new FakeTimeProvider(Now);

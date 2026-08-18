@@ -10,13 +10,14 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// <summary>
 /// Asserts the rows the CMS cannot start without arrive with the migration (task P1-07).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class CmsSeedDataTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task MigratingCreatesTheSingleSiteSettingsRow()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var settings = await context.SiteSettings.SingleAsync(cancellationToken);
@@ -27,10 +28,10 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
         settings.VersionRetentionDays.Should().Be(0, "no history is pruned until someone sets a policy");
     }
 
-    [Fact]
+    [Test]
     public async Task ASecondSiteSettingsRowIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         // "There is only ever one row" is enforced by a check constraint rather than convention,
@@ -47,10 +48,10 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
             .Where(e => e.Message.Contains("CK_SiteSettings_SingleRow"));
     }
 
-    [Fact]
+    [Test]
     public async Task MigratingCreatesTheBuiltInRawHtmlBlockType()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var blockType = await context.BlockTypes
@@ -70,10 +71,10 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
             .Which.RevisionNumber.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task SeedRowsAreNotDuplicatedWhenMigrationsRunAgain()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var databaseName = $"cms_seed_{Guid.NewGuid():N}";
 
         await using (var first = await fixture.CreateDatabaseAsync(databaseName, cancellationToken))

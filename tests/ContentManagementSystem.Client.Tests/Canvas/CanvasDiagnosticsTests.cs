@@ -9,7 +9,7 @@ namespace ContentManagementSystem.Client.Tests.Canvas;
 /// </summary>
 public class CanvasDiagnosticsTests
 {
-    [Fact]
+    [Test]
     public void ADiagnosticIsFiledUnderTheZoneItsPathNamesHoweverDeepItGoes()
     {
         var sorted = CanvasDiagnostics.From(
@@ -21,18 +21,18 @@ public class CanvasDiagnosticsTests
         sorted.For("body").Any.Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData("zones.hero", "hero")]
-    [InlineData("zones.hero.value", "hero")]
-    [InlineData("zones.hero[0]", "hero")]
-    [InlineData("slug", null)]
-    [InlineData("zones", null)]
-    [InlineData("zones.", null)]
-    [InlineData(null, null)]
+    [Test]
+    [Arguments("zones.hero", "hero")]
+    [Arguments("zones.hero.value", "hero")]
+    [Arguments("zones.hero[0]", "hero")]
+    [Arguments("slug", null)]
+    [Arguments("zones", null)]
+    [Arguments("zones.", null)]
+    [Arguments(null, null)]
     public void AZoneKeyIsReadFromThePathOrNotAtAll(string? path, string? expected) =>
         CanvasDiagnostics.ZoneKeyOf(path).Should().Be(expected);
 
-    [Fact]
+    [Test]
     public void ADiagnosticThatNamesNoZoneIsReportedAboveTheCards()
     {
         var sorted = CanvasDiagnostics.From(
@@ -45,7 +45,7 @@ public class CanvasDiagnosticsTests
         unplaced.Errors.Should().ContainSingle().Which.Property.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticAboutAZoneWithNoCardIsNotSwallowed()
     {
         var sorted = CanvasDiagnostics.From(null, [Warning("zones.retired")]);
@@ -58,7 +58,7 @@ public class CanvasDiagnosticsTests
             .Which.Property.Should().Be("zones.retired");
     }
 
-    [Fact]
+    [Test]
     public void SeverityIsTheWorstOfWhatWasSaid()
     {
         var sorted = CanvasDiagnostics.From([Error("zones.hero")], [Warning("zones.hero")]);
@@ -69,7 +69,7 @@ public class CanvasDiagnosticsTests
             .Should().Be(ZoneSeverity.Warning);
     }
 
-    [Fact]
+    [Test]
     public void TheTotalsCountEveryDiagnosticExactlyOnce()
     {
         var sorted = CanvasDiagnostics.From(
@@ -81,7 +81,7 @@ public class CanvasDiagnosticsTests
         sorted.Any.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void NothingCheckedIsNothingReported()
     {
         CanvasDiagnostics.From(null, null).Should().BeSameAs(CanvasDiagnostics.Empty);

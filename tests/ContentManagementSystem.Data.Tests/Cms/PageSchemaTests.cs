@@ -19,13 +19,14 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// between a soft delete and a global query filter. Asserting them against a fake would be
 /// asserting that the fake works.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class PageSchemaTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task APageAndItsFirstDraftAreInsertedInOneTransaction()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -43,10 +44,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         stored.PublishedVersionId.Should().BeNull("a page is not published by being created");
     }
 
-    [Fact]
+    [Test]
     public async Task TwoVersionsOfOnePageCannotShareAVersionNumber()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -60,10 +61,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TwoPagesCannotShareAPublicIdentifier()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var first = await CreatePageAsync(context, "home", cancellationToken);
@@ -75,10 +76,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task AStrayRemoveRetiresThePageInsteadOfDestroyingItsHistory()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -106,10 +107,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         stored.Versions.Should().ContainSingle("the draft is what a restore has to come back to");
     }
 
-    [Fact]
+    [Test]
     public async Task ADeletedPageIsHiddenFromOrdinaryQueriesButItsHistoryStaysReachable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -130,10 +131,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
             .Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftSavedTwiceFromStaleStateFailsRatherThanOverwriting()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var databaseName = $"cms_conc_{Guid.NewGuid():N}";
         await using var context = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
 
@@ -158,10 +159,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateConcurrencyException>();
     }
 
-    [Fact]
+    [Test]
     public async Task EditLocksAreNotWrittenToTheAuditLog()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -189,10 +190,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         (await context.AuditLogs.CountAsync(cancellationToken)).Should().Be(auditedBefore);
     }
 
-    [Fact]
+    [Test]
     public async Task ContentReferencesAreNotWrittenToTheAuditLog()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
@@ -214,10 +215,10 @@ public class PageSchemaTests(SqlServerFixture fixture)
         (await context.AuditLogs.CountAsync(cancellationToken)).Should().Be(auditedBefore);
     }
 
-    [Fact]
+    [Test]
     public async Task TheLiveChildrenIndexIsFilteredToUndeletedPages()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var filter = await context.Database

@@ -24,8 +24,9 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// puts them there in the order that collides.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ConcurrentRenderReadTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ConcurrentRenderReadTests(SqlServerFixture fixture)
 {
     /// <summary>The template with both a <c>hero</c> and a <c>footer</c>, which is the shape that fails.</summary>
     private const string TemplateKey = "marketing-landing";
@@ -35,15 +36,17 @@ public class ConcurrentRenderReadTests(SqlServerFixture fixture) : IAsyncLifetim
 
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AMediaZoneAndAReusableFooterBothRenderOnOnePage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         var template = await _bench.UseTemplateAsync(
             TemplateKey,

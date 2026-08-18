@@ -15,7 +15,7 @@ namespace ContentManagementSystem.Core.Tests.Security;
 /// </summary>
 public class SanitizationRegistrationTests
 {
-    [Fact]
+    [Test]
     public void AddCmsSanitizationSuppliesTheSanitizerTheFieldTypesNeed()
     {
         using var provider = new ServiceCollection()
@@ -26,7 +26,7 @@ public class SanitizationRegistrationTests
         provider.GetRequiredService<IFieldTypeRegistry>().Find(FieldTypeKeys.RichText).Should().NotBeNull();
     }
 
-    [Fact]
+    [Test]
     public void WithoutASanitizerTheFieldTypeRegistryRefusesToBuild()
     {
         using var provider = new ServiceCollection()
@@ -41,7 +41,7 @@ public class SanitizationRegistrationTests
         resolve.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void TheSanitizerIsASingleton()
     {
         using var provider = new ServiceCollection().AddCmsSanitization().BuildServiceProvider();
@@ -52,7 +52,7 @@ public class SanitizationRegistrationTests
             .Should().BeSameAs(provider.GetRequiredService<IContentSanitizer>());
     }
 
-    [Fact]
+    [Test]
     public void ConfiguredOptionsReachTheService()
     {
         using var provider = new ServiceCollection()
@@ -64,7 +64,7 @@ public class SanitizationRegistrationTests
             .Should().Contain("class=\"lead\"");
     }
 
-    [Fact]
+    [Test]
     public void AddCmsContentSuppliesOneMarkdownRendererOverTheSameSanitizer()
     {
         using var provider = new ServiceCollection()

@@ -35,7 +35,7 @@ public class ConflictDialogTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AllThreeResolutionsAreOffered()
     {
         var dialog = Render();
@@ -47,7 +47,7 @@ public class ConflictDialogTests : IDisposable
         labels.Should().Contain(label => label.Contains("Compare the two versions"));
     }
 
-    [Fact]
+    [Test]
     public void TheEditorIsToldTheirWorkIsStillHereBeforeBeingAskedToChoose()
     {
         var dialog = Render();
@@ -56,7 +56,7 @@ public class ConflictDialogTests : IDisposable
             .Should().Contain("still here").And.Contain("Nothing is discarded");
     }
 
-    [Fact]
+    [Test]
     public void KeepingMineIsOneClickBecauseNothingItOverwritesIsLost()
     {
         var kept = 0;
@@ -67,7 +67,7 @@ public class ConflictDialogTests : IDisposable
         kept.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void TakingTheirsAsksTwiceBecauseWhatItReplacesExistsNowhereElse()
     {
         var taken = 0;
@@ -84,7 +84,7 @@ public class ConflictDialogTests : IDisposable
         taken.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void BackingOutOfTakingTheirsDisarmsIt()
     {
         var taken = 0;
@@ -100,7 +100,7 @@ public class ConflictDialogTests : IDisposable
         taken.Should().Be(0, "a destructive button must not stay armed behind another action");
     }
 
-    [Fact]
+    [Test]
     public void TheComparisonIsFetchedOnlyWhenItIsAskedForAndOnlyOnce()
     {
         var dialog = Render();
@@ -122,7 +122,7 @@ public class ConflictDialogTests : IDisposable
             "neither side changes while the dialog is open, so the comparison is asked for once");
     }
 
-    [Fact]
+    [Test]
     public void ClosingDecidesNothing()
     {
         var kept = 0;
@@ -141,7 +141,7 @@ public class ConflictDialogTests : IDisposable
         taken.Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public void ADialogThatIsNotOpenRendersNothingAtAll()
     {
         var dialog = _bunit.Render<ConflictDialog>(parameters => parameters

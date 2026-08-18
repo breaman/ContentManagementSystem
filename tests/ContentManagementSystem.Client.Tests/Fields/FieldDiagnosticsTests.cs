@@ -15,7 +15,7 @@ namespace ContentManagementSystem.Client.Tests.Fields;
 /// </remarks>
 public class FieldDiagnosticsTests
 {
-    [Fact]
+    [Test]
     public void APathCoversItselfAndEverythingBeneathIt()
     {
         ZoneDiagnostics.Covers("zones.hero", "zones.hero").Should().BeTrue();
@@ -23,21 +23,21 @@ public class FieldDiagnosticsTests
         ZoneDiagnostics.Covers("zones.hero", "zones.hero.items[0].properties.title").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void APathDoesNotCoverASiblingThatMerelyStartsTheSame()
     {
         ZoneDiagnostics.Covers("zones.hero", "zones.heroine.value").Should().BeFalse();
         ZoneDiagnostics.Covers("zones.body.items[1]", "zones.body.items[10].id").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ADiagnosticAboutNothingInParticularIsCoveredByNothing()
     {
         ZoneDiagnostics.Covers("zones.hero", null).Should().BeFalse();
         ZoneDiagnostics.Covers("zones.hero", string.Empty).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void NarrowingKeepsTheSeverityOfWhatSurvivedRatherThanWhatItCameFrom()
     {
         var zone = new ZoneDiagnostics(
@@ -52,7 +52,7 @@ public class FieldDiagnosticsTests
         zone.Within("zones.body.items[2]").Severity.Should().Be(ZoneSeverity.None);
     }
 
-    [Fact]
+    [Test]
     public void ANestedContextCarriesOnlyWhatNamesSomethingInsideIt()
     {
         var zone = new FieldEditorContext(
@@ -79,7 +79,7 @@ public class FieldDiagnosticsTests
         broken.Diagnostics!.Errors.Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public void AContextThatNamesNoPathStillKnowsWhereItsZoneSits()
     {
         // Every construction site that predates nesting — the canvas's, and every test building a

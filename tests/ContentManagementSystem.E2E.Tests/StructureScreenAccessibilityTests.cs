@@ -51,26 +51,27 @@ public class StructureScreenAccessibilityTests
     /// "Loading templates…" — which has no tables, no forms, and no violations. The gate would go
     /// green having checked nothing at all.
     /// </remarks>
-    public static TheoryData<string, Type, Dictionary<string, object?>, string> Screens => new()
-    {
-        { "template list", typeof(Templates), [], "marketing-landing" },
-        {
+    public static IEnumerable<(string Description, Type Component,
+        Dictionary<string, object?> Parameters, string Expected)> Screens =>
+    [
+        ("template list", typeof(Templates), [], "marketing-landing"),
+        (
             "template editor",
             typeof(TemplateEditor),
             new() { ["Id"] = FakeStructureClient.Id },
             "heroTitle"
-        },
-        { "block type list", typeof(BlockTypes), [], "hero-banner" },
-        {
+        ),
+        ("block type list", typeof(BlockTypes), [], "hero-banner"),
+        (
             "block type editor",
             typeof(BlockTypeEditor),
             new() { ["Id"] = FakeStructureClient.Id },
             "spacing-options"
-        },
-    };
+        ),
+    ];
 
-    [Theory]
-    [MemberData(nameof(Screens))]
+    [Test]
+    [MethodDataSource(nameof(Screens))]
     public async Task AStructureScreenHasNoAccessibilityViolations(
         string description,
         Type component,

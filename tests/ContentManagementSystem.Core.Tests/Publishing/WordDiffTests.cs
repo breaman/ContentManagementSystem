@@ -13,7 +13,7 @@ namespace ContentManagementSystem.Core.Tests.Publishing;
 /// </remarks>
 public class WordDiffTests
 {
-    [Fact]
+    [Test]
     public void IdenticalTextProducesOneUnchangedRun()
     {
         var segments = WordDiff.Compute("the hero headline is fine", "the hero headline is fine");
@@ -22,7 +22,7 @@ public class WordDiffTests
             .Which.Kind.Should().Be(ContentChangeKind.Unchanged);
     }
 
-    [Fact]
+    [Test]
     public void AReplacedWordIsReportedAsARemovalFollowedByAnAddition()
     {
         var segments = WordDiff.Compute("the hero headline is wrong", "the hero headline is right");
@@ -41,7 +41,7 @@ public class WordDiffTests
         segments[2].Kind.Should().Be(ContentChangeKind.Added);
     }
 
-    [Fact]
+    [Test]
     public void InsertedWordsAreTheOnlyThingReportedAsAdded()
     {
         var segments = WordDiff.Compute("plans for teams", "plans and pricing for teams");
@@ -50,7 +50,7 @@ public class WordDiffTests
         Rebuild(segments, ContentChangeKind.Added).Should().Be("plans and pricing for teams");
     }
 
-    [Fact]
+    [Test]
     public void TextAppearingOrDisappearingEntirelyIsOneSegment()
     {
         WordDiff.Compute(null, "brand new").Should().ContainSingle()
@@ -62,7 +62,7 @@ public class WordDiffTests
         WordDiff.Compute(null, null).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AReorderedSentenceKeepsTheWordsItStillHas()
     {
         var segments = WordDiff.Compute("alpha beta gamma delta", "alpha gamma beta delta");
@@ -75,7 +75,7 @@ public class WordDiffTests
         segments.Count(segment => segment.Kind is ContentChangeKind.Unchanged).Should().BeGreaterThan(1);
     }
 
-    [Fact]
+    [Test]
     public void TextTooLongToCompareWordByWordDegradesToAWholesaleReplacement()
     {
         var before = string.Join(' ', Enumerable.Range(0, WordDiff.MaxWords + 1).Select(i => $"w{i}"));
@@ -90,7 +90,7 @@ public class WordDiffTests
         segments[1].Kind.Should().Be(ContentChangeKind.Added);
     }
 
-    [Fact]
+    [Test]
     public void WhitespaceIsCarriedWithTheWordsSoTheTextCanBeReassembled()
     {
         const string Before = "one  two\tthree\nfour";

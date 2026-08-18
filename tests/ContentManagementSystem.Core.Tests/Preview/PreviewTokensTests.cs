@@ -17,7 +17,7 @@ namespace ContentManagementSystem.Core.Tests.Preview;
 /// </remarks>
 public class PreviewTokensTests
 {
-    [Fact]
+    [Test]
     public void ATokenIsThirtyTwoBytesOfEntropyEncodedAsBase64Url()
     {
         var (token, hash) = PreviewTokens.Create();
@@ -30,7 +30,7 @@ public class PreviewTokensTests
         hash.Should().HaveCount(32);
     }
 
-    [Fact]
+    [Test]
     public void TwoTokensAreNeverTheSame()
     {
         // Not a real entropy test — that is the CSPRNG's job — but it does catch the one mistake
@@ -40,7 +40,7 @@ public class PreviewTokensTests
         tokens.Distinct().Should().HaveCount(tokens.Count);
     }
 
-    [Fact]
+    [Test]
     public void APresentedTokenHashesToWhatIssuingStored()
     {
         var (token, stored) = PreviewTokens.Create();
@@ -49,7 +49,7 @@ public class PreviewTokensTests
         presented.Should().Equal(stored);
     }
 
-    [Fact]
+    [Test]
     public void TheHashIsTakenOverTheDecodedBytesNotTheEncodedString()
     {
         // The distinction that would otherwise be discovered in production. base64url has spellings
@@ -61,12 +61,12 @@ public class PreviewTokensTests
         stored.Should().NotEqual(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("not a token")]
-    [InlineData("c2hvcnQ")]
-    [InlineData("bG9uZ2VyLXRoYW4tdGhpcnR5LXR3by1ieXRlcy1vZi1kZWNvZGVkLW1hdGVyaWFs")]
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("not a token")]
+    [Arguments("c2hvcnQ")]
+    [Arguments("bG9uZ2VyLXRoYW4tdGhpcnR5LXR3by1ieXRlcy1vZi1kZWNvZGVkLW1hdGVyaWFs")]
     public void SomethingThatWasNeverIssuedIsRefusedWithoutAQuery(string? candidate)
     {
         // Shape is checked before the database is asked, which is the cheap half of the rate limit:
@@ -75,7 +75,7 @@ public class PreviewTokensTests
         hash.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TheSharedUrlIsAssembledInOnePlace()
     {
         // So that no caller has to know the shape of the path and get it subtly wrong — a link with
@@ -85,7 +85,7 @@ public class PreviewTokensTests
         PreviewTokens.UrlFor(token).Should().Be($"/preview/s/{token}");
     }
 
-    [Fact]
+    [Test]
     public void TheExpiryBoundsAreTheOnesTheSpecStates()
     {
         // Pinned rather than left implicit: seven days and thirty are numbers in spec section 12.2,

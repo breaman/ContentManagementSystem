@@ -11,7 +11,7 @@ namespace ContentManagementSystem.Core.Tests.Fields;
 /// </summary>
 public class FieldTypeRegistryTests
 {
-    [Fact]
+    [Test]
     public void FindReturnsTheFieldTypeRegisteredUnderAKey()
     {
         var registry = new FieldTypeRegistry([new StubFieldType("richText"), new StubFieldType("plainText")]);
@@ -19,7 +19,7 @@ public class FieldTypeRegistryTests
         registry.Find("richText")!.Key.Should().Be("richText");
     }
 
-    [Fact]
+    [Test]
     public void FindReturnsNullForAnUnknownKey()
     {
         var registry = new FieldTypeRegistry([new StubFieldType("richText")]);
@@ -30,7 +30,7 @@ public class FieldTypeRegistryTests
         registry.Contains("mysteryType").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void KeyLookupIsCaseSensitive()
     {
         var registry = new FieldTypeRegistry([new StubFieldType("richText")]);
@@ -40,7 +40,7 @@ public class FieldTypeRegistryTests
         registry.Find("richtext").Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void TwoFieldTypesSharingAKeyFailAtStartup()
     {
         var construct = () => new FieldTypeRegistry([new StubFieldType("richText"), new StubFieldType("richText")]);
@@ -49,7 +49,7 @@ public class FieldTypeRegistryTests
             .WithMessage("*richText*");
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeWithNoKeyFailsAtStartup()
     {
         var construct = () => new FieldTypeRegistry([new StubFieldType("  ")]);
@@ -57,7 +57,7 @@ public class FieldTypeRegistryTests
         construct.Should().Throw<InvalidOperationException>();
     }
 
-    [Fact]
+    [Test]
     public void AllIsOrderedByKey()
     {
         var registry = new FieldTypeRegistry(
@@ -66,7 +66,7 @@ public class FieldTypeRegistryTests
         registry.All.Select(f => f.Key).Should().Equal("boolean", "media", "richText");
     }
 
-    [Fact]
+    [Test]
     public void AnEmptyRegistryIsUsable()
     {
         var registry = new FieldTypeRegistry([]);

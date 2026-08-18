@@ -26,7 +26,7 @@ public class PlainZoneEditorTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ATextZoneStoresWhatIsTypedIntoItInsideTheEnvelope()
     {
         var raised = string.Empty;
@@ -41,7 +41,7 @@ public class PlainZoneEditorTests : IDisposable
         raised.Should().Be("""{"type":"plainText","value":"after"}""");
     }
 
-    [Fact]
+    [Test]
     public void RichTextIsNotEditableHereBecauseItsFormatWouldBeLost()
     {
         var editor = Render(
@@ -55,7 +55,7 @@ public class PlainZoneEditorTests : IDisposable
         editor.Find("textarea").HasAttribute("readonly").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeWithNoEditorIsShownAsStoredAndNotEditable()
     {
         var editor = Render(FieldTypeKeys.Blocks, """{ "type": "blocks", "items": [] }""", _ => { });
@@ -69,7 +69,7 @@ public class PlainZoneEditorTests : IDisposable
         editor.Markup.Should().Contain("No editor is registered");
     }
 
-    [Fact]
+    [Test]
     public void ADisabledZoneCannotBeTypedInto()
     {
         var editor = Render(
@@ -81,7 +81,7 @@ public class PlainZoneEditorTests : IDisposable
         editor.Find("textarea").HasAttribute("disabled").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void TheControlIsNamedAndDescribedByTheCardAroundIt()
     {
         var editor = Render(FieldTypeKeys.PlainText, """{"type":"plainText","value":"v"}""", _ => { });

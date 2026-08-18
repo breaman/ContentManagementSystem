@@ -17,13 +17,14 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// soft delete and a global query filter. Asserting them against a fake would be asserting that the
 /// fake works.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class ReusableContentSchemaTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task AnItemAndItsFirstDraftAreInsertedInOneTransaction()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
@@ -41,10 +42,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
         stored.PublishedVersionId.Should().BeNull("an item is not published by being created");
     }
 
-    [Fact]
+    [Test]
     public async Task TwoVersionsOfOneItemCannotShareAVersionNumber()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
@@ -58,10 +59,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TwoItemsCannotShareAKeyEvenWhenOneIsInTheRecycleBin()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var first = await CreateItemAsync(context, "site-footer", cancellationToken);
@@ -77,10 +78,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
         await create.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TheLibraryIndexIsFilteredToUndeletedItems()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var filter = await context.Database
@@ -99,10 +100,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
         filter.Should().Contain("IsDeleted").And.Contain("0");
     }
 
-    [Fact]
+    [Test]
     public async Task ADeletedItemIsHiddenFromOrdinaryQueriesButItsHistoryStaysReachable()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
@@ -128,10 +129,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
             .Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftSavedTwiceFromStaleStateFailsRatherThanOverwriting()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var databaseName = $"cms_ru_conc_{Guid.NewGuid():N}";
         await using var context = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
 
@@ -156,10 +157,10 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateConcurrencyException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ABlockTypeCannotBeDeletedWhileAnItemIsShapedByIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         await CreateItemAsync(context, "site-footer", cancellationToken);

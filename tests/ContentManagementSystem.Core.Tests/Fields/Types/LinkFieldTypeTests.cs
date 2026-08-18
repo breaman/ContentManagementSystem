@@ -10,7 +10,7 @@ public class LinkFieldTypeTests
 {
     private readonly LinkFieldType _fieldType = new();
 
-    [Fact]
+    [Test]
     public async Task AnInternalLinkIsAccepted()
     {
         var result = await _fieldType.ValidateAsync(
@@ -22,7 +22,7 @@ public class LinkFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnInternalLinkWithoutAPageIsRejected()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "link", "kind": "page" }""");
@@ -31,7 +31,7 @@ public class LinkFieldTypeTests
         result.Paths().Should().Equal("pageId");
     }
 
-    [Fact]
+    [Test]
     public async Task ALinkWithNoKindIsUnfilledRatherThanMalformed()
     {
         var draft = await _fieldType.ValidateAsync("""{ "type": "link" }""", isRequired: true);
@@ -44,7 +44,7 @@ public class LinkFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public async Task AKindOutsideTheV1SetIsRejected()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "link", "kind": "telephone" }""");
@@ -52,9 +52,9 @@ public class LinkFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.LinkKind);
     }
 
-    [Theory]
-    [InlineData("https://example.com/pricing")]
-    [InlineData("http://example.com")]
+    [Test]
+    [Arguments("https://example.com/pricing")]
+    [Arguments("http://example.com")]
     public async Task AnExternalLinkOnAWebSchemeIsAccepted(string url)
     {
         var result = await _fieldType.ValidateAsync(
@@ -63,11 +63,11 @@ public class LinkFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("javascript:alert(1)")]
-    [InlineData("data:text/html;base64,PHNjcmlwdD4=")]
-    [InlineData("/pricing")]
-    [InlineData("")]
+    [Test]
+    [Arguments("javascript:alert(1)")]
+    [Arguments("data:text/html;base64,PHNjcmlwdD4=")]
+    [Arguments("/pricing")]
+    [Arguments("")]
     public async Task AnExternalLinkOnAnythingElseIsRejected(string url)
     {
         var result = await _fieldType.ValidateAsync(
@@ -78,7 +78,7 @@ public class LinkFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.LinkUrl);
     }
 
-    [Fact]
+    [Test]
     public async Task AMediaLinkIdentifiesTheFile()
     {
         var result = await _fieldType.ValidateAsync(
@@ -87,7 +87,7 @@ public class LinkFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnchorLinkNeedsAFragment()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "link", "kind": "anchor", "anchor": "" }""");
@@ -95,9 +95,9 @@ public class LinkFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.LinkAnchor);
     }
 
-    [Theory]
-    [InlineData("hello@example.com")]
-    [InlineData("first.last+tag@sub.example.co.uk")]
+    [Test]
+    [Arguments("hello@example.com")]
+    [Arguments("first.last+tag@sub.example.co.uk")]
     public async Task AnEmailLinkAcceptsAnAddressThatCouldBeDeliveredTo(string email)
     {
         var result = await _fieldType.ValidateAsync(
@@ -106,12 +106,12 @@ public class LinkFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("example.com")]
-    [InlineData("@example.com")]
-    [InlineData("hello@")]
-    [InlineData("two@at@example.com")]
-    [InlineData("hello world@example.com")]
+    [Test]
+    [Arguments("example.com")]
+    [Arguments("@example.com")]
+    [Arguments("hello@")]
+    [Arguments("two@at@example.com")]
+    [Arguments("hello world@example.com")]
     public async Task AnEmailLinkRejectsWhatIsNotAnAddressAtAll(string email)
     {
         var result = await _fieldType.ValidateAsync(
@@ -120,7 +120,7 @@ public class LinkFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.LinkEmail);
     }
 
-    [Fact]
+    [Test]
     public async Task ATargetThatIsNotABrowsingContextIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -129,7 +129,7 @@ public class LinkFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.LinkTarget);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAbsentTargetIsFine()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "link", "kind": "page", "pageId": 44 }""");
@@ -137,7 +137,7 @@ public class LinkFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AnInternalLinkIsReportedAsAPageReference()
     {
         var references = _fieldType.ExtractReferences("""{ "type": "link", "kind": "page", "pageId": 44 }""");
@@ -148,7 +148,7 @@ public class LinkFieldTypeTests
             .Which.Should().Be(new ContentReference(ContentReferenceTargetType.Page, 44));
     }
 
-    [Fact]
+    [Test]
     public void AMediaLinkIsReportedAsAMediaReference()
     {
         var references = _fieldType.ExtractReferences("""{ "type": "link", "kind": "media", "mediaId": 91 }""");
@@ -157,17 +157,17 @@ public class LinkFieldTypeTests
             .Which.Should().Be(new ContentReference(ContentReferenceTargetType.Media, 91));
     }
 
-    [Theory]
-    [InlineData("""{ "type": "link", "kind": "external", "url": "https://example.com" }""")]
-    [InlineData("""{ "type": "link", "kind": "anchor", "anchor": "pricing" }""")]
-    [InlineData("""{ "type": "link", "kind": "email", "email": "hello@example.com" }""")]
+    [Test]
+    [Arguments("""{ "type": "link", "kind": "external", "url": "https://example.com" }""")]
+    [Arguments("""{ "type": "link", "kind": "anchor", "anchor": "pricing" }""")]
+    [Arguments("""{ "type": "link", "kind": "email", "email": "hello@example.com" }""")]
     public void ALinkLeavingThisSiteReportsNothing(string property)
     {
         // Nothing here can move underneath the page, so there is nothing to invalidate.
         _fieldType.ExtractReferences(property).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AnIdIsNotReportedUnderTheWrongKind()
     {
         var references = _fieldType.ExtractReferences(
@@ -178,7 +178,7 @@ public class LinkFieldTypeTests
         references.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TheVisibleLabelIsIndexed()
     {
         var text = _fieldType.ExtractSearchText(FieldTypeTestHarness.Element(

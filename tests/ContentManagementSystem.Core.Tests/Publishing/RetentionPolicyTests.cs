@@ -28,7 +28,7 @@ public class RetentionPolicyTests
         CreatedOn: Cutoff.AddDays(-1),
         IsPointedAt: false);
 
-    [Fact]
+    [Test]
     public void AnOrdinaryOldVersionOutsideTheRecentSetIsPrunable()
     {
         // The control. Without it, every assertion below passes for a policy that keeps everything,
@@ -36,7 +36,7 @@ public class RetentionPolicyTests
         RetentionPolicy.Decide(Ordinary, Cutoff).Should().Be(RetentionReason.Prunable);
     }
 
-    [Fact]
+    [Test]
     public void TheDraftAndThePublishedVersionAreKept()
     {
         // Destroying one of these does not lose history, it breaks the page: Page.DraftVersionId
@@ -45,7 +45,7 @@ public class RetentionPolicyTests
             .Should().Be(RetentionReason.Pointer);
     }
 
-    [Fact]
+    [Test]
     public void AVersionThatWasEverLiveIsKept()
     {
         // Both spellings, because they part company. A superseded publish is Archived and keeps its
@@ -58,7 +58,7 @@ public class RetentionPolicyTests
             .Should().Be(RetentionReason.Published);
     }
 
-    [Fact]
+    [Test]
     public void ANamedCheckpointIsKept()
     {
         RetentionPolicy.Decide(Ordinary with { Label = "before the rewrite" }, Cutoff)
@@ -70,7 +70,7 @@ public class RetentionPolicyTests
             .Should().Be(RetentionReason.Prunable);
     }
 
-    [Fact]
+    [Test]
     public void AVersionInsideTheRetentionWindowIsKeptHoweverFarDownTheListItIs()
     {
         RetentionPolicy.Decide(Ordinary with { CreatedOn = Cutoff }, Cutoff)
@@ -83,7 +83,7 @@ public class RetentionPolicyTests
             .Should().Be(RetentionReason.Prunable);
     }
 
-    [Fact]
+    [Test]
     public void AVersionWhoseAgeIsUnknownIsKept()
     {
         // CreatedOn is written by the audit interceptor. Its absence means the row's age cannot be
@@ -92,10 +92,10 @@ public class RetentionPolicyTests
             .Should().Be(RetentionReason.InsideWindow);
     }
 
-    [Theory]
-    [InlineData(1, RetentionReason.RecentlyEnough)]
-    [InlineData(RetentionPolicy.KeepPerPage, RetentionReason.RecentlyEnough)]
-    [InlineData(RetentionPolicy.KeepPerPage + 1, RetentionReason.Prunable)]
+    [Test]
+    [Arguments(1, RetentionReason.RecentlyEnough)]
+    [Arguments(RetentionPolicy.KeepPerPage, RetentionReason.RecentlyEnough)]
+    [Arguments(RetentionPolicy.KeepPerPage + 1, RetentionReason.Prunable)]
     public void TheMostRecentVersionsSurviveTheWindowByCount(int rank, RetentionReason expected)
     {
         // The boundary in both directions. Off by one here is either twenty-one versions kept for
@@ -103,10 +103,10 @@ public class RetentionPolicyTests
         RetentionPolicy.Decide(Ordinary with { Rank = rank }, Cutoff).Should().Be(expected);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(0)]
-    [InlineData(-30)]
+    [Test]
+    [Arguments(null)]
+    [Arguments(0)]
+    [Arguments(-30)]
     public void AnUnsetOrNonsensicalWindowFallsBackToTheDefault(int? configured)
     {
         // The seeded SiteSettings row carries zero. Reading that literally as "keep nothing" would
@@ -114,7 +114,7 @@ public class RetentionPolicyTests
         RetentionPolicy.WindowDays(configured).Should().Be(RetentionPolicy.DefaultRetentionDays);
     }
 
-    [Fact]
+    [Test]
     public void AConfiguredWindowIsHonoured()
     {
         RetentionPolicy.WindowDays(30).Should().Be(30);
@@ -125,7 +125,7 @@ public class RetentionPolicyTests
         RetentionPolicy.CutoffFrom(now, null).Should().Be(now.AddDays(-RetentionPolicy.DefaultRetentionDays));
     }
 
-    [Fact]
+    [Test]
     public void TheDefaultsAreTheOnesTheSpecNames()
     {
         // Pinned rather than derived. These two numbers are a published promise about how much

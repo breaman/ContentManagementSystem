@@ -33,7 +33,7 @@ public class BlocksRendererTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void EachItemIsRenderedByTheComponentDeclaringItsBlockTypeKey()
     {
         var markup = _harness.Render(Quote);
@@ -43,7 +43,7 @@ public class BlocksRendererTests : IDisposable
             .And.Contain("data-revision=\"2\"");
     }
 
-    [Fact]
+    [Test]
     public void ABlockPropertyGoesThroughItsOwnFieldTypesRenderer()
     {
         // The reason CmsBlockProperty exists: a block's structured properties are read by the field
@@ -58,7 +58,7 @@ public class BlocksRendererTests : IDisposable
         markup.Should().Contain("a &lt; b");
     }
 
-    [Fact]
+    [Test]
     public void ABlockPropertySeesTheConfigurationItsRevisionCaptured()
     {
         // Resolved from the block type revision the instance named, not from whatever the block type
@@ -84,7 +84,7 @@ public class BlocksRendererTests : IDisposable
             "the captured profile is extended, which permits figure");
     }
 
-    [Fact]
+    [Test]
     public void ABlockWhoseTypeThisDeploymentNoLongerCarriesIsSkippedAndTheRestRender()
     {
         // One retired block type must not blank a page (spec section 15.3).
@@ -102,7 +102,7 @@ public class BlocksRendererTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("retired-block"));
     }
 
-    [Fact]
+    [Test]
     public void ABlockNamingNoTypeAtAllIsSkippedAndLogged()
     {
         var markup = _harness.Render("""
@@ -113,7 +113,7 @@ public class BlocksRendererTests : IDisposable
         _harness.Logs.Entries.Should().Contain(entry => entry.Level == LogLevel.Warning);
     }
 
-    [Fact]
+    [Test]
     public void BlocksRenderInTheOrderTheyWereAuthored()
     {
         var markup = _harness.Render("""
@@ -129,7 +129,7 @@ public class BlocksRendererTests : IDisposable
             .BeLessThan(markup.IndexOf("Second", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Test]
     public void ABlockMissingAPropertyItsMarkupReadsRendersTheRestOfItself()
     {
         // A block authored against an older revision is simply missing what was added since.
@@ -143,7 +143,7 @@ public class BlocksRendererTests : IDisposable
         _harness.Logs.Entries.Should().BeEmpty("an unauthored property is ordinary, not a fault");
     }
 
-    [Fact]
+    [Test]
     public void ANestedReferenceInsideABlockStillTagsThePageThatDependsOnIt()
     {
         // The failure a container renderer makes easy: rendering the nesting but losing the

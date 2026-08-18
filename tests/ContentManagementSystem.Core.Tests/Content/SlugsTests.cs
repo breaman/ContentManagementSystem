@@ -15,15 +15,15 @@ namespace ContentManagementSystem.Core.Tests.Content;
 /// </remarks>
 public class SlugsTests
 {
-    [Theory]
-    [InlineData("Pricing", "pricing")]
-    [InlineData("Our Team", "our-team")]
-    [InlineData("  Leading and trailing  ", "leading-and-trailing")]
-    [InlineData("What's New?", "what-s-new")]
-    [InlineData("C# for Beginners", "c-for-beginners")]
-    [InlineData("2026 Annual Report", "2026-annual-report")]
-    [InlineData("Slashes/and\\backslashes", "slashes-and-backslashes")]
-    [InlineData("Multiple   spaces --- and dashes", "multiple-spaces-and-dashes")]
+    [Test]
+    [Arguments("Pricing", "pricing")]
+    [Arguments("Our Team", "our-team")]
+    [Arguments("  Leading and trailing  ", "leading-and-trailing")]
+    [Arguments("What's New?", "what-s-new")]
+    [Arguments("C# for Beginners", "c-for-beginners")]
+    [Arguments("2026 Annual Report", "2026-annual-report")]
+    [Arguments("Slashes/and\\backslashes", "slashes-and-backslashes")]
+    [Arguments("Multiple   spaces --- and dashes", "multiple-spaces-and-dashes")]
     public void ASlugIsDerivedFromTheTitle(string title, string expected)
     {
         var slug = Slugs.Generate(title);
@@ -32,7 +32,7 @@ public class SlugsTests
         Slugs.Validate(slug, isRootLevel: true).IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AccentsAreFoldedToTheirBaseLetters()
     {
         // The "normalized to ASCII where unambiguous" half of spec section 10.2. A café that is
@@ -44,7 +44,7 @@ public class SlugsTests
         Slugs.Validate(slug, isRootLevel: true).IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ALetterWithNoAsciiFormIsKeptRatherThanDropped()
     {
         // Dropping it would turn a title in a non-Latin script into an empty slug and leave the
@@ -55,7 +55,7 @@ public class SlugsTests
         slug.Should().Be("привет-мир");
     }
 
-    [Fact]
+    [Test]
     public void ANonAsciiSlugIsAcceptedWithAHomographWarning()
     {
         var result = Slugs.Validate("привет-мир", isRootLevel: true);
@@ -66,7 +66,7 @@ public class SlugsTests
                 d.Code == PageCodes.SlugHomograph && d.Severity == ValidationSeverity.Warning);
     }
 
-    [Fact]
+    [Test]
     public void ATitleWithNothingUsableInItProducesNoSlug()
     {
         // Not an exception and not a made-up slug: the editor is told to type one, which is the only
@@ -77,7 +77,7 @@ public class SlugsTests
             .Should().ContainSingle().Which.Code.Should().Be(PageCodes.SlugRequired);
     }
 
-    [Fact]
+    [Test]
     public void AGeneratedSlugIsCutToTheColumnAndNeverEndsOnAHyphen()
     {
         var slug = Slugs.Generate(string.Join(' ', Enumerable.Repeat("verylongword", 40)));
@@ -87,30 +87,30 @@ public class SlugsTests
         Slugs.Validate(slug, isRootLevel: true).IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("-leading")]
-    [InlineData("trailing-")]
-    [InlineData("double--hyphen")]
-    [InlineData("has space")]
-    [InlineData("has/slash")]
-    [InlineData("Uppercase")]
-    [InlineData("has.dot")]
-    [InlineData("has_underscore")]
+    [Test]
+    [Arguments("-leading")]
+    [Arguments("trailing-")]
+    [Arguments("double--hyphen")]
+    [Arguments("has space")]
+    [Arguments("has/slash")]
+    [Arguments("Uppercase")]
+    [Arguments("has.dot")]
+    [Arguments("has_underscore")]
     public void AnUnusableSegmentIsRefused(string slug) =>
         Slugs.Validate(slug, isRootLevel: true).Diagnostics
             .Should().ContainSingle().Which.Code.Should().Be(PageCodes.SlugFormat);
 
-    [Fact]
+    [Test]
     public void ASegmentLongerThanTheColumnIsRefused() =>
         Slugs.Validate(new string('a', FieldLengths.Slug + 1), isRootLevel: true).Diagnostics
             .Should().ContainSingle().Which.Code.Should().Be(PageCodes.TooLong);
 
-    [Theory]
-    [InlineData("admin")]
-    [InlineData("api")]
-    [InlineData("media")]
-    [InlineData("preview")]
-    [InlineData("health")]
+    [Test]
+    [Arguments("admin")]
+    [Arguments("api")]
+    [Arguments("media")]
+    [Arguments("preview")]
+    [Arguments("health")]
     public void AReservedFirstSegmentIsRefusedAtTheRootAndAllowedBeneathAParent(string slug)
     {
         Slugs.Validate(slug, isRootLevel: true).Diagnostics
@@ -121,7 +121,7 @@ public class SlugsTests
         Slugs.Validate(slug, isRootLevel: false).IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void CaseAndNormalizationFormAreFoldedRatherThanRefused()
     {
         // Neither is a mistake an editor made. URLs are lowercase by configuration, and two byte

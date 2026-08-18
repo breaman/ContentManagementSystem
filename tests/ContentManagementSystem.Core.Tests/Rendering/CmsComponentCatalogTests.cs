@@ -20,7 +20,7 @@ namespace ContentManagementSystem.Core.Tests.Rendering;
 /// </remarks>
 public class CmsComponentCatalogTests
 {
-    [Fact]
+    [Test]
     public void ADeclaredTemplateAndBlockTypeAreFoundByTheirKeys()
     {
         var catalog = Catalog(typeof(TestTemplate), typeof(TestBlock));
@@ -35,9 +35,9 @@ public class CmsComponentCatalogTests
         catalog.BlockTypeKeys.Should().ContainSingle();
     }
 
-    [Theory]
-    [InlineData("no-such-template")]
-    [InlineData("")]
+    [Test]
+    [Arguments("no-such-template")]
+    [Arguments("")]
     public void AKeyNoComponentDeclaresReportsFailureRatherThanThrowing(string key)
     {
         // Reached from a stored payload on every request that renders an orphaned template, so the
@@ -49,7 +49,7 @@ public class CmsComponentCatalogTests
         component.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void TwoComponentsDeclaringOneKeyFailAtStartup()
     {
         // No defensible winner: the key is written into stored payloads, and picking one silently
@@ -60,7 +60,7 @@ public class CmsComponentCatalogTests
             .WithMessage("*duplicate-key*");
     }
 
-    [Fact]
+    [Test]
     public void ATemplateAttributeOnSomethingThatIsNotAComponentFailsAtStartup()
     {
         // The alternative is a deployment that fails one page at a time, on whichever request first

@@ -13,7 +13,7 @@ namespace ContentManagementSystem.Core.Tests.Content;
 /// </summary>
 public class ContentSchemaSnapshotTests
 {
-    [Fact]
+    [Test]
     public void AnEmptySnapshotIsNoSlotsRatherThanAnError()
     {
         ContentSchemaSnapshot.Read(null).Should().BeEmpty();
@@ -21,7 +21,7 @@ public class ContentSchemaSnapshotTests
         ContentSchemaSnapshot.Read("[]").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void SlotsKeepTheOrderTheSnapshotListsThemIn()
     {
         var slots = ContentSchemaSnapshot.Read(
@@ -35,7 +35,7 @@ public class ContentSchemaSnapshotTests
         slots.Select(slot => slot.Key).Should().Equal("b", "a");
     }
 
-    [Fact]
+    [Test]
     public void ASlotWithNoLabelFallsBackToItsKey()
     {
         var slot = ContentSchemaSnapshot.Read("""[ { "key": "hero", "fieldTypeKey": "blocks" } ]""")
@@ -45,7 +45,7 @@ public class ContentSchemaSnapshotTests
         slot.Name.Should().Be("hero");
     }
 
-    [Fact]
+    [Test]
     public void ASnapshotThatIsNotAnArrayIsRefused()
     {
         var read = () => ContentSchemaSnapshot.Read("""{ "key": "hero" }""");
@@ -53,7 +53,7 @@ public class ContentSchemaSnapshotTests
         read.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void ASlotWithNoKeyOrNoFieldTypeIsRefused()
     {
         var noKey = () => ContentSchemaSnapshot.Read("""[ { "fieldTypeKey": "plainText" } ]""");
@@ -65,7 +65,7 @@ public class ContentSchemaSnapshotTests
         noFieldType.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void AMalformedConfigurationIsCaughtWhileCuttingTheRevisionNotWhileValidatingContent()
     {
         var write = () => ContentSchemaSnapshot.WriteZones(
@@ -82,7 +82,7 @@ public class ContentSchemaSnapshotTests
         write.Should().Throw<JsonException>();
     }
 
-    [Fact]
+    [Test]
     public void ZonesAreCapturedInEditorOrder()
     {
         var written = ContentSchemaSnapshot.WriteZones(
@@ -94,7 +94,7 @@ public class ContentSchemaSnapshotTests
         ContentSchemaSnapshot.Read(written).Select(slot => slot.Key).Should().Equal("a", "b");
     }
 
-    [Fact]
+    [Test]
     public void AZonesHelpTextAndGroupingAreCapturedWithIt()
     {
         var written = ContentSchemaSnapshot.WriteZones(
@@ -120,7 +120,7 @@ public class ContentSchemaSnapshotTests
         slot.Group.Should().Be("SEO");
     }
 
-    [Fact]
+    [Test]
     public void ASnapshotCutBeforeGroupingExistedReadsAsUngrouped()
     {
         var slot = CapturedSlot
@@ -133,7 +133,7 @@ public class ContentSchemaSnapshotTests
         slot.Description.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void BlockTypePropertiesUseTheSameFormatAsZones()
     {
         var written = ContentSchemaSnapshot.WriteProperties(
@@ -154,7 +154,7 @@ public class ContentSchemaSnapshotTests
         schema.FindProperty("headline")!.IsRequired.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ATemplateDeclaringOneZoneKeyTwiceIsRefused()
     {
         var build = () => ContentSchemaSnapshot.ReadTemplate(
@@ -169,7 +169,7 @@ public class ContentSchemaSnapshotTests
         build.Should().Throw<ArgumentException>();
     }
 
-    [Fact]
+    [Test]
     public void ZoneKeysAreMatchedExactly()
     {
         var schema = ContentSchemaSnapshot.ReadTemplate(
@@ -183,7 +183,7 @@ public class ContentSchemaSnapshotTests
         schema.DeclaresZone("Hero").Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void ABlockCarryingNoRevisionResolvesToTheNewestKnownOne()
     {
         var catalog = new ContentSchemaCatalog(
@@ -204,7 +204,7 @@ public class ContentSchemaSnapshotTests
         catalog.TryGetBlockType("missing", null, out _).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void TheSeededBuiltInBlockTypeCarriesAReadableSnapshot()
     {
         var revision = CmsSeedData.RawHtmlBlockTypeRevision;

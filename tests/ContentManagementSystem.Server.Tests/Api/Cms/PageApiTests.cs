@@ -20,20 +20,23 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// under test here is the part only an endpoint can get wrong: the status code, the precondition,
 /// the header, and whether the permission on the route agrees with the check inside the service.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageApiTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task CreatingAPageAnswers201WithItsLocationAndAnEmptyDraft()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-create", cancellationToken);
 
@@ -59,10 +62,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         payload.RootElement.GetProperty("zones").EnumerateObject().Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task ReadingAPageStampsTheDraftsRowVersionAsAnETag()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-etag", cancellationToken);
         var page = await CreatePageAsync(client, template, "Etag", cancellationToken);
@@ -79,10 +82,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Headers.ETag.IsWeak.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftSaveWithNoPreconditionIsRefusedWith428()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-no-precondition", cancellationToken);
         var page = await CreatePageAsync(client, template, "Unconditional", cancellationToken);
@@ -100,10 +103,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain(PageCodes.ConcurrentChange);
     }
 
-    [Fact]
+    [Test]
     public async Task TwoConcurrentDraftSavesGiveTheSecondA409CarryingBothPayloads()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-conflict", cancellationToken);
         var page = await CreatePageAsync(client, template, "Contested", cancellationToken);
@@ -154,10 +157,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.RowVersion.Should().Be(won.RowVersion);
     }
 
-    [Fact]
+    [Test]
     public async Task ARefusalThatNothingWonCarriesNoConflictAtAll()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-no-conflict-body", cancellationToken);
         var page = await CreatePageAsync(client, template, "Malformed", cancellationToken);
@@ -177,10 +180,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await ProblemAsync(response, cancellationToken)).Conflict.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnsavedPayloadCanBeComparedAgainstTheStoredDraft()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-draft-diff", cancellationToken);
         var page = await CreatePageAsync(client, template, "Contested", cancellationToken);
@@ -211,10 +214,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         diff.Metadata.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task ComparingAgainstAPageThatDoesNotExistIsANotFoundRatherThanAnEmptyDiff()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -225,10 +228,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task TheSignedInEditorCanReadTheirOwnIdentity()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var me = await client.GetFromJsonAsync<CurrentUser>(
@@ -241,10 +244,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         me.DisplayName.Should().Be("test-user-1");
     }
 
-    [Fact]
+    [Test]
     public async Task NobodySignedInLearnsNothingAboutWhoIsSignedIn()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = _factory.CreateClient();
 
         var response = await client.GetAsync($"{CmsApiEndpoints.BasePath}/me", cancellationToken);
@@ -252,10 +255,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task ASavedDraftAnswersWithTheNewETagAndNoNewVersionRow()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-save", cancellationToken);
         var page = await CreatePageAsync(client, template, "Saved", cancellationToken);
@@ -278,10 +281,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         versions.Should().ContainSingle();
     }
 
-    [Fact]
+    [Test]
     public async Task AMetadataPatchChangesOnlyWhatItNames()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-patch", cancellationToken);
         var page = await CreatePageAsync(client, template, "Before", cancellationToken);
@@ -306,10 +309,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         patched.Seo.MetaDescription.Should().Be("What our plans cost.");
     }
 
-    [Fact]
+    [Test]
     public async Task AMetadataPatchWithAStalePreconditionIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-patch-conflict", cancellationToken);
         var page = await CreatePageAsync(client, template, "Contested", cancellationToken);
@@ -332,10 +335,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
-    [Fact]
+    [Test]
     public async Task TheListIsFilteredAndPagedByCursor()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-list", cancellationToken);
         var other = await CreateTemplateAsync(client, "page-list-other", cancellationToken);
@@ -367,10 +370,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Equal("Alpha", "Beta", "Gamma");
     }
 
-    [Fact]
+    [Test]
     public async Task TheListSearchesTitlesAndRefusesAFilterItCannotRead()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-search", cancellationToken);
         await CreatePageAsync(client, template, "Quarterly Report", cancellationToken);
@@ -392,10 +395,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         badCursor.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    [Fact]
+    [Test]
     public async Task TheTreeReturnsChildrenToTheRequestedDepth()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-tree", cancellationToken);
 
@@ -422,10 +425,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Page.Title.Should().Be("Blue Widget");
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftIsDiscardedBackToWhatIsPublished()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-discard", cancellationToken);
         var page = await CreatePageAsync(client, template, "Discardable", cancellationToken);
@@ -449,10 +452,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         draft.VersionNumber.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task ACheckpointAddsAFrozenVersionBesideTheDraft()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-checkpoint", cancellationToken);
         var page = await CreatePageAsync(client, template, "Bookmarked", cancellationToken);
@@ -475,10 +478,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         versions.Should().ContainSingle(version => version.IsDraft);
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayReadPagesButNotWriteThem()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(administrator, "page-viewer", cancellationToken);
         var page = await CreatePageAsync(administrator, template, "Readable", cancellationToken);
@@ -502,10 +505,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         patch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnonymousCallerIsChallengedRatherThanRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var anonymous = _factory.CreateClient();
 
         var response = await anonymous.GetAsync(Pages, cancellationToken);
@@ -515,10 +518,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
-    [Fact]
+    [Test]
     public async Task AWriteWithoutAnAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var administrator = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(administrator, "page-forged", cancellationToken);
 
@@ -535,10 +538,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain("request.antiforgery");
     }
 
-    [Fact]
+    [Test]
     public async Task APayloadNamingAnotherTemplateIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "page-envelope", cancellationToken);
         var page = await CreatePageAsync(client, template, "Guarded", cancellationToken);
@@ -557,10 +560,10 @@ public class PageApiTests(SqlServerFixture fixture) : IAsyncLifetime
         (await CodesAsync(response, cancellationToken)).Should().Contain(PageCodes.TemplateMismatch);
     }
 
-    [Fact]
+    [Test]
     public async Task APageThatIsNotThereIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var page = await client.GetAsync($"{Pages}/987654", cancellationToken);

@@ -33,7 +33,7 @@ public class MediaStorageKeyTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AnOriginalKeyIsContentAddressedAndFannedOut()
     {
         var key = MediaStorageKeys.ForOriginal(Hash, ".jpg");
@@ -42,46 +42,46 @@ public class MediaStorageKeyTests : IDisposable
         key.Should().Be($"originals/{hex[..2]}/{hex[2..4]}/{hex}.jpg");
     }
 
-    [Fact]
+    [Test]
     public void IdenticalBytesProduceAnIdenticalKey() =>
         // Deduplication as a property of the naming scheme rather than of a check somebody could
         // skip (spec section 13.1).
         MediaStorageKeys.ForOriginal(Hash, ".jpg")
             .Should().Be(MediaStorageKeys.ForOriginal(SHA256.HashData("a photograph"u8.ToArray()), ".JPG"));
 
-    [Fact]
+    [Test]
     public void AQuarantineKeyCarriesNoExtension() =>
         // Nothing should ever hand a quarantined file to a program that opens it by extension.
         Path.GetExtension(MediaStorageKeys.ForQuarantine(Hash)).Should().BeEmpty();
 
-    [Theory]
-    [InlineData("originals/ab/cd/abcd.jpg")]
-    [InlineData("renditions/812/9c4b.webp")]
-    [InlineData("quarantine/ab/abcd")]
+    [Test]
+    [Arguments("originals/ab/cd/abcd.jpg")]
+    [Arguments("renditions/812/9c4b.webp")]
+    [Arguments("quarantine/ab/abcd")]
     public void AGeneratedKeyIsValid(string key) =>
         MediaStorageKeys.IsValid(key).Should().BeTrue();
 
-    [Theory]
-    [InlineData("../../etc/passwd")]
-    [InlineData("originals/../../../etc/passwd")]
-    [InlineData("/etc/passwd")]
-    [InlineData("originals//abcd.jpg")]
-    [InlineData("originals/./abcd.jpg")]
-    [InlineData("originals\\..\\abcd.jpg")]
-    [InlineData("C:/Windows/System32/config")]
-    [InlineData("originals/ab/cd/ABCD.JPG")]
-    [InlineData("originals/ab/cd/abcd.jpg/")]
-    [InlineData("originals/ab/cd/ab cd.jpg")]
-    [InlineData("originals/ab/cd/abcd.jpg\u0000")]
-    [InlineData("")]
+    [Test]
+    [Arguments("../../etc/passwd")]
+    [Arguments("originals/../../../etc/passwd")]
+    [Arguments("/etc/passwd")]
+    [Arguments("originals//abcd.jpg")]
+    [Arguments("originals/./abcd.jpg")]
+    [Arguments("originals\\..\\abcd.jpg")]
+    [Arguments("C:/Windows/System32/config")]
+    [Arguments("originals/ab/cd/ABCD.JPG")]
+    [Arguments("originals/ab/cd/abcd.jpg/")]
+    [Arguments("originals/ab/cd/ab cd.jpg")]
+    [Arguments("originals/ab/cd/abcd.jpg\u0000")]
+    [Arguments("")]
     public void AKeyThisApplicationCouldNotHaveGeneratedIsRefused(string key) =>
         MediaStorageKeys.IsValid(key).Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void AKeyLongerThanTheColumnIsRefused() =>
         MediaStorageKeys.IsValid(new string('a', MediaStorageKeys.MaxLength + 1)).Should().BeFalse();
 
-    [Fact]
+    [Test]
     public void TheFileSystemStoreRefusesARootInsideWwwroot()
     {
         var act = () => new FileSystemMediaStore(
@@ -93,7 +93,7 @@ public class MediaStorageKeyTests : IDisposable
         act.Should().Throw<ArgumentException>().WithMessage("*wwwroot*");
     }
 
-    [Fact]
+    [Test]
     public async Task TheFileSystemStoreRoundTripsContent()
     {
         var store = new FileSystemMediaStore(_root, NullLogger<FileSystemMediaStore>.Instance);
@@ -101,52 +101,52 @@ public class MediaStorageKeyTests : IDisposable
 
         using var content = new MemoryStream("bytes"u8.ToArray());
 
-        var result = await store.PutAsync(key, content, "image/jpeg", TestContext.Current.CancellationToken);
+        var result = await store.PutAsync(key, content, "image/jpeg", TestContext.Current!.Execution.CancellationToken);
 
         result.SizeBytes.Should().Be(5);
 
-        (await store.ExistsAsync(key, TestContext.Current.CancellationToken)).Should().BeTrue();
+        (await store.ExistsAsync(key, TestContext.Current!.Execution.CancellationToken)).Should().BeTrue();
 
-        await using (var read = await store.GetAsync(key, TestContext.Current.CancellationToken))
+        await using (var read = await store.GetAsync(key, TestContext.Current!.Execution.CancellationToken))
         {
             read.Should().NotBeNull();
 
             using var buffer = new MemoryStream();
 
-            await read!.CopyToAsync(buffer, TestContext.Current.CancellationToken);
+            await read!.CopyToAsync(buffer, TestContext.Current!.Execution.CancellationToken);
 
             Encoding.UTF8.GetString(buffer.ToArray()).Should().Be("bytes");
         }
 
-        await store.DeleteAsync(key, TestContext.Current.CancellationToken);
+        await store.DeleteAsync(key, TestContext.Current!.Execution.CancellationToken);
 
-        (await store.ExistsAsync(key, TestContext.Current.CancellationToken)).Should().BeFalse();
+        (await store.ExistsAsync(key, TestContext.Current!.Execution.CancellationToken)).Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingSomethingThatIsNotThereSucceeds()
     {
         var store = new FileSystemMediaStore(_root, NullLogger<FileSystemMediaStore>.Instance);
 
         var act = async () => await store.DeleteAsync(
-            MediaStorageKeys.ForOriginal(Hash, ".png"), TestContext.Current.CancellationToken);
+            MediaStorageKeys.ForOriginal(Hash, ".png"), TestContext.Current!.Execution.CancellationToken);
 
         await act.Should().NotThrowAsync();
     }
 
-    [Theory]
-    [InlineData("../../../etc/passwd")]
-    [InlineData("originals/../../escape.jpg")]
+    [Test]
+    [Arguments("../../../etc/passwd")]
+    [Arguments("originals/../../escape.jpg")]
     public async Task TheFileSystemStoreRefusesATraversalProbe(string key)
     {
         var store = new FileSystemMediaStore(_root, NullLogger<FileSystemMediaStore>.Instance);
 
-        var act = async () => await store.ExistsAsync(key, TestContext.Current.CancellationToken);
+        var act = async () => await store.ExistsAsync(key, TestContext.Current!.Execution.CancellationToken);
 
         await act.Should().ThrowAsync<ArgumentException>();
     }
 
-    [Fact]
+    [Test]
     public void TheFileSystemStoreHasNoPublicUrl() =>
         // A file on the application's own disk has no URL a client could fetch, and inventing one
         // would mean exposing the root through static file middleware.

@@ -58,7 +58,7 @@ public class PageEditorSavingTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AScreenNobodyTypesIntoWritesNothing()
     {
         var editor = Render();
@@ -68,7 +68,7 @@ public class PageEditorSavingTests : IDisposable
         editor.WaitForAssertion(() => _client.Writes.Should().BeEmpty());
     }
 
-    [Fact]
+    [Test]
     public void TypingIntoAZoneIsSavedTwentySecondsLater()
     {
         var editor = Render();
@@ -85,7 +85,7 @@ public class PageEditorSavingTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void ThePayloadIsWrittenBeforeTheMetadataSoTheSecondWriteHoldsTheRightToken()
     {
         var editor = Render();
@@ -108,7 +108,7 @@ public class PageEditorSavingTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void OnlyTheFieldsTheEditorTouchedAreSent()
     {
         var editor = Render();
@@ -127,7 +127,7 @@ public class PageEditorSavingTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void ARefusedDetailIsReportedInThePaneThatCanActOnItAndNotTheOther()
     {
         _client.NextPatchFails = true;
@@ -149,7 +149,7 @@ public class PageEditorSavingTests : IDisposable
         });
     }
 
-    [Fact]
+    [Test]
     public void ASaveThatLosesARaceOpensTheConflictDialogRatherThanBeingRetried()
     {
         _client.NextSaveConflicts = true;
@@ -172,7 +172,7 @@ public class PageEditorSavingTests : IDisposable
         editor.Find(".cms-save-state").TextContent.Should().Contain("Not saved");
     }
 
-    [Fact]
+    [Test]
     public void KeepingMineResendsTheSameTextWithTheWinnersToken()
     {
         _client.NextSaveConflicts = true;
@@ -199,7 +199,7 @@ public class PageEditorSavingTests : IDisposable
             "nothing an editor typed is dropped by choosing to keep it");
     }
 
-    [Fact]
+    [Test]
     public void TheSaveStateSaysWhenRatherThanJustThatItSaved()
     {
         var editor = Render();
@@ -215,7 +215,7 @@ public class PageEditorSavingTests : IDisposable
                 "quietly broken since\""));
     }
 
-    [Fact]
+    [Test]
     public async Task TheSaveShortcutRunsTheSameSaveTheButtonDoes()
     {
         var editor = Render();
@@ -234,7 +234,7 @@ public class PageEditorSavingTests : IDisposable
             .Which.Should().Contain("Typed and then saved by chord");
     }
 
-    [Fact]
+    [Test]
     public async Task TheHelpShortcutOpensTheListOfShortcuts()
     {
         var editor = Render();

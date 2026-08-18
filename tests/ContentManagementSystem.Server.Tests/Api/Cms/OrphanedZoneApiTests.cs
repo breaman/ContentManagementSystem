@@ -28,20 +28,23 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// the page moves forward, which is exactly when an editor would see it.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class OrphanedZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class OrphanedZoneApiTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task RemovingAZoneLeavesTheStoredValueWhereItWas()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var (template, zoneId, pageId) = await FilledPageAsync(client, "orphan-kept", cancellationToken);
 
@@ -59,10 +62,10 @@ public class OrphanedZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
             "the draft still captures the revision it was authored against");
     }
 
-    [Fact]
+    [Test]
     public async Task TheLeftoverValueIsReportedAsObsoleteContentOnceThePageAdoptsTheNewRevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var (template, zoneId, pageId) = await FilledPageAsync(client, "orphan-warned", cancellationToken);
 
@@ -104,10 +107,10 @@ public class OrphanedZoneApiTests(SqlServerFixture fixture) : IAsyncLifetime
         after.TemplateRevision.Should().Be(current);
     }
 
-    [Fact]
+    [Test]
     public async Task APageCarryingAnOrphanedZoneCanStillBePublished()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var (template, zoneId, pageId) = await FilledPageAsync(client, "orphan-publish", cancellationToken);
 

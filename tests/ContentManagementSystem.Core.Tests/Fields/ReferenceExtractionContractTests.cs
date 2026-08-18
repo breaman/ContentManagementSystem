@@ -85,12 +85,12 @@ public class ReferenceExtractionContractTests
             """,
     };
 
-    public static TheoryData<string> ReferenceBearingKeys => Keys(FieldTypeCapabilities.ReferenceBearing);
+    public static IEnumerable<string> ReferenceBearingKeys => Keys(FieldTypeCapabilities.ReferenceBearing);
 
-    public static TheoryData<string> ContainerKeys => Keys(FieldTypeCapabilities.Container);
+    public static IEnumerable<string> ContainerKeys => Keys(FieldTypeCapabilities.Container);
 
-    [Theory]
-    [MemberData(nameof(ReferenceBearingKeys))]
+    [Test]
+    [MethodDataSource(nameof(ReferenceBearingKeys))]
     public void EveryReferenceBearingFieldTypeReportsAPopulatedValue(string key)
     {
         var fieldType = Registry().Find(key);
@@ -104,8 +104,8 @@ public class ReferenceExtractionContractTests
         fieldType.ExtractReferences(PopulatedValues[key]).Should().NotBeEmpty();
     }
 
-    [Theory]
-    [MemberData(nameof(ContainerKeys))]
+    [Test]
+    [MethodDataSource(nameof(ContainerKeys))]
     public void EveryContainerReportsTheReferencesOfANestedValue(string key)
     {
         var fieldType = Registry().Find(key);
@@ -119,8 +119,8 @@ public class ReferenceExtractionContractTests
         fieldType.ExtractReferences(NestedValues[key]).Should().NotBeEmpty();
     }
 
-    [Theory]
-    [MemberData(nameof(ReferenceBearingKeys))]
+    [Test]
+    [MethodDataSource(nameof(ReferenceBearingKeys))]
     public void ExtractionAgreesWithValidationOnWhatCountsAsAReference(string key)
     {
         var fieldType = Registry().Find(key);
@@ -134,7 +134,7 @@ public class ReferenceExtractionContractTests
         references.Should().OnlyContain(reference => reference.TargetId > 0);
     }
 
-    [Fact]
+    [Test]
     public void NoFieldTypeReportsReferencesWithoutClaimingTo()
     {
         var registry = Registry();
@@ -151,8 +151,8 @@ public class ReferenceExtractionContractTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(ReferenceBearingKeys))]
+    [Test]
+    [MethodDataSource(nameof(ReferenceBearingKeys))]
     public void EveryReferenceBearingFieldTypeRewritesTheReferencesItReports(string key)
     {
         var fieldType = Registry().Find(key);
@@ -181,8 +181,8 @@ public class ReferenceExtractionContractTests
                 originals.Select(reference => (reference.TargetType, reference.TargetId + Shift)));
     }
 
-    [Theory]
-    [MemberData(nameof(ContainerKeys))]
+    [Test]
+    [MethodDataSource(nameof(ContainerKeys))]
     public void EveryContainerRewritesTheReferencesOfANestedValue(string key)
     {
         var fieldType = Registry().Find(key);
@@ -205,8 +205,8 @@ public class ReferenceExtractionContractTests
             .Should().BeEquivalentTo(originals.Select(reference => reference.TargetId + Shift));
     }
 
-    [Theory]
-    [MemberData(nameof(ReferenceBearingKeys))]
+    [Test]
+    [MethodDataSource(nameof(ReferenceBearingKeys))]
     public void ARemapThatChangesNothingLeavesTheValueAlone(string key)
     {
         var fieldType = Registry().Find(key);
@@ -219,16 +219,16 @@ public class ReferenceExtractionContractTests
             .Should().BeNull();
     }
 
-    private static TheoryData<string> Keys(FieldTypeCapabilities capability)
+    private static IEnumerable<string> Keys(FieldTypeCapabilities capability)
     {
-        var data = new TheoryData<string>();
+        var keys = new List<string>();
 
         foreach (var fieldType in Registry().All)
         {
-            if (fieldType.Capabilities.HasFlag(capability)) data.Add(fieldType.Key);
+            if (fieldType.Capabilities.HasFlag(capability)) keys.Add(fieldType.Key);
         }
 
-        return data;
+        return keys;
     }
 
     /// <summary>

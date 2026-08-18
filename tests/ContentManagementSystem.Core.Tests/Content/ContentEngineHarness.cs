@@ -86,7 +86,7 @@ internal static class ContentEngineHarness
         this IContentSchemaCatalog catalog,
         string payloadJson,
         ValidationMode mode = ValidationMode.Draft) =>
-        Validator(catalog).ValidateAsync(Payload(payloadJson), mode, TestContext.Current.CancellationToken);
+        Validator(catalog).ValidateAsync(Payload(payloadJson), mode, TestContext.Current!.Execution.CancellationToken);
 
     /// <summary>Validates a payload written as JSON against a schema chosen by the caller.</summary>
     /// <param name="schema">The template revision to check against.</param>
@@ -102,7 +102,7 @@ internal static class ContentEngineHarness
             Payload(payloadJson),
             schema,
             mode,
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
 
     /// <summary>The codes reported, for asserting on without pinning message wording.</summary>
     /// <param name="report">The report.</param>

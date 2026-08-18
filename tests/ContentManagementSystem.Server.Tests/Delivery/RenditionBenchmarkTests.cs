@@ -46,8 +46,9 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// hardest kind of failure to act on.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class RenditionBenchmarkTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class RenditionBenchmarkTests(SqlServerFixture fixture)
 {
     /// <summary>Width of the source, as NFR-8 names it.</summary>
     private const int SourceWidth = 4000;
@@ -68,15 +69,17 @@ public class RenditionBenchmarkTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AColdFourThousandPixelSourceRendersToTwelveEightyWebpWellInsideTheBudget()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var item = await UploadSourceAsync(cancellationToken);
 
         item.Width.Should().Be(SourceWidth, "NFR-8 is stated against a 4000 px source");

@@ -2,6 +2,8 @@ using ContentManagementSystem.Core.Security;
 
 using ContentManagementSystem.Shared.Contracts.Security;
 
+using TUnit.Core.Interfaces;
+
 namespace ContentManagementSystem.Core.Tests.Security;
 
 /// <summary>
@@ -28,22 +30,26 @@ public class XssCorpusTests
         SanitizationProfile.Developer,
     ];
 
-    private readonly ITestOutputHelper _output;
     private readonly SanitizationService _sanitizer = new();
 
-    public XssCorpusTests(ITestOutputHelper output) => _output = output;
+    /// <summary>
+    /// Where the suite writes what each profile stripped. TUnit reaches the current test's log
+    /// through the ambient context rather than a constructor-injected helper, so this is a property
+    /// rather than a field.
+    /// </summary>
+    private static ITestOutput Output => TestContext.Current!.Output;
 
-    public static TheoryData<string, SanitizationProfile> Corpus
+    public static IEnumerable<(string Name, SanitizationProfile Profile)> Corpus
     {
         get
         {
-            var data = new TheoryData<string, SanitizationProfile>();
+            var data = new List<(string, SanitizationProfile)>();
 
             foreach (var payload in XssCorpus.All)
             {
                 foreach (var profile in Profiles)
                 {
-                    data.Add(payload.Name, profile);
+                    data.Add((payload.Name, profile));
                 }
             }
 
@@ -51,8 +57,8 @@ public class XssCorpusTests
         }
     }
 
-    [Theory]
-    [MemberData(nameof(Corpus))]
+    [Test]
+    [MethodDataSource(nameof(Corpus))]
     public void EveryCorpusPayloadIsNeutralizedUnderEveryProfile(string name, SanitizationProfile profile)
     {
         var payload = Find(name);
@@ -62,20 +68,20 @@ public class XssCorpusTests
         // Written whether or not the assertion holds, because the report is half of what this task
         // asks for: a payload that is safe but was gutted is risk R3, and it is invisible unless
         // someone can read what went.
-        _output.WriteLine($"[{payload.Group}] {payload.Name} under {profile}");
-        _output.WriteLine($"  in : {payload.Payload}");
-        _output.WriteLine($"  out: {result.Html}");
+        Output.WriteLine($"[{payload.Group}] {payload.Name} under {profile}");
+        Output.WriteLine($"  in : {payload.Payload}");
+        Output.WriteLine($"  out: {result.Html}");
 
         foreach (var removal in result.Removals)
         {
-            _output.WriteLine($"  ✂ {removal.Describe()}");
+            Output.WriteLine($"  ✂ {removal.Describe()}");
         }
 
         SanitizationAssertions.AssertNeutralized(result.Html, profile);
     }
 
-    [Theory]
-    [MemberData(nameof(Corpus))]
+    [Test]
+    [MethodDataSource(nameof(Corpus))]
     public void SanitizingTwiceChangesNothingFurther(string name, SanitizationProfile profile)
     {
         var payload = Find(name);
@@ -90,8 +96,8 @@ public class XssCorpusTests
         twice.Should().Be(once);
     }
 
-    [Theory]
-    [MemberData(nameof(Corpus))]
+    [Test]
+    [MethodDataSource(nameof(Corpus))]
     public void TheReportedRemovalsAccountForTheChange(string name, SanitizationProfile profile)
     {
         var payload = Find(name);
@@ -119,7 +125,7 @@ public class XssCorpusTests
         }
     }
 
-    [Fact]
+    [Test]
     public void TheCorpusCoversEveryEvasionGroup()
     {
         // Cheap, but it is what stops the corpus from decaying into thirty variations of one trick.

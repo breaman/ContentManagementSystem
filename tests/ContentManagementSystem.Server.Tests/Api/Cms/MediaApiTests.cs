@@ -34,23 +34,26 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// account takes.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class MediaApiTests(SqlServerFixture fixture)
 {
     /// <summary>Route of the media collection.</summary>
     private const string Media = $"{CmsApiEndpoints.BasePath}/media";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task UploadingAJpegAnswers201WithItsDimensionsAndSize()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var response = await UploadAsync(client, Unique("photo") + ".jpg", Jpeg(800, 600), cancellationToken);
@@ -80,10 +83,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// a pipeline that stripped the metadata from a copy and stored the upload would pass any
     /// assertion made against the bytes it happened to keep in memory.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task APhotographsGpsCoordinatesAreGoneFromTheStoredOriginal()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         // Orientation 6 is "rotate 90° clockwise", and the fixture carries GPS alongside it. Both
@@ -125,10 +128,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// is the safe reading of an unanswered question — answering it changes one line of
     /// configuration rather than any code.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AnSvgUploadFollowsTheDeploymentsPolicyWhichDefaultsToRefusingIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var svg = Encoding.UTF8.GetBytes(
@@ -146,10 +149,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     }
 
     /// <remarks>Acceptance criterion P5 #6 — the half that says the original is never rewritten.</remarks>
-    [Fact]
+    [Test]
     public async Task EditingAnItemLeavesItsStoredOriginalByteForByteIdentical()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 83);
 
@@ -171,10 +174,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     }
 
     /// <remarks>Task P5-31, acceptance criterion P5 #2.</remarks>
-    [Fact]
+    [Test]
     public async Task ReuploadingIdenticalBytesReturnsTheExistingItemRatherThanCreatingASecond()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         // Identical pixels, deliberately different file names and folders. The hash is taken over
@@ -203,10 +206,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     }
 
     /// <remarks>Acceptance criterion P5 #3 — the type-confusion refusal, over HTTP.</remarks>
-    [Fact]
+    [Test]
     public async Task AnHtmlFileRenamedJpgIsRefusedWithATypeMismatch()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var html = Encoding.UTF8.GetBytes("<html><body><script>alert(1)</script></body></html>");
@@ -226,10 +229,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// pixel is decoded, which is why a file that would allocate gigabytes costs a few kilobytes to
     /// reject.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ADecodeBombIsRefusedFromItsHeaderRatherThanDecoded()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         // 40,000 × 40,000 is 1.6 gigapixels — six gigabytes decoded, and a few hundred bytes on the
@@ -248,10 +251,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.DimensionsTooLarge);
     }
 
-    [Fact]
+    [Test]
     public async Task AnImageWithNeitherAltTextNorADecorativeFlagIsRefusedAtUpload()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var response = await UploadAsync(
@@ -274,10 +277,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// with no purge to run: it is folded into every rendition signature, so a page's image URLs
     /// after the edit are different strings from the ones already cached (ADR 0007).
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ALibraryEditBumpsEditsVersionAndRevertingBumpsItAgain()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken);
 
@@ -321,10 +324,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
         afterRevert.EditsVersion.Should().Be(afterEdit.EditsVersion + 1);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEditDocumentWithAnImpossibleRotationIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken);
 
@@ -346,10 +349,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// on pointing at it — and moves the counter, which is what makes the new picture visible
     /// through caches.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task ReplacingAnItemKeepsItsIdAndChangesItsBytes()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken);
 
@@ -370,10 +373,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
         replaced.Item.AltText.Should().Be(item.AltText, "a replacement does not blank the description");
     }
 
-    [Fact]
+    [Test]
     public async Task ReplacingAnItemWithBytesAlreadyInTheLibraryIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var target = await UploadItemAsync(client, cancellationToken, seed: 31);
@@ -395,10 +398,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.Duplicate);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingMovesTheItemToTheBinAndRestoringBringsItBack()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 41);
 
@@ -425,10 +428,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     }
 
     /// <remarks>Task P5-24 — permanent deletion is never the first thing that happens to a file.</remarks>
-    [Fact]
+    [Test]
     public async Task PermanentDeletionOfAnItemThatIsNotInTheBinIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 43);
 
@@ -442,10 +445,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.NotDeleted);
     }
 
-    [Fact]
+    [Test]
     public async Task PermanentDeletionRemovesAnUnreferencedItemFromTheBin()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 47);
 
@@ -471,10 +474,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// managers hold. An Author may upload and describe files and may put one in the bin; taking it
     /// out of the database for good is a different decision.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AnAuthorMayUploadAndPatchButNotPermanentlyDelete()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var author = await ClientAsync(_factory, cancellationToken, CmsRoles.Author);
 
         var uploaded = await UploadAsync(
@@ -491,10 +494,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerMayBrowseTheLibraryButNotWriteToIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var viewer = await ClientAsync(_factory, cancellationToken, CmsRoles.Viewer);
 
         (await viewer.GetAsync(Media, cancellationToken)).StatusCode.Should().Be(HttpStatusCode.OK);
@@ -505,10 +508,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
         upload.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task PatchingMetadataLeavesOmittedMembersAloneAndStampsAnETag()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 61);
 
@@ -538,10 +541,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
         afterCaption.Credit.Should().Be("A photographer");
     }
 
-    [Fact]
+    [Test]
     public async Task ClearingTheAltTextOfANonDecorativeImageIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 67);
 
@@ -558,10 +561,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.AltTextRequired);
     }
 
-    [Fact]
+    [Test]
     public async Task FoldersNestFilterTheBrowserAndRefuseToBeDeletedWhileTheyHoldAnything()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var created = await client.PostAsJsonAsync(
@@ -608,10 +611,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.FolderNotEmpty);
     }
 
-    [Fact]
+    [Test]
     public async Task AFolderCannotBeMovedInsideItself()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var parentResponse = await client.PostAsJsonAsync(
@@ -637,10 +640,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(MediaCodes.FolderInvalidParent);
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnusedItemAppearsInTheUnusedFilterAndHasAnEmptyWhereUsedList()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var item = await UploadItemAsync(client, cancellationToken, seed: 73);
 
@@ -658,10 +661,10 @@ public class MediaApiTests(SqlServerFixture fixture) : IAsyncLifetime
         impact.IsReferenced.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AWriteWithoutAnAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // Deliberately not through ClientAsync, which fetches the token pair first.
         using var client = _factory.CreateClientAs(CmsRoles.Administrator);

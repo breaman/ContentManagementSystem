@@ -27,22 +27,25 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// asserting about that instead.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class DeliveryTests(SqlServerFixture fixture)
 {
     private const string TemplateKey = "article";
 
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task APublishedPageIsReachableAtItsUrlByAnAnonymousRequest()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PublishedPageAsync("Pricing", "Our best plans yet", cancellationToken);
 
         using var client = _bench.CreateClient();
@@ -66,10 +69,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         page.Summary.Id.Should().BePositive();
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnpublishedPageReturnsNotFoundToAnAnonymousRequest()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await TemplateAsync(cancellationToken);
         var page = await _bench.AddPageAsync(template, "Unreleased", cancellationToken);
 
@@ -88,10 +91,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         html.Should().NotContain("Not for the public yet");
     }
 
-    [Fact]
+    [Test]
     public async Task DraftEditsAfterAPublishDoNotChangeTheAnonymousResponse()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PublishedPageAsync("Offers", "What the public sees", cancellationToken);
 
         using var client = _bench.CreateClient();
@@ -112,10 +115,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         after.Should().Contain("What the public sees").And.NotContain("Draft edit");
     }
 
-    [Fact]
+    [Test]
     public async Task AChangedSlugRedirectsTheOldUrlPermanently()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var page = await PublishedPageAsync("Offers", "Still here", cancellationToken);
 
         (await _bench.Resolve<IPageService>().PatchMetadataAsync(
@@ -135,10 +138,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Headers.Location!.OriginalString.Should().Be("/deals");
     }
 
-    [Fact]
+    [Test]
     public async Task ANonCanonicalSpellingIsSentToTheCanonicalUrl()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await PublishedPageAsync("Pricing", "Our best plans yet", cancellationToken);
 
@@ -151,10 +154,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         response.Headers.Location!.OriginalString.Should().Be("/pricing");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnresolvedUrlIsRecordedOnceWithAnAccurateHitCount()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _bench.CreateClient();
 
@@ -177,10 +180,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         logged.FirstSeenOn.Should().BeOnOrBefore(logged.LastSeenOn);
     }
 
-    [Fact]
+    [Test]
     public async Task TheConfiguredCmsPageIsServedForAnUnresolvedUrlWithA404Status()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var notFoundPage = await PublishedPageAsync("Sorry", "We could not find that", cancellationToken);
 
         var settings = await _bench.Context.SiteSettings.SingleAsync(cancellationToken);
@@ -197,10 +200,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain("We could not find that");
     }
 
-    [Fact]
+    [Test]
     public async Task AnUnchangedPageRevalidatesToNotModified()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await PublishedPageAsync("Pricing", "Our best plans yet", cancellationToken);
 
@@ -220,10 +223,10 @@ public class DeliveryTests(SqlServerFixture fixture) : IAsyncLifetime
         first.Headers.CacheControl!.ToString().Should().Contain("s-maxage=300");
     }
 
-    [Fact]
+    [Test]
     public async Task A404IsNeverCached()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var client = _bench.CreateClient();
         using var response = await client.GetAsync("/nothing/here", cancellationToken);

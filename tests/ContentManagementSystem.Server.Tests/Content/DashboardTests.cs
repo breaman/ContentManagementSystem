@@ -20,20 +20,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// nobody would go looking for: a review date that passed in silence, a live page pointing at a page
 /// somebody deleted, and a picture nobody described.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class DashboardTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task MyWorkListsTheDraftsTheSignedInEditorHasMovedOnFromWhatIsPublished()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("dash-mine", cancellationToken, PageWorkbench.TextZone("hero"));
         var ahead = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var untouched = await _bench.AddPageAsync(template, "About", cancellationToken);
@@ -63,10 +66,10 @@ public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
             "'assignment has not shipped'");
     }
 
-    [Fact]
+    [Test]
     public async Task TheScheduledTileHighlightsAPublishWhoseMomentCameAndWent()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("dash-sched", cancellationToken, PageWorkbench.TextZone("hero"));
         var late = await _bench.AddPageAsync(template, "Autumn campaign", cancellationToken);
         var soon = await _bench.AddPageAsync(template, "Winter campaign", cancellationToken);
@@ -91,10 +94,10 @@ public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
         publishing.Items.Single(item => !item.IsOverdue).Title.Should().Be("Winter campaign");
     }
 
-    [Fact]
+    [Test]
     public async Task NeedsAttentionFindsAnOverdueReviewAndAnUndescribedImage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("dash-rot", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
 
@@ -144,10 +147,10 @@ public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Detail.Should().Contain("412 request(s)");
     }
 
-    [Fact]
+    [Test]
     public async Task ABrokenReferenceIsReportedOnlyOnceItIsLiveOnThePublicSite()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "dash-refs",
             cancellationToken,
@@ -195,10 +198,10 @@ public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
         broken.Items[0].Detail.Should().Contain("no longer exists").And.Contain("related");
     }
 
-    [Fact]
+    [Test]
     public async Task EveryTileTrimsToTheLimitWhileSayingHowManyThereReallyAre()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("dash-many", cancellationToken, PageWorkbench.TextZone("hero"));
 
         for (var i = 0; i < 8; i++)
@@ -221,10 +224,10 @@ public class DashboardTests(SqlServerFixture fixture) : IAsyncLifetime
             "to surface");
     }
 
-    [Fact]
+    [Test]
     public async Task AViewerWhoMayNotReadContentGetsARefusalRatherThanAnEmptyDashboard()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var bench = await PageWorkbench.CreateAsync(
             fixture,

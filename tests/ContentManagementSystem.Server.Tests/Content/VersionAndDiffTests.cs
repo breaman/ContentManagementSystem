@@ -12,8 +12,9 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// <summary>
 /// Version history, rollback, retention, and the diff (tasks P2-13 and P2-14).
 /// </summary>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class VersionAndDiffTests(SqlServerFixture fixture)
 {
     private const string BlockA = "11111111-1111-4111-8111-111111111111";
     private const string BlockB = "22222222-2222-4222-8222-222222222222";
@@ -21,15 +22,17 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task HistoryListsEveryVersionWithItsStatusAuthorAndTimestamp()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (template, page) = await PublishedPageAsync(cancellationToken);
 
         var history = await _bench.Resolve<IVersionService>().ListAsync(page.Summary.Id, cancellationToken);
@@ -53,10 +56,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         _ = template;
     }
 
-    [Fact]
+    [Test]
     public async Task RestoringAVersionCopiesItIntoTheDraftAndLeavesThePublishedVersionAlone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (template, page) = await PublishedPageAsync(cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
 
@@ -105,10 +108,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         pageAfter.PublishedVersionId.Should().Be(publishedId);
     }
 
-    [Fact]
+    [Test]
     public async Task AVersionBelongingToAnotherPageIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (_, first) = await PublishedPageAsync(cancellationToken);
         var (_, second) = await PublishedPageAsync(cancellationToken, "Other");
 
@@ -122,10 +125,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
             .Outcome.Should().Be(CmsOutcome.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task RetentionKeepsWhatAnEditorWouldBeUpsetToLose()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (template, page) = await PublishedPageAsync(cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
 
@@ -186,10 +189,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         kept.Should().Contain(version => version.Label == "before the rewrite");
     }
 
-    [Fact]
+    [Test]
     public async Task NothingIsPrunedFromAPageInTheRecycleBin()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (template, page) = await PublishedPageAsync(cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
 
@@ -231,10 +234,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         after.Should().Be(before);
     }
 
-    [Fact]
+    [Test]
     public async Task AReorderedBlockIsReportedAsMovedRatherThanRemovedAndAdded()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -282,10 +285,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
             block.BlockId == Guid.Parse(BlockC) && block.BeforeIndex == 2 && block.AfterIndex == 0);
     }
 
-    [Fact]
+    [Test]
     public async Task AChangedBlockPropertyIsDiffedWordByWordAndAnUntouchedBlockIsSilent()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -332,10 +335,10 @@ public class VersionAndDiffTests(SqlServerFixture fixture) : IAsyncLifetime
         property.Segments.Should().Contain(segment => segment.Kind == ContentChangeKind.Removed);
     }
 
-    [Fact]
+    [Test]
     public async Task MetadataIsDiffedAsAFlatListAndAnIdenticalPairReportsNothing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (template, page) = await PublishedPageAsync(cancellationToken);
         var diffs = _bench.Resolve<IContentDiffService>();
         var versions = (await _bench.Resolve<IVersionService>().ListAsync(page.Summary.Id, cancellationToken)).Value!;

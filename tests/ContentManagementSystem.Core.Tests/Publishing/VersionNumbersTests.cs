@@ -14,14 +14,14 @@ namespace ContentManagementSystem.Core.Tests.Publishing;
 /// </remarks>
 public class VersionNumbersTests
 {
-    [Fact]
+    [Test]
     public void APageWithNoVersionsStartsAtOne()
     {
         VersionNumbers.Next([]).Should().Be(VersionNumbers.First);
         VersionNumbers.First.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void TheNextNumberIsTheHighestEverIssuedPlusOne()
     {
         VersionNumbers.Next([1, 2, 3]).Should().Be(4);
@@ -31,7 +31,7 @@ public class VersionNumbersTests
         VersionNumbers.Next([1, 4, 5]).Should().Be(6);
     }
 
-    [Fact]
+    [Test]
     public void TheOrderTheNumbersArriveInDoesNotMatter()
     {
         // The query feeding this is ordered by version number descending today. A rule that read the
@@ -40,7 +40,7 @@ public class VersionNumbersTests
         VersionNumbers.Next([3, 1, 5]).Should().Be(6);
     }
 
-    [Fact]
+    [Test]
     public void PruningTheOldHistoryDoesNotMakeANumberAvailableAgain()
     {
         var history = Enumerable.Range(1, 30).ToList();
@@ -55,7 +55,7 @@ public class VersionNumbersTests
         VersionNumbers.Next(pruned).Should().Be(next);
     }
 
-    [Fact]
+    [Test]
     public void TheNewestVersionIsNeverThePrunableOne()
     {
         var cutoff = new DateTimeOffset(2026, 8, 14, 0, 0, 0, TimeSpan.Zero);

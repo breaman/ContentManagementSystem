@@ -31,20 +31,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// API suite once <c>P2-16</c> maps the endpoints.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageServiceTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task CreatingAPageProducesADraftVersionWithAnEmptySchemaValidPayload()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -82,10 +85,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         report.HasErrors.Should().BeFalse(string.Join("; ", report.Diagnostics.Select(d => d.Message)));
     }
 
-    [Fact]
+    [Test]
     public async Task TheCreatingTransactionLeavesThePageItsDraftPointerAndItsPath()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -119,10 +122,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.PublishedVersionId.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public async Task ASiblingCannotClaimASlugThatIsTakenButAPageUnderAnotherParentCan()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -155,10 +158,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         elsewhere.IsSuccess.Should().BeTrue(Because(elsewhere));
     }
 
-    [Fact]
+    [Test]
     public async Task AReservedSegmentIsRefusedAtTheRootAndAcceptedBeneathAParent()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -183,10 +186,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         accepted.IsSuccess.Should().BeTrue(Because(accepted));
     }
 
-    [Fact]
+    [Test]
     public async Task ATemplateThatIsMissingOrDisabledIsRefusedAsABadValueRatherThanAsANotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -211,10 +214,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.TemplateDisabled);
     }
 
-    [Fact]
+    [Test]
     public async Task APageInTheRecycleBinIsNotAnAvailableParent()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -236,10 +239,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.ParentNotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task ANonAsciiSlugIsStoredAndItsHomographWarningSurvivesTheSave()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -258,10 +261,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.SlugHomograph);
     }
 
-    [Fact]
+    [Test]
     public async Task APatchChangesOnlyWhatItSuppliesAndCreatesNoNewVersion()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -309,10 +312,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         versions.Should().ContainSingle().Which.VersionNumber.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public async Task SendingAMemberAsNullClearsItWhileOmittingItDoesNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -338,10 +341,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             "an omitted member is not a null one");
     }
 
-    [Fact]
+    [Test]
     public async Task APatchIsCheckedBeforeItIsApplied()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -382,10 +385,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.Title.Should().Be("Pricing", "a refused patch changes nothing");
     }
 
-    [Fact]
+    [Test]
     public async Task ReadingAndWritingBothRequireTheirOwnPermission()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var template = await AddTemplateAsync(context, "landing", cancellationToken);
@@ -412,10 +415,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Outcome.Should().Be(CmsOutcome.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task ReadingAPageThatIsNotThereIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);
@@ -427,10 +430,10 @@ public class PageServiceTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task AnOwnerWhoDoesNotExistIsRefusedRatherThanLeftToTheForeignKey()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var pages = Service(scope, context);

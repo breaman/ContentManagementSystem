@@ -26,7 +26,7 @@ public class ShortcutTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void TheReferenceDialogDocumentsEveryShortcutTheListenerAnswersTo()
     {
         var dialog = _bunit.Render<ShortcutHelpDialog>(parameters => parameters
@@ -49,7 +49,7 @@ public class ShortcutTests : IDisposable
         dialog.Find("[role=dialog] .btn-outline-secondary").Click();
     }
 
-    [Fact]
+    [Test]
     public void AnEditorWhoMayNotWriteIsNotOfferedTheShortcutsThatWrite()
     {
         var offered = EditorShortcuts.For(canEdit: false);
@@ -58,12 +58,12 @@ public class ShortcutTests : IDisposable
         offered.Should().Contain(shortcut => shortcut.Id == EditorShortcuts.ShowHelp);
     }
 
-    [Theory]
-    [InlineData("s", true, false, EditorShortcuts.Save)]
+    [Test]
+    [Arguments("s", true, false, EditorShortcuts.Save)]
     // The letter as the keyboard reports it when Shift is down, which is what a browser sends.
-    [InlineData("S", true, false, EditorShortcuts.Save)]
-    [InlineData("p", true, true, EditorShortcuts.Publish)]
-    [InlineData("?", false, true, EditorShortcuts.ShowHelp)]
+    [Arguments("S", true, false, EditorShortcuts.Save)]
+    [Arguments("p", true, true, EditorShortcuts.Publish)]
+    [Arguments("?", false, true, EditorShortcuts.ShowHelp)]
     public async Task AChordRunsTheShortcutItNames(string key, bool control, bool shift, string expected)
     {
         string? ran = null;
@@ -75,14 +75,14 @@ public class ShortcutTests : IDisposable
         ran.Should().Be(expected);
     }
 
-    [Theory]
+    [Test]
     // Without the modifier it is a letter somebody typed.
-    [InlineData("s", false, false, false)]
+    [Arguments("s", false, false, false)]
     // With one modifier too many it is a different chord, which may belong to the browser.
-    [InlineData("s", true, true, false)]
+    [Arguments("s", true, true, false)]
     // Alt is the tree's move modifier and composes characters on several layouts, so it is matched
     // as "not held" rather than ignored.
-    [InlineData("s", true, false, true)]
+    [Arguments("s", true, false, true)]
     public async Task AChordThatIsNotAShortcutIsLeftAlone(string key, bool control, bool shift, bool alt)
     {
         string? ran = null;

@@ -41,7 +41,7 @@ public class DashboardScreenTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void EveryTileIsDrawnAndLinksToItsOwnUnabridgedList()
     {
         var screen = _bunit.Render<DashboardScreen>();
@@ -60,7 +60,7 @@ public class DashboardScreenTests : IDisposable
             "a tile that cannot be opened is a report, not a dashboard");
     }
 
-    [Fact]
+    [Test]
     public void ARowLinksToThePageItIsAboutAndSaysWhyItIsListed()
     {
         var screen = _bunit.Render<DashboardScreen>();
@@ -73,7 +73,7 @@ public class DashboardScreenTests : IDisposable
             "a list of titles with no reason beside them is a list nobody can prioritise");
     }
 
-    [Fact]
+    [Test]
     public void AnOverdueRowSaysSoInWordsRatherThanOnlyInColour()
     {
         var screen = _bunit.Render<DashboardScreen>();
@@ -85,7 +85,7 @@ public class DashboardScreenTests : IDisposable
             "a row that is only red is one half the people reading it cannot tell from the rest (P6-39)");
     }
 
-    [Fact]
+    [Test]
     public void ATileShowingSomeOfManySaysHowManyThereAre()
     {
         var screen = _bunit.Render<DashboardScreen>();
@@ -93,7 +93,7 @@ public class DashboardScreenTests : IDisposable
         screen.Markup.Should().Contain("Showing 1 of 12");
     }
 
-    [Fact]
+    [Test]
     public void TheTileScreenLoadsTheTileTheRouteNames()
     {
         var screen = _bunit.Render<DashboardTileScreen>(parameters => parameters
@@ -103,7 +103,7 @@ public class DashboardScreenTests : IDisposable
         screen.Find("h1").TextContent.Should().Be("Needs attention");
     }
 
-    [Fact]
+    [Test]
     public void ATileNameNothingWroteIsSaidRatherThanShownAsAnEmptyList()
     {
         var screen = _bunit.Render<DashboardTileScreen>(parameters => parameters

@@ -10,7 +10,7 @@ public class TagsFieldTypeTests
 {
     private readonly TagsFieldType _fieldType = new();
 
-    [Fact]
+    [Test]
     public async Task AListOfTagsIsAccepted()
     {
         var result = await _fieldType.ValidateAsync(
@@ -19,7 +19,7 @@ public class TagsFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyTagIsRejected()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "tags", "value": ["ok", "  "] }""");
@@ -28,7 +28,7 @@ public class TagsFieldTypeTests
         result.Paths().Should().Equal("value[1]");
     }
 
-    [Fact]
+    [Test]
     public async Task ATagThatIsNotTextIsRejected()
     {
         var result = await _fieldType.ValidateAsync("""{ "type": "tags", "value": ["ok", 3] }""");
@@ -36,7 +36,7 @@ public class TagsFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task TheSameTagInADifferentCaseIsARepeat()
     {
         var result = await _fieldType.ValidateAsync(
@@ -47,7 +47,7 @@ public class TagsFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Duplicate);
     }
 
-    [Fact]
+    [Test]
     public async Task ATagLongerThanTheConfiguredLimitIsRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -57,7 +57,7 @@ public class TagsFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxLength);
     }
 
-    [Fact]
+    [Test]
     public async Task MoreTagsThanTheMaximumAreRejected()
     {
         var result = await _fieldType.ValidateAsync(
@@ -67,7 +67,7 @@ public class TagsFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.MaxItems);
     }
 
-    [Fact]
+    [Test]
     public async Task NoTagsSavesAsADraftButDoesNotPublishWhenRequired()
     {
         var draft = await _fieldType.ValidateAsync(
@@ -82,7 +82,7 @@ public class TagsFieldTypeTests
         publish.Codes().Should().Equal(FieldValidationCodes.Required);
     }
 
-    [Fact]
+    [Test]
     public void TagsAreIndexedAsWords()
     {
         var text = _fieldType.ExtractSearchText(FieldTypeTestHarness.Element(
@@ -91,7 +91,7 @@ public class TagsFieldTypeTests
         text.Should().Be("release-notes v2");
     }
 
-    [Fact]
+    [Test]
     public void TagsReportNoReferences()
     {
         // A tag names a concept, not an entity: nothing breaks when one falls out of use, and there

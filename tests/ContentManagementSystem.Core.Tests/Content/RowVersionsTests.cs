@@ -27,7 +27,7 @@ public class RowVersionsTests
 {
     private static readonly byte[] Stored = [1, 2, 3, 4, 5, 6, 7, 8];
 
-    [Fact]
+    [Test]
     public void ATokenTheCallerSuppliedBecomesTheOriginalValueTheUpdateIsJudgedAgainst()
     {
         using var context = Context();
@@ -44,7 +44,7 @@ public class RowVersionsTests
         draft.RowVersion.Should().Equal(Stored, "the entity itself is not rewritten");
     }
 
-    [Fact]
+    [Test]
     public void NoTokenLeavesTheWriteUnconditional()
     {
         using var context = Context();
@@ -60,11 +60,11 @@ public class RowVersionsTests
         entry.Property(version => version.RowVersion).OriginalValue.Should().Equal(Stored);
     }
 
-    [Theory]
-    [InlineData("not base64 at all")]
-    [InlineData("!!!!")]
-    [InlineData("AQIDBA")]
-    [InlineData("AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=")]
+    [Test]
+    [Arguments("not base64 at all")]
+    [Arguments("!!!!")]
+    [Arguments("AQIDBA")]
+    [Arguments("AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=")]
     public void ATokenThisServerCouldNotHaveIssuedIsRefusedAndChangesNothing(string supplied)
     {
         using var context = Context();
@@ -79,7 +79,7 @@ public class RowVersionsTests
         entry.Property(version => version.RowVersion).OriginalValue.Should().Equal(Stored);
     }
 
-    [Fact]
+    [Test]
     public void TheTokenTheApiHandsOutIsOneItWillAcceptBack()
     {
         using var context = Context();
@@ -93,7 +93,7 @@ public class RowVersionsTests
         entry.Property(version => version.RowVersion).OriginalValue.Should().Equal(Stored);
     }
 
-    [Fact]
+    [Test]
     public void AVersionWithNoRowVersionYetStillTakesAToken()
     {
         using var context = Context();

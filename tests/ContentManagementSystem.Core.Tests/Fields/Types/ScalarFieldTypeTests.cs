@@ -13,7 +13,7 @@ public class ScalarFieldTypeTests
     private readonly ColorFieldType _color = new();
     private readonly JsonFieldType _json = new();
 
-    [Fact]
+    [Test]
     public async Task ANumberBelowMinIsRejected()
     {
         var result = await _number.ValidateAsync(
@@ -23,7 +23,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Min);
     }
 
-    [Fact]
+    [Test]
     public async Task ANumberAboveMaxIsRejected()
     {
         var result = await _number.ValidateAsync(
@@ -33,7 +33,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Max);
     }
 
-    [Fact]
+    [Test]
     public async Task ANumberOnTheBoundaryIsAccepted()
     {
         var result = await _number.ValidateAsync(
@@ -43,7 +43,7 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AFractionalStepDoesNotSufferFloatingPointDrift()
     {
         var result = await _number.ValidateAsync(
@@ -55,7 +55,7 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task StepsAreCountedFromMin()
     {
         var offGrid = await _number.ValidateAsync(
@@ -70,7 +70,7 @@ public class ScalarFieldTypeTests
         onGrid.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task TextStoredWhereANumberBelongsIsAShapeError()
     {
         var result = await _number.ValidateAsync("""{ "type": "number", "value": "12" }""");
@@ -78,7 +78,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Fact]
+    [Test]
     public async Task FalseIsAFilledBooleanValue()
     {
         var result = await _boolean.ValidateAsync(
@@ -91,7 +91,7 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AStringIsNotABoolean()
     {
         var result = await _boolean.ValidateAsync("""{ "type": "boolean", "value": "true" }""");
@@ -99,10 +99,10 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.Shape);
     }
 
-    [Theory]
-    [InlineData("#1f6feb")]
-    [InlineData("#1F6FEB")]
-    [InlineData("#000000")]
+    [Test]
+    [Arguments("#1f6feb")]
+    [Arguments("#1F6FEB")]
+    [Arguments("#000000")]
     public async Task SixDigitHexColoursAreAccepted(string color)
     {
         var result = await _color.ValidateAsync($$"""{ "type": "color", "value": "{{color}}" }""");
@@ -110,12 +110,12 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("#fff")]
-    [InlineData("1f6feb")]
-    [InlineData("rgb(31, 111, 235)")]
-    [InlineData("rebeccapurple")]
-    [InlineData("#1f6feb0a")]
+    [Test]
+    [Arguments("#fff")]
+    [Arguments("1f6feb")]
+    [Arguments("rgb(31, 111, 235)")]
+    [Arguments("rebeccapurple")]
+    [Arguments("#1f6feb0a")]
     public async Task OtherColourNotationsAreRefused(string color)
     {
         var result = await _color.ValidateAsync($$"""{ "type": "color", "value": "{{color}}" }""");
@@ -125,7 +125,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ColorFormat);
     }
 
-    [Fact]
+    [Test]
     public async Task AColourOutsideThePaletteIsRejected()
     {
         var result = await _color.ValidateAsync(
@@ -135,7 +135,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.ColorPalette);
     }
 
-    [Fact]
+    [Test]
     public async Task ThePaletteIsMatchedRegardlessOfCase()
     {
         var result = await _color.ValidateAsync(
@@ -146,11 +146,11 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Theory]
-    [InlineData("""{ "type": "json", "value": { "rows": [1, 2, 3] } }""")]
-    [InlineData("""{ "type": "json", "value": [] }""")]
-    [InlineData("""{ "type": "json", "value": 42 }""")]
-    [InlineData("""{ "type": "json", "value": "text" }""")]
+    [Test]
+    [Arguments("""{ "type": "json", "value": { "rows": [1, 2, 3] } }""")]
+    [Arguments("""{ "type": "json", "value": [] }""")]
+    [Arguments("""{ "type": "json", "value": 42 }""")]
+    [Arguments("""{ "type": "json", "value": "text" }""")]
     public async Task AnyJsonIsAcceptedByTheEscapeHatch(string property)
     {
         var result = await _json.ValidateAsync(property);
@@ -158,7 +158,7 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task AnEmptyObjectIsAFilledJsonValue()
     {
         var result = await _json.ValidateAsync(
@@ -169,7 +169,7 @@ public class ScalarFieldTypeTests
         result.IsValid.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task JsonLargerThanMaxBytesIsRejected()
     {
         var result = await _json.ValidateAsync(
@@ -179,7 +179,7 @@ public class ScalarFieldTypeTests
         result.Codes().Should().Equal(FieldValidationCodes.JsonMaxBytes);
     }
 
-    [Fact]
+    [Test]
     public void JsonIsRestrictedToDevelopersAndContributesNothingToSearch()
     {
         _json.Capabilities.Should().Be(FieldTypeCapabilities.DeveloperOnly);

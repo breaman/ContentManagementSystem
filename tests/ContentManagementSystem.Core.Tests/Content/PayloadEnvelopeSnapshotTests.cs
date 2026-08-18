@@ -18,7 +18,7 @@ public class PayloadEnvelopeSnapshotTests
 {
     private const string BlockId = "0f6c8b1e-3a4d-4f2b-9c7e-1d2a3b4c5d6e";
 
-    [Fact]
+    [Test]
     public void TheEnvelopeAPageStartsLifeWithIsPinned()
     {
         var payload = ContentPayload.CreateEmpty("marketing-landing", 7);
@@ -26,7 +26,7 @@ public class PayloadEnvelopeSnapshotTests
         JsonSnapshot.Match(payload.ToJson(), "empty-page.json");
     }
 
-    [Fact]
+    [Test]
     public void TheEnvelopeOfAnAuthoredPageIsPinned()
     {
         var payload = new ContentPayloadBuilder("marketing-landing", 7)
@@ -67,7 +67,7 @@ public class PayloadEnvelopeSnapshotTests
         JsonSnapshot.Match(payload.ToJson(), "authored-page.json");
     }
 
-    [Fact]
+    [Test]
     public void TheStoredFormOfAPayloadIsCompact()
     {
         var payload = ContentPayload.CreateEmpty("marketing-landing", 7);
@@ -77,7 +77,7 @@ public class PayloadEnvelopeSnapshotTests
         payload.ToJson().Should().NotContain("\n");
     }
 
-    [Fact]
+    [Test]
     public void TheSchemaSnapshotFormatIsPinned()
     {
         var zones = new List<Zone>
@@ -106,7 +106,7 @@ public class PayloadEnvelopeSnapshotTests
         JsonSnapshot.Match(ContentSchemaSnapshot.WriteZones(zones), "zone-snapshot.json");
     }
 
-    [Fact]
+    [Test]
     public void ASchemaSnapshotRoundTripsBackIntoTheSameDefinitions()
     {
         var written = ContentSchemaSnapshot.WriteZones(

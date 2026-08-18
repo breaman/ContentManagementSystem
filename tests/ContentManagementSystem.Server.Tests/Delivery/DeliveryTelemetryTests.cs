@@ -21,20 +21,23 @@ namespace ContentManagementSystem.Server.Tests.Delivery;
 /// never being reached — an early return that skips the recording, a name that drifted from the one
 /// the dashboard queries. Recording a measurement by hand passes every one of those.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class DeliveryTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class DeliveryTelemetryTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task RenderingAPageRecordsItsDurationTaggedByTemplate()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await PublishedPageAsync(cancellationToken);
 
@@ -50,10 +53,10 @@ public class DeliveryTelemetryTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Should().BeGreaterThanOrEqualTo(0);
     }
 
-    [Fact]
+    [Test]
     public async Task AUrlThatResolvesToNothingCountsAsARouteMiss()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         using var recorder = new MeasurementRecorder(_bench.Resolve<IMeterFactory>());
         using var client = _bench.CreateClient();

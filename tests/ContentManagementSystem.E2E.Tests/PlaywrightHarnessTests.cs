@@ -13,7 +13,7 @@ namespace ContentManagementSystem.E2E.Tests;
 /// </remarks>
 public class PlaywrightHarnessTests
 {
-    [Fact]
+    [Test]
     public async Task ChromiumLaunchesAndRendersMarkup()
     {
         PlaywrightBrowsers.EnsureInstalled();

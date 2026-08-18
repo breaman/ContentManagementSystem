@@ -17,7 +17,7 @@ public class SanitizationServiceTests
 {
     private readonly SanitizationService _sanitizer = new();
 
-    [Fact]
+    [Test]
     public void BasicKeepsProseAndLinks()
     {
         const string Markup =
@@ -31,12 +31,12 @@ public class SanitizationServiceTests
             "p", "strong", "em", "code", "h2", "ul", "li", "blockquote", "a");
     }
 
-    [Theory]
-    [InlineData("mailto:hello@example.test")]
-    [InlineData("tel:+15555550123")]
-    [InlineData("https://example.test/page")]
-    [InlineData("/about/team")]
-    [InlineData("#section")]
+    [Test]
+    [Arguments("mailto:hello@example.test")]
+    [Arguments("tel:+15555550123")]
+    [Arguments("https://example.test/page")]
+    [Arguments("/about/team")]
+    [Arguments("#section")]
     public void TheSchemeAllowlistKeepsTheSchemesAuthorsActuallyUse(string href)
     {
         var sanitized = _sanitizer.Sanitize($"<a href=\"{href}\">x</a>", SanitizationProfile.Basic);
@@ -44,7 +44,7 @@ public class SanitizationServiceTests
         sanitized.Should().Contain(href);
     }
 
-    [Fact]
+    [Test]
     public void AnUnknownWrapperIsUnwrappedRatherThanDeleted()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -56,7 +56,7 @@ public class SanitizationServiceTests
         sanitized.Should().Be("<p>Kept</p>");
     }
 
-    [Fact]
+    [Test]
     public void ACodeBearingElementIsDeletedWithItsContents()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -68,7 +68,7 @@ public class SanitizationServiceTests
         sanitized.Should().Be("<p>Before</p><p>After</p>");
     }
 
-    [Fact]
+    [Test]
     public void BasicRefusesTablesAndImagesThatExtendedAllows()
     {
         const string Markup = "<table><tr><td>Cell</td></tr></table><img src=\"https://cdn.test/a.png\" alt=\"a\">";
@@ -80,7 +80,7 @@ public class SanitizationServiceTests
             .Should().Contain(["table", "tr", "td", "img"]);
     }
 
-    [Fact]
+    [Test]
     public void ExtendedRefusesTheEmbedsDeveloperAllows()
     {
         const string Markup = "<iframe src=\"https://www.youtube.com/embed/x\"></iframe>";
@@ -92,7 +92,7 @@ public class SanitizationServiceTests
             .Should().Equal("iframe");
     }
 
-    [Fact]
+    [Test]
     public void AnIframePointingAtAnUnlistedHostIsRemovedEntirely()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -105,7 +105,7 @@ public class SanitizationServiceTests
         sanitized.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AnIframeOverPlainHttpIsRefused()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -115,7 +115,7 @@ public class SanitizationServiceTests
         sanitized.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void DataAttributesAreDeveloperOnly()
     {
         const string Markup = "<div data-widget=\"pricing\">x</div>";
@@ -124,7 +124,7 @@ public class SanitizationServiceTests
         _sanitizer.Sanitize(Markup, SanitizationProfile.Developer).Should().Contain("data-widget");
     }
 
-    [Fact]
+    [Test]
     public void AnInlineImageSurvivesWhileAnInlineDocumentDoesNot()
     {
         // A one-pixel transparent GIF: an image, base64, and well under the cap.
@@ -139,7 +139,7 @@ public class SanitizationServiceTests
             .Should().NotContain("data:");
     }
 
-    [Fact]
+    [Test]
     public void AnInlineSvgImageIsRefusedEvenThoughItIsAnImage()
     {
         const string Svg = "data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSkvPg==";
@@ -150,7 +150,7 @@ public class SanitizationServiceTests
             .Should().NotContain("data:");
     }
 
-    [Fact]
+    [Test]
     public void AnInlineImageOverTheCapIsRefused()
     {
         var sanitizer = new SanitizationService(new SanitizationOptions { MaxDataUriBytes = 64 });
@@ -160,7 +160,7 @@ public class SanitizationServiceTests
             .Should().NotContain("data:");
     }
 
-    [Fact]
+    [Test]
     public void ANonBase64DataUriIsRefusedRatherThanMeasured()
     {
         // Percent-encoded rather than base64 is the shape a text/html payload takes when it is
@@ -171,7 +171,7 @@ public class SanitizationServiceTests
             .Should().NotContain("data:");
     }
 
-    [Fact]
+    [Test]
     public void ATargetedLinkGetsNoopenerAndNoreferrer()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -181,7 +181,7 @@ public class SanitizationServiceTests
         sanitized.Should().Contain("rel=\"noopener noreferrer\"");
     }
 
-    [Fact]
+    [Test]
     public void ForcingRelKeepsTheTokensTheAuthorWrote()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -192,7 +192,7 @@ public class SanitizationServiceTests
         sanitized.Should().Contain("nofollow").And.Contain("noopener").And.Contain("noreferrer");
     }
 
-    [Fact]
+    [Test]
     public void ALinkThatOpensInPlaceIsLeftAlone()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -202,7 +202,7 @@ public class SanitizationServiceTests
         sanitized.Should().NotContain("rel=");
     }
 
-    [Fact]
+    [Test]
     public void AnInlineStyleKeepsAllowlistedPropertiesAndDropsTheRest()
     {
         var sanitized = _sanitizer.Sanitize(
@@ -213,7 +213,7 @@ public class SanitizationServiceTests
         sanitized.Should().NotContain("position").And.NotContain("z-index");
     }
 
-    [Fact]
+    [Test]
     public void ClassesAreRefusedUntilADeploymentDeclaresWhichOnesExist()
     {
         const string Markup = "<p class=\"lead\">x</p>";
@@ -229,7 +229,7 @@ public class SanitizationServiceTests
             .Should().Contain("class=\"lead\"");
     }
 
-    [Fact]
+    [Test]
     public void AnUnlistedClassIsDroppedWhileAListedOneSurvives()
     {
         var options = new SanitizationOptions();
@@ -242,7 +242,7 @@ public class SanitizationServiceTests
         sanitized.Should().Contain("lead").And.NotContain("admin-only");
     }
 
-    [Fact]
+    [Test]
     public void ClassesAreNeverAllowedUnderBasic()
     {
         var options = new SanitizationOptions();
@@ -252,16 +252,16 @@ public class SanitizationServiceTests
             .Should().NotContain("class");
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
     public void EmptyInputSanitizesToEmptyOutput(string? html)
     {
         _sanitizer.Sanitize(html, SanitizationProfile.Basic).Should().BeEmpty();
         _sanitizer.SanitizeWithReport(html, SanitizationProfile.Basic).RemovedAnything.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void CleanMarkupIsReportedAsUnchanged()
     {
         var result = _sanitizer.SanitizeWithReport("<p>Clean</p>", SanitizationProfile.Basic);
@@ -270,7 +270,7 @@ public class SanitizationServiceTests
         result.RemovedAnything.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void TheReportAndTheFastPathAgree()
     {
         // SanitizeWithReport builds its own sanitizer so that a caller's list cannot be written to

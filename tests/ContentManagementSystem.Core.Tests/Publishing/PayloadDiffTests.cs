@@ -27,7 +27,7 @@ public class PayloadDiffTests
 
     private static readonly PayloadDiff Diff = new(ContentEngineHarness.Registry);
 
-    [Fact]
+    [Test]
     public void AReorderedBlockIsReportedAsMovedWithItsBeforeAndAfterPositions()
     {
         var changes = Compare(Blocks(BlockA, BlockB, BlockC), Blocks(BlockC, BlockA, BlockB));
@@ -45,7 +45,7 @@ public class PayloadDiffTests
             block.BlockId == Guid.Parse(BlockA) && block.BeforeIndex == 0 && block.AfterIndex == 1);
     }
 
-    [Fact]
+    [Test]
     public void ABlockInsertedInTheMiddleIsOneAdditionAndOneMove()
     {
         var changes = Compare(Blocks(BlockA, BlockC), Blocks(BlockA, BlockB, BlockC));
@@ -64,7 +64,7 @@ public class PayloadDiffTests
         zone.Blocks.Should().NotContain(block => block.BlockId == Guid.Parse(BlockA));
     }
 
-    [Fact]
+    [Test]
     public void ADeletedBlockIsReportedOnceAtThePositionItHeld()
     {
         var changes = Compare(Blocks(BlockA, BlockB, BlockC), Blocks(BlockA, BlockC));
@@ -83,7 +83,7 @@ public class PayloadDiffTests
             block.BlockId == Guid.Parse(BlockB) && block.Kind == ContentChangeKind.Added);
     }
 
-    [Fact]
+    [Test]
     public void AChangeInsideOneBlockIsReportedOnThatBlockAndItsSiblingsStaySilent()
     {
         var before = Blocks(BlockA, BlockB);
@@ -108,7 +108,7 @@ public class PayloadDiffTests
         property.Segments.Should().Contain(segment => segment.Kind == ContentChangeKind.Removed);
     }
 
-    [Fact]
+    [Test]
     public void ABlockThatBothMovedAndChangedIsReportedAsChanged()
     {
         var before = Blocks(BlockA, BlockB);
@@ -127,7 +127,7 @@ public class PayloadDiffTests
         block.AfterIndex.Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public void AddingAPropertyToABlockIsAnAdditionAndRemovingOneIsARemoval()
     {
         var bare = $$"""
@@ -158,7 +158,7 @@ public class PayloadDiffTests
         removed.After.Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void AnIdenticalPairReportsNothingEvenWhenItsMembersAreInADifferentOrder()
     {
         var ordered = $$"""
@@ -180,7 +180,7 @@ public class PayloadDiffTests
         Compare(Zone(ordered), Zone(shuffled)).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AZoneAddedClearedOrRemovedIsDistinguishedFromAValueThatChanged()
     {
         var empty = """{ "schemaVersion": 1, "templateKey": "landing", "templateRevision": 1, "zones": {} }""";
@@ -199,7 +199,7 @@ public class PayloadDiffTests
         Compare(empty, cleared).Single().Kind.Should().Be(ContentChangeKind.Added);
     }
 
-    [Fact]
+    [Test]
     public void AZoneOnlyTheEarlierVersionHadIsAppendedAfterTheLaterVersionsOwnOrder()
     {
         var before = """
@@ -224,7 +224,7 @@ public class PayloadDiffTests
         changes[2].Kind.Should().Be(ContentChangeKind.Removed);
     }
 
-    [Fact]
+    [Test]
     public void AReferenceBearingZoneRendersTheIdentitiesItPointsAtAndIsNotWordDiffed()
     {
         var before = """
@@ -247,7 +247,7 @@ public class PayloadDiffTests
         zone.Segments.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AValueWrittenByAFieldTypeThisBuildDoesNotHaveStillDiffs()
     {
         var before = """
@@ -269,7 +269,7 @@ public class PayloadDiffTests
         zone.After.Should().Contain("after");
     }
 
-    [Fact]
+    [Test]
     public void AnUnparseablePayloadComparesAsThoughItHeldNoZones()
     {
         var compare = () => Diff.Compare(null, ContentEngineHarness.Payload(Text("hero", "Still here")));
@@ -282,7 +282,7 @@ public class PayloadDiffTests
         Diff.Compare(null, null).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TwoBlocksSharingAnIdAreReadAsOneRatherThanThrowing()
     {
         var duplicated = Blocks(BlockA, BlockA);

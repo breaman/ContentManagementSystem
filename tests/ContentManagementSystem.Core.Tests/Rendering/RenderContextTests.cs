@@ -12,7 +12,7 @@ namespace ContentManagementSystem.Core.Tests.Rendering;
 /// </remarks>
 public class RenderContextTests
 {
-    [Fact]
+    [Test]
     public void EveryRenderStartsTaggedWithItsOwnPageAndTemplate()
     {
         // Seeded by the context rather than by each caller: a tag that has to be remembered is one
@@ -22,7 +22,7 @@ public class RenderContextTests
         context.CacheTags.ToArray().Should().Equal("page:44", "tpl:7");
     }
 
-    [Fact]
+    [Test]
     public void TagsAccumulateDuringTheRenderAndAreCollectedOnce()
     {
         var context = RenderingHarness.Context(RenderingHarness.Payload());
@@ -35,7 +35,7 @@ public class RenderContextTests
         context.CacheTags.Count.Should().Be(4);
     }
 
-    [Fact]
+    [Test]
     public void TheTagFormatsAreTheOnesTheSpecTableNames()
     {
         // Spec section 16.2. Eviction on publish spells these independently, so a change here is a
@@ -48,7 +48,7 @@ public class RenderContextTests
         CacheTags.All.Should().Be("content");
     }
 
-    [Fact]
+    [Test]
     public void TwoContextsDoNotShareATagSet()
     {
         // The failure this prevents is one visitor's dependencies being applied to another's
@@ -62,10 +62,10 @@ public class RenderContextTests
         second.CacheTags.Contains("media:812").Should().BeFalse();
     }
 
-    [Theory]
-    [InlineData(CmsRenderMode.Live, false)]
-    [InlineData(CmsRenderMode.Preview, true)]
-    [InlineData(CmsRenderMode.ScheduledPreview, true)]
+    [Test]
+    [Arguments(CmsRenderMode.Live, false)]
+    [Arguments(CmsRenderMode.Preview, true)]
+    [Arguments(CmsRenderMode.ScheduledPreview, true)]
     public void PreviewIsBothPreviewModes(CmsRenderMode mode, bool expected)
     {
         // Renderers branch on this to decide whether an unpublished link target resolves and is

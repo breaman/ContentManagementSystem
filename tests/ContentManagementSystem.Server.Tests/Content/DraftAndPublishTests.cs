@@ -19,20 +19,23 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// published version's stored bytes are captured, the draft is edited several times, and the bytes
 /// are compared again (acceptance criterion P2 #4).
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class DraftAndPublishTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current.CancellationToken);
+        _bench = await PageWorkbench.CreateAsync(fixture, cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task SavingADraftMutatesItInPlaceAndCreatesNoVersionRow()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
@@ -56,10 +59,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         versions[0].ContentJson.Should().Contain("Our best plans yet");
     }
 
-    [Fact]
+    [Test]
     public async Task TwoConcurrentDraftSavesLeaveTheSecondWithAConflictAndBothPayloads()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
@@ -91,10 +94,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         second.Value.Draft.ContentJson.Should().NotContain("Marcus wrote this");
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftCannotBeSavedAgainstAnotherTemplateOrAnInventedRevision()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         await _bench.AddTemplateAsync("news-story", cancellationToken, PageWorkbench.TextZone("body"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
@@ -119,10 +122,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.TemplateRevisionInvalid);
     }
 
-    [Fact]
+    [Test]
     public async Task ADraftSavesWithARequiredZoneEmptyAndAPublishDoesNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -148,10 +151,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         published.Diagnostics.Diagnostics.Should().Contain(diagnostic => diagnostic.RelativePath!.Contains("hero"));
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingSnapshotsTheDraftAndLeavesItByteForByteAloneAfterwards()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
@@ -203,10 +206,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         draft.ContentJson.Should().Contain("Draft revision 2");
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingAgainArchivesThePreviousVersionAndRepointsThePage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var publishing = _bench.Resolve<IPublishingService>();
@@ -242,10 +245,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         superseded.Status.Should().Be(PageVersionStatus.Archived);
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingProjectsTheReferenceRowsOfTheVersionThatIsNowLive()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -282,10 +285,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         row.ZoneKey.Should().Be("related");
     }
 
-    [Fact]
+    [Test]
     public async Task LinkingToAPageThatIsGoneBlocksAPublishAndLinkingToAnUnpublishedOneOnlyWarns()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync(
             "landing",
             cancellationToken,
@@ -323,10 +326,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         afterDelete.Value.Errors.Should().Contain(error => error.Code == PageCodes.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task DiscardingADraftResetsItToWhatIsPublishedAndUnpublishingRetiresTheVersion()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
@@ -370,10 +373,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.DraftVersionId.Should().NotBeNull("unpublishing does not touch the draft");
     }
 
-    [Fact]
+    [Test]
     public async Task ACheckpointFreezesACopyOfTheDraftWithoutPublishingAnything()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken, PageWorkbench.TextZone("hero"));
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
         var drafts = _bench.Resolve<IDraftService>();
@@ -411,10 +414,10 @@ public class DraftAndPublishTests(SqlServerFixture fixture) : IAsyncLifetime
         page2.DraftVersionId.Should().Be(versions[0].Id);
     }
 
-    [Fact]
+    [Test]
     public async Task PublishingNeedsItsOwnPermission()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var editor = await PageWorkbench.CreateAsync(
             fixture,

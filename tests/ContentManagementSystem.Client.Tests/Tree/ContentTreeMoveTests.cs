@@ -45,7 +45,7 @@ public class ContentTreeMoveTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AltArrowDownMovesThePageDownOnePositionAmongItsSiblings()
     {
         // A reorder among siblings changes no address, so it goes straight through and both halves
@@ -70,7 +70,7 @@ public class ContentTreeMoveTests : IDisposable
             });
     }
 
-    [Fact]
+    [Test]
     public void AltArrowUpOnTheFirstSiblingAsksForNothing()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -82,7 +82,7 @@ public class ContentTreeMoveTests : IDisposable
             "round trip spent to tell the editor what the tree already showed");
     }
 
-    [Fact]
+    [Test]
     public void AltArrowUpDoesNotAlsoMoveTheSelection()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -101,7 +101,7 @@ public class ContentTreeMoveTests : IDisposable
                 "Alt is the modifier that means 'move the page', so it must not also navigate");
     }
 
-    [Fact]
+    [Test]
     public void AMoveThatChangesNoUrlIsAppliedWithoutADialog()
     {
         _client.UrlChanges = [];
@@ -117,7 +117,7 @@ public class ContentTreeMoveTests : IDisposable
         _client.Requests.Should().HaveCount(2, "the preview and then the move itself");
     }
 
-    [Fact]
+    [Test]
     public void AMoveThatChangesUrlsWaitsForAConfirmationListingThem()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -135,7 +135,7 @@ public class ContentTreeMoveTests : IDisposable
         dialog.TextContent.Should().Contain("redirect");
     }
 
-    [Fact]
+    [Test]
     public void ConfirmingTheDialogAppliesTheSameMoveThatWasPreviewed()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -151,7 +151,7 @@ public class ContentTreeMoveTests : IDisposable
             "the confirmed move must be the previewed move, or the dialog described something else");
     }
 
-    [Fact]
+    [Test]
     public void CancellingTheDialogWritesNothing()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -165,7 +165,7 @@ public class ContentTreeMoveTests : IDisposable
         _client.Requests.Should().ContainSingle().Which.Request.Preview.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void ARefusedMoveIsReportedInWordsRatherThanSwallowed()
     {
         _client.Refusal = "A page cannot be moved inside itself or one of its own descendants.";

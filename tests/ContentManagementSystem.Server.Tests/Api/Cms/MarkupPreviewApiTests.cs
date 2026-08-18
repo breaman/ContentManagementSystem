@@ -18,23 +18,26 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// exactly what a second implementation in the browser would have quietly stopped doing on the first
 /// upgrade of either.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class MarkupPreviewApiTests(SqlServerFixture fixture)
 {
     /// <summary>Route of the preview renderer.</summary>
     private const string Preview = $"{CmsApiEndpoints.BasePath}/markup-preview";
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task MarkdownIsRenderedThroughThePipelineTheSiteUses()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var result = await RenderAsync(
@@ -46,10 +49,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         result.RemovedAnything.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task ThePreviewSaysWhatTheProfileWillTakeOut()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var result = await RenderAsync(
@@ -63,10 +66,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         result.Removals.Should().Contain(removal => removal.Name == "script");
     }
 
-    [Fact]
+    [Test]
     public async Task TheBasicProfileIsWhatAnUnaskedForOneMeans()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var result = await RenderAsync(
@@ -79,10 +82,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         result.Html.Should().NotContain("<table");
     }
 
-    [Fact]
+    [Test]
     public async Task AMistypedProfileIsRefusedRatherThanQuietlyReplaced()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -95,10 +98,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    [Fact]
+    [Test]
     public async Task AFormatWithNoReadableMeaningIsRefusedRatherThanGuessedAt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -111,10 +114,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    [Fact]
+    [Test]
     public async Task TheDeveloperProfileNeedsTheRoleThatCanAuthorAgainstIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var author = await PageApiClient.ClientAsync(_factory, cancellationToken, CmsRoles.Author);
 
         var response = await author.PostAsJsonAsync(
@@ -128,10 +131,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAnonymousCallerCannotRenderAnything()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
@@ -142,10 +145,10 @@ public class MarkupPreviewApiTests(SqlServerFixture fixture) : IAsyncLifetime
         response.StatusCode.Should().BeOneOf(HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task TheProfilesEachListWhatTheyKeep()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await PageApiClient.AdministratorAsync(_factory, cancellationToken);
 
         var profiles = await client.GetFromJsonAsync<List<SanitizationProfileDescriptor>>(

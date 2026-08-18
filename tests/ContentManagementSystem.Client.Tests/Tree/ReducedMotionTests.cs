@@ -35,7 +35,7 @@ public partial class ReducedMotionTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void EveryStylesheetThatMovesSomethingAlsoSaysWhenToStop()
     {
         var unguarded = new List<string>();
@@ -60,7 +60,7 @@ public partial class ReducedMotionTests : IDisposable
             string.Join(", ", unguarded));
     }
 
-    [Fact]
+    [Test]
     public void AtLeastOneStylesheetWasActuallyRead()
     {
         // The guard above passes vacuously if the file walk finds nothing, which is exactly what a
@@ -68,11 +68,11 @@ public partial class ReducedMotionTests : IDisposable
         Stylesheets().Should().NotBeEmpty("the stylesheets could not be found, so nothing was checked");
     }
 
-    [Theory]
-    [InlineData(1, false, null, "Published")]
-    [InlineData(1, true, null, "Unpublished changes")]
-    [InlineData(null, false, null, "Not published")]
-    [InlineData(1, true, "future", "Scheduled")]
+    [Test]
+    [Arguments(1, false, null, "Published")]
+    [Arguments(1, true, null, "Unpublished changes")]
+    [Arguments(null, false, null, "Not published")]
+    [Arguments(1, true, "future", "Scheduled")]
     public void EveryTreeStatusIsAWordAndNotOnlyAColour(
         int? published,
         bool unpublishedChanges,

@@ -16,7 +16,7 @@ namespace ContentManagementSystem.Client.Tests.Fields;
 /// </remarks>
 public class FieldEditorCatalogTests
 {
-    [Fact]
+    [Test]
     public void EveryFieldTypeShippedWithTheCmsHasAnEditor()
     {
         var registered = typeof(FieldTypeKeys)
@@ -31,7 +31,7 @@ public class FieldEditorCatalogTests
             "an author with no control for a required property cannot publish the page at all");
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeWithNoEditorIsReportedRatherThanHidden()
     {
         var catalog = FieldEditorCatalog.For("nobodysFieldType", FieldTypeKeys.PlainText);
@@ -39,7 +39,7 @@ public class FieldEditorCatalogTests
         catalog.FieldTypesWithNoEditor.Should().ContainSingle().Which.Should().Be("nobodysFieldType");
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeWithNoEditorStillDrawsSomething()
     {
         var catalog = new FieldEditorCatalog();
@@ -51,7 +51,7 @@ public class FieldEditorCatalogTests
         catalog.EditorFor("nobodysFieldType").Should().Be<PlainZoneEditor>();
     }
 
-    [Fact]
+    [Test]
     public void AnEditorThatIsNotAComponentIsRefusedWhileTheCatalogIsBeingBuilt()
     {
         var build = () => FieldEditorCatalog.For(
@@ -63,7 +63,7 @@ public class FieldEditorCatalogTests
         build.Should().Throw<InvalidOperationException>().WithMessage("*not a Razor component*");
     }
 
-    [Fact]
+    [Test]
     public void EveryEditorTakesTheThreeParametersTheHostPassesByName()
     {
         foreach (var (key, editor) in BuiltInFieldEditors.ByFieldTypeKey)

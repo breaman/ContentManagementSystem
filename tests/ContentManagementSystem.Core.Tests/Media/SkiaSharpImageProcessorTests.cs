@@ -25,7 +25,7 @@ public class SkiaSharpImageProcessorTests
 {
     private readonly SkiaSharpImageProcessor _processor = new(NullLogger<SkiaSharpImageProcessor>.Instance);
 
-    [Fact]
+    [Test]
     public void TheDeclaredFormatsCanActuallyBeEncoded()
     {
         // The startup assertion of task P5-09. Skia answers an unsupported encode with null rather
@@ -36,14 +36,14 @@ public class SkiaSharpImageProcessorTests
         act.Should().NotThrow();
     }
 
-    [Fact]
+    [Test]
     public void AvifIsNotOffered() =>
         // Not a capability this implementation has; declaring it would mean renditions that fail
         // silently (ADR 0011).
         _processor.SupportedOutputFormats.Should().BeEquivalentTo(
             [ImageOutputFormat.Jpeg, ImageOutputFormat.Png, ImageOutputFormat.Webp]);
 
-    [Fact]
+    [Test]
     public void ProbeReportsDimensionsWithoutDecoding()
     {
         using var content = new MemoryStream(TestImages.Encode(800, 600));
@@ -57,7 +57,7 @@ public class SkiaSharpImageProcessorTests
         probe.PixelCount.Should().Be(480_000);
     }
 
-    [Fact]
+    [Test]
     public void ProbeReadsTheExifOrientation()
     {
         using var content = new MemoryStream(TestImages.EncodeWithExif(800, 600, orientation: 6));
@@ -72,7 +72,7 @@ public class SkiaSharpImageProcessorTests
         probe.OrientedSize.Should().Be(new PixelSize(600, 800));
     }
 
-    [Fact]
+    [Test]
     public void ProbeReturnsNothingForSomethingThatIsNotAnImage()
     {
         using var content = new MemoryStream("<html><body>not an image</body></html>"u8.ToArray());
@@ -80,7 +80,7 @@ public class SkiaSharpImageProcessorTests
         _processor.Probe(content).Should().BeNull();
     }
 
-    [Fact]
+    [Test]
     public void NormalizingBakesTheOrientationIntoThePixels()
     {
         using var content = new MemoryStream(TestImages.EncodeWithExif(800, 600, orientation: 6));
@@ -93,7 +93,7 @@ public class SkiaSharpImageProcessorTests
         normalized.Height.Should().Be(800);
     }
 
-    [Fact]
+    [Test]
     public void NormalizingStripsEveryMetadataBlock()
     {
         var source = TestImages.EncodeWithExif(800, 600, orientation: 6);
@@ -113,7 +113,7 @@ public class SkiaSharpImageProcessorTests
         ReadDirectories(normalized.Bytes).OfType<ExifIfd0Directory>().Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void NormalizingAnUprightImageStillReEncodesIt()
     {
         var source = TestImages.EncodeWithExif(400, 300, orientation: 1);
@@ -129,7 +129,7 @@ public class SkiaSharpImageProcessorTests
         normalized.Width.Should().Be(400);
     }
 
-    [Fact]
+    [Test]
     public void RenderingProducesTheRequestedBoxInTheRequestedFormat()
     {
         using var content = new MemoryStream(TestImages.Encode(4000, 3000));
@@ -150,7 +150,7 @@ public class SkiaSharpImageProcessorTests
         decoded.Width.Should().Be(1280);
     }
 
-    [Fact]
+    [Test]
     public void RenderingAppliesTheLibraryRotationBeforeTheUsageCrop()
     {
         using var content = new MemoryStream(TestImages.Encode(4000, 2000));
@@ -165,7 +165,7 @@ public class SkiaSharpImageProcessorTests
         rendered.Width.Should().Be(320);
     }
 
-    [Fact]
+    [Test]
     public void ARenditionCarriesNoMetadataEither()
     {
         using var content = new MemoryStream(TestImages.EncodeWithExif(2000, 1500, orientation: 1));
@@ -178,7 +178,7 @@ public class SkiaSharpImageProcessorTests
         ReadDirectories(rendered.Bytes).OfType<GpsDirectory>().Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void PaddingReturnsTheRequestedBoxExactly()
     {
         using var content = new MemoryStream(TestImages.Encode(2000, 500));

@@ -4,19 +4,17 @@ using ContentManagementSystem.Data.Models;
 
 using DotNet.Testcontainers.Builders;
 
-using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 
 using Testcontainers.MsSql;
 
-using Xunit;
+using TUnit.Core.Interfaces;
 
 namespace ContentManagementSystem.TestSupport;
 
 /// <summary>
-/// Starts a disposable SQL Server container shared by every test in a collection.
+/// Starts a disposable SQL Server container shared by every test that asks for one.
 /// </summary>
 /// <remarks>
 /// Container start-up costs tens of seconds, so the fixture is shared and each test asks for its
@@ -26,10 +24,11 @@ namespace ContentManagementSystem.TestSupport;
 /// </remarks>
 /// <example>
 /// <code>
-/// [Collection(SqlServerCollection.Name)]
+/// [ClassDataSource&lt;SqlServerFixture&gt;(Shared = SharedType.PerTestSession)]
+/// [NotInParallel(SqlServerConstraint.Key)]
 /// public class MyTests(SqlServerFixture fixture)
 /// {
-///     [Fact]
+///     [Test]
 ///     public async Task Works()
 ///     {
 ///         await using var db = await fixture.CreateDatabaseAsync();
@@ -37,19 +36,10 @@ namespace ContentManagementSystem.TestSupport;
 /// }
 /// </code>
 /// </example>
-public sealed class SqlServerFixture : IAsyncLifetime
+public sealed class SqlServerFixture : IAsyncInitializer, IAsyncDisposable
 {
     private const int ReadinessAttempts = 60;
     private static readonly TimeSpan ReadinessDelay = TimeSpan.FromSeconds(2);
-
-    /// <summary>
-    /// Minimal service provider supplying the Identity options that shape the EF model. The web
-    /// host configures the same value in <c>AddIdentityCore</c>; both read it from
-    /// <see cref="IdentitySchema"/> so they cannot drift.
-    /// </summary>
-    private static readonly IServiceProvider IdentityModelServices = new ServiceCollection()
-        .Configure<IdentityOptions>(options => options.Stores.SchemaVersion = IdentitySchema.Version)
-        .BuildServiceProvider();
 
     private readonly MsSqlContainer _container = new MsSqlBuilder(SqlServerImage.Tag)
         // The stock MsSql wait strategy shells out to sqlcmd, which is absent from the Azure SQL
@@ -62,7 +52,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public string MasterConnectionString => _container.GetConnectionString();
 
     /// <inheritdoc />
-    public async ValueTask InitializeAsync()
+    public async Task InitializeAsync()
     {
         await _container.StartAsync();
         await WaitUntilAcceptingConnectionsAsync();
@@ -111,11 +101,9 @@ public sealed class SqlServerFixture : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlServer(ConnectionStringFor(databaseName))
-            // IdentityDbContext reads the store schema version out of the application service
-            // provider while building the model. Without it the context builds an older Identity
-            // schema than the migrations were generated from, and EF then reports the model as
-            // having pending changes.
-            .UseApplicationServiceProvider(IdentityModelServices)
+            // Without this the context builds an older Identity schema than the migrations were
+            // generated from; see IdentityModelServices for why every test-owned context needs it.
+            .UseApplicationServiceProvider(IdentityModelServices.Instance)
             // Soft-delete rewriting, fingerprint stamping, and audit capture. They are options-level
             // behaviour rather than part of the context type, so a fixture that skipped them would
             // hand tests a context that saves without any of it — and the suites here assert on all

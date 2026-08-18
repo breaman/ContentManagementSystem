@@ -27,8 +27,9 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// that pipeline's refusals, which is the failure mode a chunked uploader invites: a back door that
 /// looks like a feature.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class ChunkedUploadApiTests(SqlServerFixture fixture)
 {
     private const string Uploads = $"{CmsApiEndpoints.BasePath}/media/uploads";
 
@@ -37,9 +38,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
 
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync()
     {
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
         // Configured down from the deployment default so a test fixture does not have to be four
         // megabytes to be more than one part. The service clamps a configured size upwards when it
@@ -47,12 +49,13 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
         _factory.Services.GetRequiredService<MediaUploadOptions>().ChunkBytes = ChunkBytes;
     }
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task AFileSentInPartsBecomesTheSameItemASingleRequestWouldHaveProduced()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var bytes = Jpeg(1600, 1200, seed: 11);
@@ -110,10 +113,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// The property that makes the upload resumable rather than merely restartable: the server says
     /// where it got to, and a client that lost its connection continues from there.
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AnInterruptedUploadReportsWhereItGotToAndContinuesFromThere()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var bytes = Jpeg(1600, 1200, seed: 23);
@@ -145,10 +148,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
         completed.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
-    [Fact]
+    [Test]
     public async Task APartOfferedOutOfOrderIsRefusedAndTheRefusalNamesTheOneExpected()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var bytes = Jpeg(1600, 1200, seed: 31);
@@ -172,10 +175,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
         body.Should().Contain(MediaCodes.UploadChunkOutOfOrder).And.Contain("part 0");
     }
 
-    [Fact]
+    [Test]
     public async Task FinishingBeforeEveryByteHasArrivedIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var bytes = Jpeg(1600, 1200, seed: 41);
@@ -200,10 +203,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// feature until somebody noticed an HTML file being served from the site's own origin
     /// (spec section 20.7).
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AFileWhoseBytesDisagreeWithItsNameIsRefusedWhenTheSessionIsFinished()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var html = System.Text.Encoding.UTF8.GetBytes(
@@ -226,10 +229,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain(MediaCodes.TypeMismatch);
     }
 
-    [Fact]
+    [Test]
     public async Task AnExtensionTheSiteDoesNotAcceptIsRefusedBeforeAnyBytesAreTransferred()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -245,10 +248,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain(MediaCodes.ExtensionNotAllowed);
     }
 
-    [Fact]
+    [Test]
     public async Task AFileLargerThanTheLimitIsRefusedBeforeAnyBytesAreTransferred()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var response = await client.PostAsJsonAsync(
@@ -262,10 +265,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .Should().Contain(MediaCodes.TooLarge);
     }
 
-    [Fact]
+    [Test]
     public async Task AnAbandonedSessionStopsExistingAndItsPartsGoWithIt()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         var bytes = Jpeg(1600, 1200, seed: 53);
@@ -290,10 +293,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
     /// checked for shape rather than sanitized. A traversal attempt therefore reads as "no such
     /// session" rather than reaching the store at all (spec section 13.2).
     /// </remarks>
-    [Fact]
+    [Test]
     public async Task AnUploadIdThatIsNotOneThisServerIssuedResolvesToNothing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         foreach (var candidate in (string[])["..%2f..%2fetc", "not-a-guid", new string('z', 32)])
@@ -304,10 +307,10 @@ public class ChunkedUploadApiTests(SqlServerFixture fixture) : IAsyncLifetime
         }
     }
 
-    [Fact]
+    [Test]
     public async Task AnEditorWithoutTheUploadPermissionCannotOpenASession()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         // A viewer may browse the library and may not add to it.
         using var client = await ClientAsync(_factory, cancellationToken, CmsRoles.Viewer);

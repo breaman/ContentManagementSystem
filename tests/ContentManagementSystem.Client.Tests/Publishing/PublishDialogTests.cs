@@ -31,7 +31,7 @@ public class PublishDialogTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ProblemsAreGroupedByZoneAndNamedTheWayTheCanvasNamesThem()
     {
         var dialog = Render(
@@ -50,7 +50,7 @@ public class PublishDialogTests : IDisposable
         headings.Should().Equal("Hero banner", "Body");
     }
 
-    [Fact]
+    [Test]
     public void EachGroupIsALinkIntoTheZoneItIsAbout()
     {
         string? went = null;
@@ -64,7 +64,7 @@ public class PublishDialogTests : IDisposable
         went.Should().Be("body");
     }
 
-    [Fact]
+    [Test]
     public void AProblemThatNamesNoZoneIsGroupedUnderThePageRatherThanDropped()
     {
         var dialog = Render(
@@ -76,7 +76,7 @@ public class PublishDialogTests : IDisposable
         dialog.Find(".cms-publish__entry").TextContent.Should().Contain("already in use");
     }
 
-    [Fact]
+    [Test]
     public void ErrorsBlockPublishingOutright()
     {
         var dialog = Render(
@@ -88,7 +88,7 @@ public class PublishDialogTests : IDisposable
             "there is nothing to acknowledge while something is still blocking");
     }
 
-    [Fact]
+    [Test]
     public void WarningsAreAcknowledgedOnceAndOnPurpose()
     {
         bool? acknowledged = null;
@@ -113,7 +113,7 @@ public class PublishDialogTests : IDisposable
             "with this set (spec section 22.2)");
     }
 
-    [Fact]
+    [Test]
     public void ReopeningTheDialogStartsUnacknowledged()
     {
         var dialog = Render(
@@ -130,7 +130,7 @@ public class PublishDialogTests : IDisposable
         Confirm(dialog).HasAttribute("disabled").Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AClearCheckSaysSoAndPublishesInOneClick()
     {
         bool? acknowledged = null;
@@ -149,7 +149,7 @@ public class PublishDialogTests : IDisposable
         acknowledged.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public void TheCheckStillRunningIsSaidRatherThanShownAsAllClear()
     {
         var dialog = _bunit.Render<PublishDialog>(parameters => parameters

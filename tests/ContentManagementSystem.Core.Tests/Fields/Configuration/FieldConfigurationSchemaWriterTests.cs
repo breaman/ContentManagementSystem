@@ -21,7 +21,7 @@ namespace ContentManagementSystem.Core.Tests.Fields.Configuration;
 /// </remarks>
 public class FieldConfigurationSchemaWriterTests
 {
-    [Fact]
+    [Test]
     public void ADocumentIsWrittenForEveryRegisteredFieldType()
     {
         foreach (var fieldType in Registry().All)
@@ -38,7 +38,7 @@ public class FieldConfigurationSchemaWriterTests
         }
     }
 
-    [Fact]
+    [Test]
     public void EveryDeclaredSettingAppearsWithItsType()
     {
         var properties = Write(FieldTypeKeys.PlainText).GetProperty("properties");
@@ -49,7 +49,7 @@ public class FieldConfigurationSchemaWriterTests
         properties.GetProperty("patternMessage").GetProperty("type").GetString().Should().Be("string");
     }
 
-    [Fact]
+    [Test]
     public void AnExclusiveBoundIsWrittenAsOne()
     {
         var step = Write(FieldTypeKeys.Number).GetProperty("properties").GetProperty("step");
@@ -58,7 +58,7 @@ public class FieldConfigurationSchemaWriterTests
         step.GetProperty("exclusiveMinimum").GetDecimal().Should().Be(0);
     }
 
-    [Fact]
+    [Test]
     public void AClosedSetOfValuesIsWrittenAsAnEnum()
     {
         var profile = Write(FieldTypeKeys.RichText).GetProperty("properties").GetProperty("profile");
@@ -68,7 +68,7 @@ public class FieldConfigurationSchemaWriterTests
             .Should().Equal("basic", "extended");
     }
 
-    [Fact]
+    [Test]
     public void AListSettingConstrainsItsItemsRatherThanItself()
     {
         var palette = Write(FieldTypeKeys.Color).GetProperty("properties").GetProperty("palette");
@@ -77,7 +77,7 @@ public class FieldConfigurationSchemaWriterTests
         palette.GetProperty("items").GetProperty("pattern").GetString().Should().Be("^#[0-9a-fA-F]{6}$");
     }
 
-    [Fact]
+    [Test]
     public void ARangeIsCarriedAsAnAnnotationBecauseJsonSchemaCannotSayIt()
     {
         var range = Write(FieldTypeKeys.Blocks).GetProperty("x-cmsOrderedRanges").EnumerateArray().Single();
@@ -86,7 +86,7 @@ public class FieldConfigurationSchemaWriterTests
         range.GetProperty("upper").GetString().Should().Be("max");
     }
 
-    [Fact]
+    [Test]
     public void ASettingNotYetEnforcedSaysSoInBothPlaces()
     {
         var deferred = Write(DeferredSettingFieldType.TypeKey)
@@ -101,7 +101,7 @@ public class FieldConfigurationSchemaWriterTests
             .Be(DeferredSettingFieldType.Phase);
     }
 
-    [Fact]
+    [Test]
     public void AFieldTypeTakingNoConfigurationStillGetsADocument()
     {
         var document = Write(FieldTypeKeys.Boolean);

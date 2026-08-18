@@ -43,7 +43,7 @@ public class CmsPageHostTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ATemplateResolvedFromTheStoredKeyRendersItsZonesThroughTheCascadedContext()
     {
         var context = RenderingHarness.Context(RenderingHarness.Payload(
@@ -61,7 +61,7 @@ public class CmsPageHostTests : IDisposable
             .And.Contain("Hello");
     }
 
-    [Fact]
+    [Test]
     public void AnUnknownTemplateKeyRendersTheFallbackLayoutAndLogsAnErrorRatherThanThrowing()
     {
         var context = RenderingHarness.Context(
@@ -85,7 +85,7 @@ public class CmsPageHostTests : IDisposable
             entry.Level == LogLevel.Error && entry.Message.Contains("template-this-deployment-lost"));
     }
 
-    [Fact]
+    [Test]
     public void TheFallbackAsksTheFieldTypesForTheTextRatherThanReadingTheJson()
     {
         var context = RenderingHarness.Context(

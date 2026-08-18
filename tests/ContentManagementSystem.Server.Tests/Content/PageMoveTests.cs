@@ -31,22 +31,25 @@ namespace ContentManagementSystem.Server.Tests.Content;
 /// linked to.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class PageMoveTests(SqlServerFixture fixture)
 {
     private PageWorkbench _bench = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
         _bench = await PageWorkbench.CreateAsync(
             fixture,
-            cancellationToken: TestContext.Current.CancellationToken);
+            cancellationToken: TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _bench.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task MovingAPublishedSubtreeRewritesEveryUrlBeneathItAndLeavesRedirects()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (about, pricing, enterprise) = await TreeAsync(cancellationToken);
 
         var moved = await Pages.MoveAsync(pricing, new MovePageRequest(about), cancellationToken);
@@ -76,10 +79,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         redirects.Should().Contain("/pricing").And.Contain("/pricing/enterprise");
     }
 
-    [Fact]
+    [Test]
     public async Task APreviewReportsWhatTheMoveWouldDoAndWritesNothing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (about, pricing, _) = await TreeAsync(cancellationToken);
 
         var preview = await Pages.MoveAsync(
@@ -115,10 +118,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         routes.Should().Equal("/pricing");
     }
 
-    [Fact]
+    [Test]
     public async Task ThePreviewAndTheMoveAgreeOnWhatWillHappen()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var (about, pricing, _) = await TreeAsync(cancellationToken);
 
         var preview = await Pages.MoveAsync(
@@ -131,10 +134,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         moved.Value!.UrlChanges.Should().BeEquivalentTo(preview.Value!.UrlChanges);
     }
 
-    [Fact]
+    [Test]
     public async Task AReorderAmongSiblingsChangesNoUrlAtAll()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
 
         var first = await _bench.AddPageAsync(template, "First", cancellationToken);
@@ -163,10 +166,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         order.Should().Equal(third.Summary.Id, first.Summary.Id, second.Summary.Id);
     }
 
-    [Fact]
+    [Test]
     public async Task APageCannotBeMovedInsideItsOwnSubtree()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
 
         var parent = await _bench.AddPageAsync(template, "Parent", cancellationToken);
@@ -191,10 +194,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         stored.ParentId.Should().BeNull("a refused move leaves the tree exactly as it was");
     }
 
-    [Fact]
+    [Test]
     public async Task AMoveIsRefusedWhenASiblingAtTheDestinationAlreadyUsesTheSlug()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
 
         var about = await _bench.AddPageAsync(template, "About", cancellationToken);
@@ -213,10 +216,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
             .Which.Code.Should().Be(PageCodes.SlugDuplicate);
     }
 
-    [Fact]
+    [Test]
     public async Task MovingRequiresPermissionToEdit()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
         var page = await _bench.AddPageAsync(template, "Pricing", cancellationToken);
 
@@ -235,10 +238,10 @@ public class PageMoveTests(SqlServerFixture fixture) : IAsyncLifetime
         refused.Outcome.Should().Be(CmsOutcome.Forbidden);
     }
 
-    [Fact]
+    [Test]
     public async Task TheBackofficeFilterMatchesATitleASlugAndAPageId()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var template = await _bench.AddTemplateAsync("landing", cancellationToken);
 
         var enterprise = await _bench.AddPageAsync(template, "Enterprise plans", cancellationToken);

@@ -14,28 +14,23 @@
     <IsTestProject Condition="$(MSBuildProjectName.EndsWith('.Tests'))">true</IsTestProject>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
-    <!-- xUnit v3 test projects are self-hosting executables. -->
-    <OutputType>Exe</OutputType>
-  </PropertyGroup>
-
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">
-    <PackageReference Include="coverlet.collector">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <!-- TUnit is the test framework for this repository. It runs on Microsoft.Testing.Platform,
+         which means the runner is compiled into the test assembly itself: the project becomes an
+         executable (TUnit.Engine.props sets OutputType), and there is deliberately no
+         Microsoft.NET.Test.Sdk and no coverlet.collector — either one hijacks the entry point and
+         discovery finds nothing. TRX reporting and code coverage come from the meta-package.
+
+         Note that unlike xUnit, TUnit runs the tests *within* a class in parallel as well as
+         across classes. Suites that share a resource say so with [NotInParallel(key)]. -->
     <PackageReference Include="FluentAssertions" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="xunit.runner.visualstudio">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="TUnit" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <!-- TUnit contributes its own implicit usings (TUnit.Core, and HookType statically, which is
+         what makes [Before(Test)] read the way it does), so only the assertion library is listed. -->
     <Using Include="FluentAssertions" />
-    <Using Include="Xunit" />
   </ItemGroup>
 
 </Project>

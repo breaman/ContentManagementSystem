@@ -15,13 +15,14 @@ namespace ContentManagementSystem.Data.Tests.Cms;
 /// which schema it was authored against. These run against real SQL Server because an index is not
 /// something the in-memory provider enforces.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class StructureSchemaTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task TemplateKeysAreUniqueAcrossTheSite()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         context.Templates.Add(CreateTemplate("marketing-landing"));
@@ -33,10 +34,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task ZoneKeysAreUniqueWithinATemplate()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var template = CreateTemplate("marketing-landing");
@@ -50,10 +51,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TheSameZoneKeyMayAppearOnTwoDifferentTemplates()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var landing = CreateTemplate("marketing-landing");
@@ -72,10 +73,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         bodyZones.Should().Be(2, "zone keys are scoped to their template, not global");
     }
 
-    [Fact]
+    [Test]
     public async Task BlockTypePropertyKeysAreUniqueWithinABlockType()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var blockType = CreateBlockType("hero-banner");
@@ -89,10 +90,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task BlockTypeKeysAreUniqueAcrossTheSite()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         context.BlockTypes.Add(CreateBlockType("hero-banner"));
@@ -104,10 +105,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task TemplateRevisionNumbersAreUniqueWithinATemplate()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var template = CreateTemplate("marketing-landing");
@@ -125,10 +126,10 @@ public class StructureSchemaTests(SqlServerFixture fixture)
         await save.Should().ThrowAsync<DbUpdateException>();
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingATemplateWithZonesIsRefusedByTheDatabase()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var template = CreateTemplate("marketing-landing");

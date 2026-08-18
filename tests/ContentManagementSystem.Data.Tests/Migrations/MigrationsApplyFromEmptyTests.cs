@@ -15,13 +15,14 @@ namespace ContentManagementSystem.Data.Tests.Migrations;
 /// including its <c>Down</c> method until the roll-forward-only policy takes effect at launch
 /// (task P9-23).
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
 public class MigrationsApplyFromEmptyTests(SqlServerFixture fixture)
 {
-    [Fact]
+    [Test]
     public async Task AllMigrationsApplyToAnEmptyDatabase()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = fixture.CreateContext($"cms_up_{Guid.NewGuid():N}");
 
         var expected = context.Database.GetMigrations().ToList();
@@ -33,10 +34,10 @@ public class MigrationsApplyFromEmptyTests(SqlServerFixture fixture)
         applied.Should().BeEquivalentTo(expected);
     }
 
-    [Fact]
+    [Test]
     public async Task EveryMigrationCanBeRolledBackToAnEmptyDatabase()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = fixture.CreateContext($"cms_down_{Guid.NewGuid():N}");
         await context.Database.MigrateAsync(cancellationToken);
 
@@ -48,10 +49,10 @@ public class MigrationsApplyFromEmptyTests(SqlServerFixture fixture)
         applied.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task IdentityAndAuditTablesExistAfterMigrating()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
 
         var tables = await context.Database

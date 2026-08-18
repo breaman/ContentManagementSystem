@@ -39,7 +39,7 @@ public class CmsZoneTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void AZoneRendersItsFieldTypesRendererWithTheStoredValue()
     {
         var markup = RenderZone(RenderingHarness.Payload(
@@ -50,7 +50,7 @@ public class CmsZoneTests : IDisposable
             .And.Contain("Hello");
     }
 
-    [Fact]
+    [Test]
     public void AZoneTheTemplateNamesButThePayloadHasNeverHeldRendersNothing()
     {
         // This is what makes "adding a zone is free" (spec section 8.5) true at render time as well
@@ -60,7 +60,7 @@ public class CmsZoneTests : IDisposable
         _logs.Entries.Should().BeEmpty("an unauthored zone is ordinary, not a fault worth logging");
     }
 
-    [Fact]
+    [Test]
     public void AZoneAnEditorClearedRendersNothing()
     {
         var payload = new ContentPayloadBuilder(RenderingHarness.TemplateKey, 1)
@@ -70,7 +70,7 @@ public class CmsZoneTests : IDisposable
         RenderZone(payload).Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void AnUnknownFieldTypeKeyRendersNothingAndLogsAWarning()
     {
         // Acceptance criterion P3 #9. The field type was removed from the deployment while content
@@ -83,7 +83,7 @@ public class CmsZoneTests : IDisposable
             entry.Level == LogLevel.Warning && entry.Message.Contains("retiredFieldType"));
     }
 
-    [Fact]
+    [Test]
     public void AStoredValueWithNoTypeDiscriminatorRendersNothingAndLogsAWarning()
     {
         // Nothing this build wrote looks like this, which is exactly why it is logged: it means
@@ -94,7 +94,7 @@ public class CmsZoneTests : IDisposable
         _logs.Entries.Should().ContainSingle(entry => entry.Level == LogLevel.Warning);
     }
 
-    [Fact]
+    [Test]
     public void TheRendererIsChosenByTheStoredDiscriminatorRatherThanBySchema()
     {
         // A value has to be read by whatever wrote it. The schema here says the zone is plain text;
@@ -108,7 +108,7 @@ public class CmsZoneTests : IDisposable
         markup.Should().Contain("data-renderer=\"alternate\"");
     }
 
-    [Fact]
+    [Test]
     public void TheCapturedConfigurationReachesTheRenderer()
     {
         var markup = RenderZone(
@@ -118,7 +118,7 @@ public class CmsZoneTests : IDisposable
         markup.Should().Contain("data-max-length=\"120\"");
     }
 
-    [Fact]
+    [Test]
     public void ConfigurationBelongingToADifferentFieldTypeIsWithheld()
     {
         // Handing over settings meant for another field type is worse than handing over none: they
@@ -130,7 +130,7 @@ public class CmsZoneTests : IDisposable
         markup.Should().Contain("data-max-length=\"-\"");
     }
 
-    [Fact]
+    [Test]
     public void AZoneWithNoCapturedSchemaStillRenders()
     {
         // A template revision the database no longer holds must not blank the page: the payload

@@ -33,31 +33,31 @@ public class SanitizationPolicyTests
         "form", "input", "button", "select", "textarea", "keygen",
     ];
 
-    public static TheoryData<SanitizationProfile> Profiles =>
+    public static IEnumerable<SanitizationProfile> Profiles =>
     [
         SanitizationProfile.Basic,
         SanitizationProfile.Extended,
         SanitizationProfile.Developer,
     ];
 
-    [Theory]
-    [MemberData(nameof(Profiles))]
+    [Test]
+    [MethodDataSource(nameof(Profiles))]
     public void NoProfileAllowsAnExecutableElement(SanitizationProfile profile) =>
         SanitizationPolicy.TagsFor(profile).Should().NotIntersectWith(Executable);
 
-    [Theory]
-    [MemberData(nameof(Profiles))]
+    [Test]
+    [MethodDataSource(nameof(Profiles))]
     public void NoProfileAllowsAnEventHandlerAttribute(SanitizationProfile profile) =>
         SanitizationPolicy.AttributesFor(profile).Should().OnlyContain(
             attribute => !attribute.StartsWith("on", StringComparison.OrdinalIgnoreCase));
 
-    [Theory]
-    [MemberData(nameof(Profiles))]
+    [Test]
+    [MethodDataSource(nameof(Profiles))]
     public void NoProfileAllowsAnAttributeThatCarriesADocument(SanitizationProfile profile) =>
         SanitizationPolicy.AttributesFor(profile).Should().NotIntersectWith(
             ["srcdoc", "http-equiv", "formaction", "xlink:href", "content"]);
 
-    [Fact]
+    [Test]
     public void TheSchemeAllowlistIsTheSpecsList()
     {
         // data is present so that the inline-image case can be reached at all; SanitizationService
@@ -67,7 +67,7 @@ public class SanitizationPolicyTests
             ["http", "https", "mailto", "tel", "data"]);
     }
 
-    [Fact]
+    [Test]
     public void NoCssPropertyCanTakeAnElementOutOfTheDocumentFlowOrFetchAUrl()
     {
         // A different threat from script injection and not addressed by the tag allowlist: an
@@ -81,7 +81,7 @@ public class SanitizationPolicyTests
             ]);
     }
 
-    [Fact]
+    [Test]
     public void NoInlineImageMayDeclareADocumentFormat()
     {
         // SVG is a document that can carry script, so it stays off this list whatever answer open
@@ -92,9 +92,9 @@ public class SanitizationPolicyTests
         SanitizationPolicy.AllowedDataUriMediaTypes.Should().NotContain("image/svg+xml");
     }
 
-    [Theory]
-    [InlineData(SanitizationProfile.Extended)]
-    [InlineData(SanitizationProfile.Developer)]
+    [Test]
+    [Arguments(SanitizationProfile.Extended)]
+    [Arguments(SanitizationProfile.Developer)]
     public void TheProfilesNestSoAWiderOneNeverSubtracts(SanitizationProfile wider)
     {
         // What makes "every rule Basic enforces, the wider two enforce as well" true by
@@ -107,7 +107,7 @@ public class SanitizationPolicyTests
             .Contain(SanitizationPolicy.AttributesFor(SanitizationProfile.Basic));
     }
 
-    [Fact]
+    [Test]
     public void OnlyDeveloperAllowsAnEmbed()
     {
         SanitizationPolicy.TagsFor(SanitizationProfile.Basic).Should().NotContain("iframe");
@@ -115,7 +115,7 @@ public class SanitizationPolicyTests
         SanitizationPolicy.TagsFor(SanitizationProfile.Developer).Should().Contain("iframe");
     }
 
-    [Fact]
+    [Test]
     public void TheDefaultFrameHostsAreTheEmbedProvidersTheSpecNames()
     {
         // The wider point in spec section 20.5 is that editor-supplied embeds should go through a
@@ -127,7 +127,7 @@ public class SanitizationPolicyTests
                     host.EndsWith("vimeo.com", StringComparison.Ordinal));
     }
 
-    [Fact]
+    [Test]
     public void ADeploymentDeclaresNoClassesByDefault()
     {
         new SanitizationOptions().AllowedCssClasses.Should().BeEmpty();

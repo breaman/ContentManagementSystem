@@ -24,20 +24,23 @@ namespace ContentManagementSystem.Server.Tests.Api.Cms;
 /// answer a different question.
 /// </para>
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class TemplateDeleteApiTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class TemplateDeleteApiTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync() =>
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync() => await _factory.DisposeAsync();
 
-    [Fact]
+    [Test]
     public async Task ATemplateNoPageUsesIsDeletedWithItsZonesAndRevisions()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "delete-unused", cancellationToken);
 
@@ -55,10 +58,10 @@ public class TemplateDeleteApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingATemplateAPageStillUsesIsRefusedAndNamesThePage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "delete-in-use", cancellationToken);
 
@@ -82,10 +85,10 @@ public class TemplateDeleteApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [Test]
     public async Task APageInTheRecycleBinStillBlocksTheDeleteUntilTheBinIsEmptied()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "delete-recycled", cancellationToken);
         var page = await CreatePageAsync(client, template, "Retired Notice", cancellationToken);
@@ -114,10 +117,10 @@ public class TemplateDeleteApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.NoContent);
     }
 
-    [Fact]
+    [Test]
     public async Task AnEditorWhoMayNotChangeTheContentModelMayNotDeleteATemplate()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var developer = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(developer, "delete-forbidden", cancellationToken);
 
@@ -132,20 +135,20 @@ public class TemplateDeleteApiTests(SqlServerFixture fixture) : IAsyncLifetime
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
-    [Fact]
+    [Test]
     public async Task DeletingATemplateThatIsNotThereIsNotFound()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
 
         (await client.DeleteAsync($"{Templates}/999999", cancellationToken))
             .StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    [Fact]
+    [Test]
     public async Task ADeleteWithNoAntiforgeryTokenIsRefused()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         using var client = await AdministratorAsync(_factory, cancellationToken);
         var template = await CreateTemplateAsync(client, "delete-antiforgery", cancellationToken);
 

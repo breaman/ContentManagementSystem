@@ -46,18 +46,21 @@ public static class ReconciledKeys
 /// Driven against a real database because every rule under test is about the difference between what
 /// code declares and what rows exist, and there is no such thing as that difference in a fake.
 /// </remarks>
-[Collection(SqlServerCollectionNames.SqlServer)]
-public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
+[ClassDataSource<SqlServerFixture>(Shared = SharedType.PerTestSession)]
+[NotInParallel(SqlServerConstraint.Key)]
+public class StructureStartupTests(SqlServerFixture fixture)
 {
     private CmsApplicationFactory _factory = null!;
     private string _schemaDirectory = null!;
 
+    [Before(HookType.Test)]
     public async ValueTask InitializeAsync()
     {
-        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current.CancellationToken);
+        _factory = await CmsApplicationFactory.CreateAsync(fixture, TestContext.Current!.Execution.CancellationToken);
         _schemaDirectory = Path.Combine(Path.GetTempPath(), $"cms-schema-{Guid.NewGuid():N}");
     }
 
+    [After(HookType.Test)]
     public async ValueTask DisposeAsync()
     {
         await _factory.DisposeAsync();
@@ -65,10 +68,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         if (Directory.Exists(_schemaDirectory)) Directory.Delete(_schemaDirectory, recursive: true);
     }
 
-    [Fact]
+    [Test]
     public async Task ReconciliationCreatesWhatCodeDeclaresAndOrphansWhatItDoesNot()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -111,10 +114,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         orphaned.IsOrphaned.Should().BeTrue();
     }
 
-    [Fact]
+    [Test]
     public async Task ReconciliationIsIdempotentAndLeavesEditedNamesAlone()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -138,10 +141,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         template.Name.Should().Be("Renamed by an editor");
     }
 
-    [Fact]
+    [Test]
     public async Task ReconciliationAdoptsATemplateWhoseComponentComesBack()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -167,10 +170,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         template.IsOrphaned.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task TheBuiltInBlockTypeIsNeverOrphaned()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -184,10 +187,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         builtIn.IsOrphaned.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task TheHealthCheckDegradesOnlyOnceAnOrphanedTemplateHasAPage()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -254,10 +257,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         recycled.Entries[CmsTemplatesHealthCheck.Name].Status.Should().Be(HealthStatus.Healthy);
     }
 
-    [Fact]
+    [Test]
     public async Task TheSchemaSyncCreatesRecordsAndIsIdempotent()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await WriteAsync("composition.sync-spacing.json", new SchemaDocument(
             SchemaKind.Composition,
@@ -319,10 +322,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         second.HasProblems.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task TheSchemaSyncRefusesToRetypeAnExistingSlotAndKeepsUnlistedOnes()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await WriteAsync("template.retype.json", new SchemaDocument(
             SchemaKind.Template,
@@ -365,10 +368,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         template.Zones.Should().HaveCount(2);
     }
 
-    [Fact]
+    [Test]
     public async Task ADiffWritesNothing()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await WriteAsync("template.diff-only.json", new SchemaDocument(
             SchemaKind.Template,
@@ -393,10 +396,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         exists.Should().BeFalse();
     }
 
-    [Fact]
+    [Test]
     public async Task AConfigurationTheFieldTypeRefusesIsReportedRatherThanStored()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await WriteAsync("template.bad-config.json", new SchemaDocument(
             SchemaKind.Template,
@@ -428,10 +431,10 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         template!.Zones.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public async Task ExportedFilesApplyBackWithNothingToDo()
     {
-        var cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var sync = scope.ServiceProvider.GetRequiredService<ISchemaSyncService>();
@@ -486,6 +489,6 @@ public class StructureStartupTests(SqlServerFixture fixture) : IAsyncLifetime
         await File.WriteAllTextAsync(
             Path.Combine(_schemaDirectory, fileName),
             JsonSerializer.Serialize(document, new JsonSerializerOptions(JsonSerializerDefaults.Web)),
-            TestContext.Current.CancellationToken);
+            TestContext.Current!.Execution.CancellationToken);
     }
 }

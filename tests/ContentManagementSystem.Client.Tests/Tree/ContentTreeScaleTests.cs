@@ -66,7 +66,7 @@ public class ContentTreeScaleTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void OpeningTheTreeReadsOneLevelHoweverLargeTheSiteIs()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -80,7 +80,7 @@ public class ContentTreeScaleTests : IDisposable
                 "twenty rows of it");
     }
 
-    [Fact]
+    [Test]
     public void AParentWithFiveHundredChildrenRendersABoundedNumberOfRows()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -112,7 +112,7 @@ public class ContentTreeScaleTests : IDisposable
         _client.Fetches.Should().Contain((1, 1));
     }
 
-    [Fact]
+    [Test]
     public void TheFilterSearchesTheServerRatherThanTheRowsItHappensToHold()
     {
         var tree = _bunit.Render<ContentTree>();

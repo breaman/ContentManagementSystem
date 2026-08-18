@@ -45,7 +45,7 @@ public class ContentTreeMenuTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [Test]
     public void ShiftF10OpensTheMenuOnTheFocusedRow()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -60,7 +60,7 @@ public class ContentTreeMenuTests : IDisposable
         menu.QuerySelectorAll("[role=menuitem]").Should().NotBeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void TheContextMenuKeyOpensItToo()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -71,7 +71,7 @@ public class ContentTreeMenuTests : IDisposable
             "Mac keyboards have no Context Menu key and PC keyboards do, so both gestures have to work");
     }
 
-    [Fact]
+    [Test]
     public void ARightClickOpensTheMenuWhereThePointerIs()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -82,7 +82,7 @@ public class ContentTreeMenuTests : IDisposable
             .Should().Contain("120px").And.Contain("240px");
     }
 
-    [Fact]
+    [Test]
     public void EscapeDismissesTheMenuWithoutRunningAnything()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -94,7 +94,7 @@ public class ContentTreeMenuTests : IDisposable
         _client.Duplicated.Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void APageWithNothingPublishedIsNotOfferedUnpublish()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -110,7 +110,7 @@ public class ContentTreeMenuTests : IDisposable
             "an entry that cannot do anything is one an editor reads and dismisses every time");
     }
 
-    [Fact]
+    [Test]
     public void PasteIsOfferedOnlyOnceSomethingIsOnTheClipboardAndNeverOnItself()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -125,7 +125,7 @@ public class ContentTreeMenuTests : IDisposable
         Labels(tree, row: 1).Should().Contain("Paste inside");
     }
 
-    [Fact]
+    [Test]
     public void PastingACopiedPageDuplicatesItDeeplyIntoTheTarget()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -138,7 +138,7 @@ public class ContentTreeMenuTests : IDisposable
             "pasting half a section somewhere is never what was meant, so a paste is always deep");
     }
 
-    [Fact]
+    [Test]
     public void PastingACutPageGoesThroughTheMoveConfirmation()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -157,7 +157,7 @@ public class ContentTreeMenuTests : IDisposable
         tree.FindAll("[role=dialog] .btn-outline-secondary").Single().Click();
     }
 
-    [Fact]
+    [Test]
     public void DeleteStatesHowMuchItTakesBeforeAnythingHappens()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -170,7 +170,7 @@ public class ContentTreeMenuTests : IDisposable
         _client.Deleted.Should().BeEmpty("the count comes before the delete, not after it");
     }
 
-    [Fact]
+    [Test]
     public void ConfirmingTheDeleteSendsItAndSaysWhatWent()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -183,7 +183,7 @@ public class ContentTreeMenuTests : IDisposable
             .Which.Message.Should().Contain("4 page(s) beneath it");
     }
 
-    [Fact]
+    [Test]
     public void PublishBranchIsOfferedOnlyOnAPageThatHasChildren()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -194,7 +194,7 @@ public class ContentTreeMenuTests : IDisposable
             "on a leaf it is the entry above it wearing a longer name");
     }
 
-    [Fact]
+    [Test]
     public void PublishBranchStatesWhatTheBranchCoversBeforePublishingAny()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -209,7 +209,7 @@ public class ContentTreeMenuTests : IDisposable
         tree.FindAll("[role=dialog] .btn-outline-secondary").Single().Click();
     }
 
-    [Fact]
+    [Test]
     public void ConfirmingAPublishBranchReportsThePagesThatCouldNotBePublished()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -230,7 +230,7 @@ public class ContentTreeMenuTests : IDisposable
         tree.FindAll("[role=dialog]").Should().BeEmpty();
     }
 
-    [Fact]
+    [Test]
     public void NewChildAsksTheHostRatherThanCreatingThePageItself()
     {
         PageSummary? under = null;
@@ -244,7 +244,7 @@ public class ContentTreeMenuTests : IDisposable
         under!.Id.Should().Be(1);
     }
 
-    [Fact]
+    [Test]
     public void TypingInTheFilterReplacesTheTreeWithASiteWideResultList()
     {
         var tree = _bunit.Render<ContentTree>();
@@ -262,7 +262,7 @@ public class ContentTreeMenuTests : IDisposable
         _client.Searches.Should().Contain("ent");
     }
 
-    [Fact]
+    [Test]
     public void ClearingTheFilterPutsTheTreeBack()
     {
         var tree = _bunit.Render<ContentTree>();
