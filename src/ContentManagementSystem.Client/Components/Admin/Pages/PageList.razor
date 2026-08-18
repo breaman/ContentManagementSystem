@@ -51,7 +51,7 @@ else
                         </th>
                         <td><code>@node.Page.Slug</code></td>
                         <td>@node.Page.TemplateKey</td>
-                        <td>v@node.Page.DraftVersionNumber</td>
+                        <td>v@(node.Page.DraftVersionNumber)</td>
                         <td>
                             @if (node.Page.PublishedVersionNumber is { } published)
                             {

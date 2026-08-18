@@ -54,7 +54,7 @@ else
                 {
                     <tr>
                         <th scope="row">
-                            v@version.VersionNumber
+                            v@(version.VersionNumber)
                             @if (version.Label is { Length: > 0 } label)
                             {
                                 <span class="badge text-bg-info ms-1">@label</span>
@@ -121,7 +121,7 @@ else
 @if (Diff is not null)
 {
     <h2 class="h5 mt-4">
-        v@Diff.FromVersionNumber → v@Diff.ToVersionNumber
+        v@(Diff.FromVersionNumber) → v@(Diff.ToVersionNumber)
     </h2>
 
     <ContentDiffView Diff="Diff" />

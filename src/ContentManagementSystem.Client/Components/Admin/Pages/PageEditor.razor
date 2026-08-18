@@ -26,10 +26,10 @@ else
     <h1>@Page.Summary.Title</h1>
     <p class="text-body-secondary">
         <code>@Page.Summary.Slug</code> · template <code>@Page.Summary.TemplateKey</code>
-        revision @Page.TemplateRevision · draft v@Page.Summary.DraftVersionNumber
+        revision @Page.TemplateRevision · draft v@(Page.Summary.DraftVersionNumber)
         @if (Page.Summary.PublishedVersionNumber is { } published)
         {
-            <text> · published v@published</text>
+            <text> · published v@(published)</text>
         }
     </p>
 
@@ -37,7 +37,7 @@ else
     {
         <p class="alert alert-warning" role="status">
             This draft has moved on from what is published. The public site still shows
-            v@Page.Summary.PublishedVersionNumber until you publish again.
+            v@(Page.Summary.PublishedVersionNumber) until you publish again.
         </p>
     }
 
@@ -47,7 +47,7 @@ else
     {
         <div class="alert alert-secondary d-flex align-items-center gap-3" role="status">
             <span>
-                v@retired is no longer on the public site. The draft is untouched.
+                v@(retired) is no longer on the public site. The draft is untouched.
             </span>
             <AuthorizeView Roles="@CmsRoles.ContentPublishers" Context="restorer">
                 <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@IsBusy"
@@ -188,7 +188,7 @@ else
             <code>@Page.Summary.Slug</code> from the moment you confirm.
         </p>
         <p class="mb-0">
-            Nothing is deleted: v@Page.Summary.PublishedVersionNumber stays in the page's history and
+            Nothing is deleted: v@(Page.Summary.PublishedVersionNumber) stays in the page's history and
             the draft is untouched, so you can publish it again at any time.
         </p>
     </ModalDialog>

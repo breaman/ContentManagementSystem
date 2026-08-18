@@ -24,7 +24,7 @@
         <p class="fw-semibold mb-1">Copy this link now. It is not shown again.</p>
         <p class="font-monospace text-break mb-1">@Issued.Url</p>
         <p class="mb-0 small">
-            Shows v@Issued.Summary.VersionNumber, expires
+            Shows v@(Issued.Summary.VersionNumber), expires
             @Issued.Summary.ExpiresOn.UtcDateTime.ToString("d MMM yyyy HH:mm") UTC.
         </p>
     </div>
@@ -42,7 +42,7 @@
                             <option value="0">Current draft</option>
                             @foreach (var version in Versions ?? [])
                             {
-                                <option value="@version.Id">v@version.VersionNumber — @version.Status</option>
+                                <option value="@version.Id">v@(version.VersionNumber) — @version.Status</option>
                             }
                         </select>
                         <label for="version">Version to share</label>
@@ -108,7 +108,7 @@ else
                 @foreach (var token in Tokens)
                 {
                     <tr>
-                        <th scope="row">v@token.VersionNumber</th>
+                        <th scope="row">v@(token.VersionNumber)</th>
                         <td>
                             @if (token.IsActive)
                             {

@@ -56,7 +56,7 @@ else
                         <th scope="row"><a href="@($"/admin/reusable/{item.Id}")">@item.Name</a></th>
                         <td><code>@item.Key</code></td>
                         <td><code>@item.BlockTypeKey</code></td>
-                        <td>v@item.DraftVersionNumber</td>
+                        <td>v@(item.DraftVersionNumber)</td>
                         <td>
                             @if (item.PublishedVersionNumber is { } published)
                             {

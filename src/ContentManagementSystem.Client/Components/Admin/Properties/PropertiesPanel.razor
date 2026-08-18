@@ -228,7 +228,7 @@
                     @if (Page.Summary.PublishedVersionNumber is { } published)
                     {
                         <span class="badge text-bg-success">Published</span>
-                        <text> v@published</text>
+                        <text> v@(published)</text>
                     }
                     else
                     {
@@ -238,7 +238,7 @@
 
                 <dt>Draft</dt>
                 <dd>
-                    v@Page.Summary.DraftVersionNumber
+                    v@(Page.Summary.DraftVersionNumber)
                     @if (Page.Summary.HasUnpublishedChanges)
                     {
                         <text> — has changes the public site has not seen</text>
