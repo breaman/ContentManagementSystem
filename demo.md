@@ -7,6 +7,7 @@ landed since.
 
 **Audience:** management / stakeholders. No CMS knowledge assumed.
 **Running time:** ~50 minutes of demo, ~15 of questions. Acts 9 and 10 are cuttable; see §2.
+Act 1b is 4 minutes and belongs in pre-flight if you are tight.
 **Last updated:** 2026-08-16
 
 The loop the Phase 3 gate names, in order:
@@ -223,6 +224,19 @@ pre-populates the zones. **Zero zones is correct and is the point of Act 1.**
 Also open **Structure → Block types**. Four rows, all **Ready**: `hero-banner`, `feature-grid`,
 `rich-text`, and `rawHtml`. These are Act 4's building blocks.
 
+**Open `rich-text` and `hero-banner` and look at their property counts: both are zero.** For the
+same reason the templates have zero zones — the startup reconciler creates a block type from its
+`[CmsBlockType]` attribute, and the attribute carries no properties. `rawHtml` is the exception; it
+is seeded, so its `content` property is already there. **Act 1b defines the missing ones, and Act 4
+does not work without it.**
+
+> **Read [`docs/zone-and-block-property-keys.md`](./docs/zone-and-block-property-keys.md) once
+> before your dry run.** The keys below are not suggestions: a block component names the property
+> keys it renders literally in its markup, nothing reconciles that against what you type into the
+> backoffice, and a mismatched key produces a property an editor can happily fill in that then
+> renders nothing, on the page and in preview, with no error anywhere. It is the one trap in this
+> script that looks like a bug.
+
 ### 1.6 Dry run — and reset afterwards
 
 Run Acts 1 through 8 once, end to end, against a **fresh** database (§5). Time it. The first run
@@ -250,7 +264,8 @@ second `autumn-campaign` at the root collides with the first on the sibling-slug
 
 **If you are short on time,** cut in this order: Act 9 (whole), then Act 3 + Act 8 together (the
 reusable-content story is one arc and does not survive being halved), then Act 2's dedupe beat.
-Never cut Acts 5, 6, and 7 — they are the exit gate.
+Never cut Acts 5, 6, and 7 — they are the exit gate. **Act 1b can be moved into pre-flight but never
+skipped** — Act 4 has nothing to type into without it.
 
 ### Act 0 — Framing (3 minutes, no clicking)
 
@@ -333,6 +348,52 @@ Never cut Acts 5, 6, and 7 — they are the exit gate.
 **Watch out:** define the zones *before* creating the page in Act 4. A page captures the template
 revision it was created at, and a page created against a zero-zone revision shows an editor no boxes
 to type in. The screen tells you this if it happens, but it is not a good look mid-demo.
+
+### Act 1b — Give the block types their properties (4 minutes, and do not skip it)
+
+*Act 4 adds a Hero Banner and a Rich Text block to the page. Both arrive with **zero properties**,
+so without this step the block cards say "The revision this block was written against declared no
+properties" and there is nothing to fill in.*
+
+Stay in **Structure → Block types**. Open each type and add its properties with the same form Act 1
+used for zones.
+
+**`rich-text`:**
+
+| Key | Display name | Field type | Configuration (JSON) | Required | Sort |
+|---|---|---|---|---|---|
+| `body` | Body | `richText` | leave empty | **yes** | 10 |
+| `alignment` | Alignment | `choice` | `{ "options": ["left", "center", "right"] }` | no | 20 |
+
+**`hero-banner`:**
+
+| Key | Display name | Field type | Configuration (JSON) | Required | Sort |
+|---|---|---|---|---|---|
+| `headline` | Headline | `plainText` | leave empty | **yes** | 10 |
+| `standfirst` | Standfirst | `multilineText` | leave empty | no | 20 |
+| `image` | Image | `media` | leave empty | no | 30 |
+| `cta` | Call to action | `link` | leave empty | no | 40 |
+
+That is enough for the demo. `rich-text` also renders `embed` (`html`) and `settings` (`json`), and
+`hero-banner` also renders `background` (`color`) and `isFullBleed` (`boolean`) — add them if you
+want the fuller block, skip them if you want the time.
+
+> **The keys are not free choices.** A block's Razor component names the keys it renders, literally,
+> and nothing checks your typing against it. Call the rich-text property `content` instead of `body`
+> and the editor will take your prose, the draft will save, the publish will succeed, and the page
+> will render nothing — with no warning in the log, because nothing ever asked for that key. Full
+> explanation and the complete key list for all four block types:
+> [`docs/zone-and-block-property-keys.md`](./docs/zone-and-block-property-keys.md).
+
+There is a line worth saying here if you do this act on stage rather than in pre-flight:
+
+> "Same form, same rules, one level down. A template holds zones; a block type holds properties;
+> they are the same idea — a named bag of typed slots — and the editor draws both with the same
+> field editors. That is why the block list in a moment is a container rather than a second editing
+> surface."
+
+**Do this before Act 4, and ideally in pre-flight** rather than on stage — it is four form
+submissions of the same shape the audience just watched, and Act 1 has already made the point.
 
 ### Act 2 — The media library (6 minutes)
 
@@ -474,7 +535,8 @@ Act 8 comes back to.
 5. **Body — the block list.** This is the `blocks` zone and the star of the phase.
 
    - **Add** a *Hero Banner*. Fill its headline. Point out that a block's properties are drawn by
-     the same field editors the zones use.
+     the same field editors the zones use — and that they are the properties you defined in Act 1b,
+     in the browser, with no deployment.
    - **Add** a *Rich Text* block. Fill its body.
    - **Collapse** both. Point at the summary lines.
 
@@ -896,6 +958,8 @@ Close on **Q8** specifically — it is the one blocking work *today*.
 | Media screen loads but uploads fail | Azurite is not running | Check the `storage` resource in the dashboard |
 | Media or Reusable screens error | Database predates migrations 5 and 6 | Full reset (§5). Do not try to patch it live |
 | Page editor says "captured no zones" | The page was created before the zones were added | Create a new page. Do **not** try to fix it live |
+| Block card says "declared no properties" | The block type has none — Act 1b was skipped, or the block was added before it | Add the properties, then **delete and re-add the block**: a block is pinned to the revision it was inserted at |
+| A property saves fine but renders nothing, and the log is silent | The key does not match one the block's component names | Check [`docs/zone-and-block-property-keys.md`](./docs/zone-and-block-property-keys.md) §3. Do not debug this live |
 | A zone shows a raw JSON box | A field type with no editor — should not happen; all 18 have one | Note it and move on; `CmsEditorStartupService` would normally catch this at startup |
 | Rich-text editor is unstyled | The CSP style nonce did not reach it | Reload the page once. It fails *silently* by design of the browser, not of the app |
 | Published URL 404s | Publish silently refused, or you are testing the wrong URL | Re-check on `/admin/pages` — State should read **Live**. Confirm the slug |
@@ -996,8 +1060,11 @@ have a third file ready, or skip it.
 
 **Full reset**, which is what the dry run should end with: stop `aspire run`, drop the database,
 restart. Migrations and seed rows come back automatically; the startup reconciler re-registers both
-templates and all four block types. **You will have to redo §1.3 to §1.5** — account, confirmation,
-roles.
+templates and all four block types — **with zero zones and zero properties again**, since nothing in
+this repository pre-populates them. **You will have to redo §1.3 to §1.5** — account, confirmation,
+roles — **and Act 1 and Act 1b**, the zones and the block-type properties. Committing
+`Server/CmsSchema/*.json` files would remove the last of those from the reset loop; see
+[`docs/zone-and-block-property-keys.md`](./docs/zone-and-block-property-keys.md) §5.
 
 ```bash
 docker exec contentmanagementsystem-sqlserver /opt/mssql-tools18/bin/sqlcmd \
