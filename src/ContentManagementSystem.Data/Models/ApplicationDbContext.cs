@@ -113,6 +113,31 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>The in-app inbox. Written by services; excluded from the audit log.</summary>
     public DbSet<Notification> Notifications => Set<Notification>();
 
+    /// <summary>Hand-managed menus, for navigation that does not mirror the content tree.</summary>
+    public DbSet<NavigationMenu> NavigationMenus => Set<NavigationMenu>();
+
+    /// <summary>The entries of those menus.</summary>
+    public DbSet<NavigationItem> NavigationItems => Set<NavigationItem>();
+
+    /// <summary>Labels editors put on pages, for finding them again.</summary>
+    public DbSet<Tag> Tags => Set<Tag>();
+
+    /// <summary>Which pages carry which tags.</summary>
+    public DbSet<PageTag> PageTags => Set<PageTag>();
+
+    /// <summary>The full-text projection of pages, media, and reusable content.</summary>
+    /// <remarks>Derived data, rebuilt from its source; excluded from the audit log.</remarks>
+    public DbSet<SearchDocument> SearchDocuments => Set<SearchDocument>();
+
+    /// <summary>
+    /// Messages enqueued inside the transaction that caused them, dispatched afterwards.
+    /// </summary>
+    /// <remarks>
+    /// What makes a committed publish always evict its cache, on every instance, even if the
+    /// process dies immediately after the commit (spec section 16.3).
+    /// </remarks>
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     /// <inheritdoc />
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

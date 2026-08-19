@@ -164,9 +164,9 @@ and record the date in the progress table.
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
-| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 5 | 14.0 | In progress — SEO output done (`P8-01`…`P8-05`); caching, navigation, and search remain | — |
+| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 6 | 14.0 | In progress — SEO output and migration #8 done; caching, navigation, and search remain | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **227** | **203.5** | | |
+| **v1 total** | **281** | **228** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3935,9 +3935,14 @@ declared met on the strength of the layer beneath.*
 
 ### Navigation and search — 3.5 ed
 
-- [ ] **P8-14** `NavigationMenu` / `NavigationItem` entities + migration `AddCmsDelivery` — migration #8,
+- [x] **P8-14** `NavigationMenu` / `NavigationItem` entities + migration `AddCmsDelivery` — migration #8,
   also carrying `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag`. Handle the
   Azure SQL vs. on-prem raw-SQL differences for full-text catalog creation explicitly. — 0.75 ed
+  *(The catalog and index are raw SQL guarded on `SERVERPROPERTY('IsFullTextInstalled')`: SQL Server
+  and Azure SQL Database get them, and **Azure SQL Edge — which the arm64 test container runs — has
+  no full-text engine at all**, where an unguarded `CREATE FULLTEXT CATALOG` fails the whole
+  migration. A navigation item's "page or URL, never both" is a check constraint written as a count,
+  since T-SQL has no exclusive-or over predicates.)*
 - [ ] **P8-15** Structural navigation generated from the content tree, filtered by
   `Page.ShowInNavigation` and publish state [§10.7]. — 0.5 ed
 - [ ] **P8-16** Managed menus (ordered items, internal page reference or external link) + menu admin UI.
