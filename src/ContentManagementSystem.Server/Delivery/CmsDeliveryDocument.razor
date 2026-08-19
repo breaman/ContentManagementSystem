@@ -8,7 +8,10 @@
    carries the WebAssembly bootstrapper and the ImportMap; serving that to an anonymous reader would
    download the editor to every visitor and undo the reason the two front doors are separate. *@
 <!DOCTYPE html>
-<html lang="en">
+@* lang comes from SiteSettings.Culture, resolved on the same settings read the head already makes
+   (spec section 28, task P9-10). A screen reader chooses its pronunciation from this, so a wrong or
+   absent value is a failure nobody sees and every listener hears. *@
+<html lang="@Seo.Language">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

@@ -46,6 +46,9 @@ public static class ContentServiceCollectionExtensions
         // One registration, so the editor preview and delivery cannot end up holding two pipelines
         // that agree today (acceptance criterion P1 #7).
         services.TryAddSingleton<IMarkdownRenderer, MarkdownRenderer>();
+        // Singleton: it parses the markup it is handed and asks the field type registry which values
+        // carry any. Neither touches a database (task P9-10).
+        services.TryAddSingleton<IAuthoredAccessibilityValidator, AuthoredAccessibilityValidator>();
 
         return services;
     }

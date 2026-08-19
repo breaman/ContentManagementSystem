@@ -3,6 +3,7 @@ using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Server.Caching;
 using ContentManagementSystem.Server.Delivery.Seo;
+using ContentManagementSystem.Server.Security;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -70,6 +71,12 @@ public static class DeliveryEndpointRouteBuilderExtensions
         endpoints.MapGet("/{**slug}", DeliveryEndpoint.HandleAsync)
             .AllowAnonymous()
             .CacheOutput(CachingServiceCollectionExtensions.PagePolicyName)
+            // Six hundred a minute per address (spec section 20.6, task P9-03). Deliberately far
+            // above anything a reader does: a cached page costs almost nothing to serve, so the limit
+            // is here for the crawler that has stopped honouring crawl-delay rather than for people.
+            // It sits on this route alone, so the framework assets and the health probe a page load
+            // also fetches are not counted against a visitor's budget.
+            .RequireRateLimiting(CmsRateLimits.PublicPages)
             .WithName(DeliveryRouteName);
 
         return endpoints;

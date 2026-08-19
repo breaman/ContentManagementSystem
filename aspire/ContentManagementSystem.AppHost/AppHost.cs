@@ -9,7 +9,12 @@ var osArch = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var dbPassword = builder.AddParameter("sql-password", "P@ssw0rd!")
+// A run-mode default only. `publishValueAsDefault` is false, so this literal is not written to the
+// deployment manifest — publishing emits a parameter the deployer has to supply — and `secret: true`
+// keeps it out of the dashboard and the logs. The server refuses to start outside Development if it
+// finds this password in its connection string anyway, because "not in the manifest" and "never
+// copied by hand into an app setting" are different claims (task P9-05, CmsSecretsGuard).
+var dbPassword = builder.AddParameter("sql-password", "P@ssw0rd!", secret: true)
     .InitiallyHidden();
 
 var sqlServer = builder.AddSqlServer("sqlserver", dbPassword, 54134)

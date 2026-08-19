@@ -1,13 +1,20 @@
-namespace ContentManagementSystem.Core.Tests.Security;
+namespace ContentManagementSystem.TestSupport;
 
 /// <summary>
 /// The payloads every sanitization profile has to neutralize (task P1-20).
 /// </summary>
 /// <remarks>
+/// Held in <c>TestSupport</c> rather than beside one suite, because two suites assert against it and
+/// they assert different things. The unit suite runs every payload through <c>SanitizationService</c>
+/// under every profile (task P1-20); the penetration pass stores one through the API, publishes it,
+/// and reads the delivered page back over HTTP (task P9-06). The second is the one that would catch a
+/// renderer that un-escaped what the sanitizer had cleaned.
+/// <para>
 /// Drawn from the OWASP XSS Filter Evasion Cheat Sheet, the OWASP Testing Guide's stored-XSS
 /// section, and the widely circulated polyglots (0xsobky's, Ahmed Elsobky's mXSS strings, the
 /// Cure53 mutation cases). They are grouped by the trick they use rather than listed flat, because
 /// when one fails the group is what tells you which assumption broke.
+/// </para>
 /// <para>
 /// <strong>These are payloads, not test data to be tidied.</strong> The malformed ones are malformed
 /// on purpose — an unbalanced quote, a stray <c>&lt;</c>, a tag that never closes — because the
@@ -19,7 +26,7 @@ namespace ContentManagementSystem.Core.Tests.Security;
 /// The suite asserts an invariant over whatever is here, so a new entry needs no new test.
 /// </para>
 /// </remarks>
-internal static class XssCorpus
+public static class XssCorpus
 {
     /// <summary>One corpus entry.</summary>
     /// <param name="Name">A short identifier, used as the test case name.</param>

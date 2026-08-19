@@ -22,4 +22,16 @@ public static class CmsClaimTypes
     /// </para>
     /// </remarks>
     public const string Permission = "cms:permission";
+
+    /// <summary>
+    /// Whether the account has a second factor set up, as <c>bool.TrueString</c> or absent.
+    /// </summary>
+    /// <remarks>
+    /// Stamped so that the mandatory-2FA rule of spec section 20.3 costs a string comparison per
+    /// request rather than a query (task P9-04). Like <see cref="Permission"/> it is a copy of
+    /// something the database owns, and the direction it can be stale in is the safe one: the claim
+    /// says "not enrolled" until the sign-in is refreshed, so a lapse gates an editor who has already
+    /// enrolled rather than admitting one who has not.
+    /// </remarks>
+    public const string TwoFactorEnabled = "cms:2fa";
 }

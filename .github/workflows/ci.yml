@@ -93,6 +93,34 @@ jobs:
           --results-directory ${{ runner.temp }}/test-results
           --output Detailed
 
+      # The same payloads the other way round: stored through the real draft service, published, and
+      # read back over HTTP as a visitor receives them (task P9-06). It belongs in this job rather
+      # than among the integration tests for the reason the step above does — and it catches what the
+      # step above cannot, because the sanitizer is applied on write *and* on render (ADR-0008) and
+      # between them sits a component renderer that has to put the result into a document without
+      # un-escaping it.
+      #
+      # It needs a database (Testcontainers provides one) and the front-end bundles, which the server
+      # build produces from node_modules.
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/ContentManagementSystem.Server/package-lock.json
+
+      - name: Install node dependencies
+        working-directory: src/ContentManagementSystem.Server
+        run: npm ci
+
+      - name: XSS corpus against live rendering
+        run: >-
+          dotnet test --project tests/ContentManagementSystem.Server.Tests/ContentManagementSystem.Server.Tests.csproj
+          --configuration Release
+          --treenode-filter "/*/ContentManagementSystem.Server.Tests.Security/(LiveXssTests|PenetrationSweepTests)/*"
+          --report-trx --report-trx-filename live-xss.trx
+          --results-directory ${{ runner.temp }}/test-results
+
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
@@ -218,11 +246,14 @@ jobs:
       # real browser, so it needs no database and no login and runs in seconds on every pull
       # request. The full-journey pass against the running site — including colour contrast, which
       # needs the compiled stylesheet — is P9's.
-      - name: Structure screen accessibility
+      # The public gate joined this job in P9-07. It renders CmsDeliveryDocument — the real shell —
+      # and needs no stylesheet, because axe judges structure and naming here; contrast and reflow
+      # are the compiled-CSS passes in the E2E job below.
+      - name: Structure and public-page accessibility
         run: >-
           dotnet test --project tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj
           --configuration Release
-          --treenode-filter "/*/*/StructureScreenAccessibilityTests/*"
+          --treenode-filter "/*/*/(StructureScreenAccessibilityTests|PublicPageAccessibilityTests)/*"
           --report-trx --report-trx-filename accessibility.trx
           --results-directory ${{ runner.temp }}/test-results
 
@@ -261,6 +292,10 @@ jobs:
       # Browsers install themselves on first use (see PlaywrightBrowsers), so no PowerShell step.
       # axe-core assertions run inside these same browser journeys — the accessibility gate starts
       # in Phase 1 against the structure screens, not at the end of the project.
+      #
+      # This job downloads all three engines from P9-24 onwards, because the NFR-13 matrix runs the
+      # public page through Chromium, Firefox, and WebKit. Installation is per engine and on demand,
+      # so the accessibility job above still pulls Chromium alone.
       - name: Test
         run: >-
           dotnet test --project tests/ContentManagementSystem.E2E.Tests/ContentManagementSystem.E2E.Tests.csproj

@@ -1763,6 +1763,9 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Property<int>("Id")
                         .HasColumnType("int");
 
+                    b.Property<int>("AuditLogRetentionDays")
+                        .HasColumnType("int");
+
                     b.Property<int>("CreatedBy")
                         .HasColumnType("int");
 
@@ -1832,6 +1835,7 @@ namespace ContentManagementSystem.Data.Migrations
                         new
                         {
                             Id = 1,
+                            AuditLogRetentionDays = 0,
                             CreatedBy = 0,
                             Culture = "en-US",
                             ModifiedBy = 0,

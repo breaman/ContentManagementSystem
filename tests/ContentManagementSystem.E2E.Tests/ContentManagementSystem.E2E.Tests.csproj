@@ -14,6 +14,10 @@
     <!-- The structure screens are rendered here with the framework's static HtmlRenderer, so the
          a11y gate needs the components themselves and the ASP.NET Core component runtime. -->
     <ProjectReference Include="..\..\src\ContentManagementSystem.Client\ContentManagementSystem.Client.csproj" />
+    <!-- The public half of the accessibility gate renders CmsDeliveryDocument itself rather than a
+         re-creation of it (task P9-07). The document is the Server's, and a gate that judged a
+         look-alike would go green on a shell nobody serves. -->
+    <ProjectReference Include="..\..\src\ContentManagementSystem.Server\ContentManagementSystem.Server.csproj" />
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 

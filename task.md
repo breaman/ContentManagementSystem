@@ -1,8 +1,10 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — **Phase 8's 26 tasks are all done** and its exit gate is met; nine of its
-ten criteria are met, and the tenth (`P8 #10`, search latency) is asserted but has only ever run on
-an engine without full-text. **Phase 7 is complete**: all 26 tasks, all 10 acceptance criteria, and
+**Status:** In progress — **Phase 9 is under way**: its security, accessibility, and operations
+sections are done (17 of 24 tasks), leaving the performance section, two gates that need a person and
+an environment, and one deferred to after launch by its own terms. **Phase 8's 26 tasks are all done**
+and its exit gate is met; nine of its ten criteria are met, and the tenth (`P8 #10`, search latency)
+is asserted but has only ever run on an engine without full-text. **Phase 7 is complete**: all 26 tasks, all 10 acceptance criteria, and
 its exit gate. **Phase 6 is built out**, with 12 of its 14 criteria met and its gate open
 on the browser journeys and the manual keyboard pass alone. Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
@@ -134,10 +136,29 @@ half. **Multi-site was assessed and declined for v1** ([ADR 0025](./docs/adr/002
 the column was never the cost — the twenty-odd uniqueness rules are, each of them a product question
 nobody has been asked, and a discriminator nothing filters by has a failure mode no single-site test
 can catch.
-**The `Content-Security-Policy` header itself is not switched on**: the nonce
-it needs exists and is wired, but turning the policy on today would break P5's media control and
-others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
-than left as a surprise.
+**The `Content-Security-Policy` header is now switched on** — see Phase 9 below, which is where the
+inline-`style` problem noted here was resolved.
+**Phase 9 hardens what the earlier phases built, and it is the phase whose tests found the most.**
+The CSP went on as **three profiles selected from endpoint metadata**, strictest as the default, so a
+route that says nothing is strict and a route that needs more says so
+([ADR 0026](./docs/adr/0026-three-content-security-policies-public-carries-no-nonce.md)); the public
+policy deliberately carries **no nonce**, because a public response is cached and replayed and a
+per-request value in one is a constant an attacker can quote. Rate limiting is six named policies on
+endpoint groups rather than one limiter in front of the site, two of which decide per request whether
+they apply at all. Identity now asks for twelve characters and no character classes — the classes are
+what produce `Password1!` — screens against a breach list, and **will not let an `Administrator`,
+`Developer`, or `Approver` do anything but enrol a second factor**. `CmsSecretsGuard` refuses to start
+a deployment holding a development secret, because every one of those appears to work when it is
+wrong.
+**What the phase's gates turned up is the part worth reading.** A refused request was reaching clients
+as a `404`, because the site's status-code pages re-execute any body-less error response. The
+`cms-database` health check of [§24.2] **did not exist** — Aspire registers one under the context's
+full type name, which no alert rule can refer to. And the version retention sweep has implemented all
+five clauses of [§11.7] since `P2-13` with **nothing ever calling it**, so every deployment kept every
+version of every page forever while a policy that said otherwise sat in the code. The XSS corpus now
+runs against **live rendering** as well as against the sanitizer, the accessibility gate covers the
+public document as well as the backoffice, and both come with negative controls, because an assertion
+that nothing is wrong passes just as well against a page that rendered nothing.
 **Version:** 1.0
 **Last updated:** 2026-08-19
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
@@ -194,8 +215,8 @@ and record the date in the progress table.
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 26 | 14.0 | All 26 tasks done; **9 of 10 criteria met**. `P8 #10`'s 500 ms budget is asserted but has only run on an engine without full-text (arm64 Azure SQL Edge), so it waits on the same CI agent `P0 #3` does | — |
-| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 2 | 14.0 | In progress — security section started: the CSP and the companion headers are on (`P9-01`, `P9-02`) | — |
-| **v1 total** | **281** | **250** | **203.5** | | |
+| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 17 | 14.0 | In progress — **security, accessibility, and operations are done** (`P9-01`…`P9-07`, `P9-09`…`P9-11`, `P9-19`…`P9-22`, `P9-24`, `P9-25`). Open: the performance section (`P9-12`…`P9-17`), `P9-08` and `P9-18`, which need a person and an environment, and `P9-23`, which is deferred to after launch by its own terms | — |
+| **v1 total** | **281** | **265** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -238,7 +259,15 @@ These come from [§29.2](./spec.md#292-open-questions). Each one gates the phase
   way Q9 lands, an audit retention sweep is work that does not exist yet; it is recorded against
   `P9` rather than absorbed into Phase 5.
 - [ ] **Q10** — Does self-service registration stay enabled, and with what default role?
-  *Owner: Security · Needed by: Phase 1 (enforced P9)* · **Answer:** _pending_
+  *Owner: Security · Needed by: Phase 1 (enforced P9)* · **Answer:** _pending — but no longer
+  blocking._ `P9-04` ships both branches behind `CmsIdentityOptions.SelfRegistration` and **defaults
+  to `Disabled`**, which is the safe reading of [§20.3]: the registration routes answer `404` rather
+  than `403`, because a refusal a 404 would not have produced tells the caller the door is there.
+  The other branch, `NoRole`, is the registration pages as they already behave — nothing in this
+  application grants a role on registration — and it exists so that "we chose this" and "nobody has
+  decided" are different states of the file. Answering Q10 now changes one line of configuration
+  rather than any code. `ResendEmailConfirmation` stays open under both, because an account an
+  administrator created still has an address to confirm.
 
 Resolved already, recorded for reference: **Q1** — no localization, `en-US` only ([§19]).
 **Q3** — SkiaSharp (MIT) is the image library; **AVIF is not produced in v1** ([§13.9]).
@@ -4196,27 +4225,147 @@ Entry: all prior phases exit.
   and is not this application's to make. The `Permissions-Policy` denies everything except
   `publickey-credentials-get`/`-create` and `fullscreen`, all `self`: a blanket denial would turn
   signing in with a passkey into a `NotAllowedError` nobody would attribute to a header.*
-- [ ] **P9-03** Rate limiting across all endpoint groups per [§20.6] — login/register/reset 5 per 15 min
+- [x] **P9-03** Rate limiting across all endpoint groups per [§20.6] — login/register/reset 5 per 15 min
   per IP; API writes 100/min per user; uploads 20/min per user; renditions 300/min per IP; preview
   tokens 30/min per token; public pages 600/min per IP. — 1 ed
-- [ ] **P9-04** Identity hardening in `Server/Program.cs`: minimum 12-character password, breached-password
+  *Named policies on endpoint groups, not a global limiter: one of those counts the WebAssembly
+  runtime's forty asset requests and the health probe against the same budget as the traffic it
+  exists to shape. **Two policies decide per request whether they apply at all.** The credential
+  policy sits on a Razor component endpoint that answers both the `GET` rendering the sign-in form
+  and the `POST` attempting it, and five of those a quarter-hour is right for the attempt and absurd
+  for the form — a single failed sign-in requests it twice. The API policy is on the whole versioned
+  group and exempts reads, so a write added later is covered without anyone remembering to. Uploads
+  are limited on the three routes that **begin** one rather than on every request one makes: a
+  resumable 50 MB document is thirteen four-megabyte parts, and counting each as an upload would put
+  the budget at a file and a half a minute. The preview limit was already in place from `P3-18` and is
+  left as it is — 60 requests per address per minute is 30 page views, which is §20.6's number in the
+  units it means, and partitioning by address rather than by token is what makes it defeat
+  enumeration, which per-token partitioning cannot do by construction.*
+  *The test found a real defect in something older: **a refused request was reaching the client as a
+  404**. `UseStatusCodePagesWithReExecute` re-executes any error response carrying no body, and the
+  page it re-executes through sets its own status — so a body-less `429` lost its status, its reason,
+  and its `Retry-After` on the way out. The rejection handler now writes one: a problem document
+  under `/api`, a sentence anywhere else.*
+- [x] **P9-04** Identity hardening in `Server/Program.cs`: minimum 12-character password, breached-password
   screening, mandatory 2FA for `Administrator` / `Developer` / `Approver`, and the self-registration
   decision from **Q10**. *(Existing-code change — current settings are template defaults.)* — 1 ed
-- [ ] **P9-05** Verify secrets handling [§20.8]: the Aspire `sql-password` dev default never reaches
+  *Twelve characters and **no character-class rules**, which is a decision rather than an omission:
+  requiring a digit, a capital, and a symbol is what produces `Password1!`. Length and the breach
+  screen do the work instead, and lockout now applies to new users too — the template excluded them,
+  which is the one account an attacker is definitely trying. **Breach screening is two
+  implementations behind one seam**, the shape `ADR-0024` used for mail: a common-password list held
+  in the process, which always runs and costs nothing, and Have I Been Pwned's k-anonymity range API,
+  which is what makes the claim literally true and is off unless a deployment turns it on, because it
+  puts a third party on the path of every password change. An unreachable service accepts by default
+  and logs — failing closed would stop every password reset during the incident that prompted them.
+  A second validator refuses a password built out of the account's own name or address.*
+  ***Mandatory 2FA is a request-time gate, not a sign-in check.*** A check at sign-in refuses an
+  account that is already in this state and leaves it unable to fix itself, and says nothing about
+  the account granted `Administrator` while its session is open — which is how most accounts arrive
+  here. A privileged principal with no second factor may reach account management and nothing else:
+  a redirect for a document, a `403` for an API call, because a redirect to an HTML page reads as a
+  parse error to the backoffice's fetches. It reads a `cms:2fa` claim rather than the database, which
+  made one existing-code change necessary: `EnableAuthenticator` did not call `RefreshSignInAsync`,
+  so an administrator who had just enrolled would have been sent back to enrol for up to half an hour.*
+  ***Q10 is answered as configuration, defaulting to closed*** — see the decision entry above.
+- [x] **P9-05** Verify secrets handling [§20.8]: the Aspire `sql-password` dev default never reaches
   production; media-signing HMAC key sourced from key vault/environment and rotatable. — 0.25 ed
-- [ ] **P9-06** Penetration-test pass: XSS corpus against **live rendering**, IDOR sweep, upload fuzzing,
+  *Both halves already held on inspection: `AddParameter`'s `publishValueAsDefault` is false, so the
+  development password is a run-mode value and is not written to the deployment manifest, and
+  `MediaSigningOptions` has implemented two keys and a grace period since `P5-18`. What was missing
+  was the assertion. `CmsSecretsGuard` runs beside `AssertCmsMediaCapabilities` and **refuses to start
+  a non-Development deployment** that has no signing key, has a half-finished rotation with no end
+  date, or carries the Aspire password in its connection string. All three already *work* when they
+  are wrong, which is why a startup refusal rather than a health check: an unconfigured key generates
+  a per-process one, so every image renders correctly on the instance that signed the URL and `403`s
+  on the next. The parameter is also marked `secret: true` so it stays out of the dashboard and the
+  logs. Development is exempt on purpose — the point is not to make a first run require a key vault.*
+- [x] **P9-06** Penetration-test pass: XSS corpus against **live rendering**, IDOR sweep, upload fuzzing,
   unsigned rendition URLs, preview-token enumeration, CSRF. — 1.75 ed
+  *Six areas, four of them newly covered and two already held. The **corpus against live rendering**
+  is the one that could not be faked: the same 52 payloads that the unit suite puts through
+  `SanitizationService` are now stored through the real draft service, published, and read back over
+  HTTP, with the delivered document re-parsed and its content region inspected — which is what would
+  catch a field renderer reaching for `MarkupString` on a stored value, a bug every assertion in the
+  unit corpus passes. The corpus moved to `TestSupport` so both suites read one list. All 53 cases
+  pass, including the page title, whose only defence is escaping because it is plain text and is
+  written into the `<title>` and into every Open Graph `content` attribute. **Upload fuzzing** sends
+  eight payloads carrying image extensions and image content types — HTML, an SVG with script, a PHP
+  tag behind a real `GIF89a` header, a shell script, an empty file, a truncated JPEG, a double
+  extension, a traversal file name — and asserts both that each is refused as a client error rather
+  than a 500 and that **the library is still empty afterwards**, which the status codes cannot say.
+  Unsigned and forged rendition URLs and guessed preview tokens are refused, and the preview refusals
+  are asserted to be **byte-identical to one another**, because a body that distinguished "no such
+  token" from "expired" is an oracle confirming a guess landed. CSRF is asserted behaviourally across
+  three verbs in addition to the structural check `ApiContractTests` already makes. The **IDOR
+  sweep** is `P7-07`'s and is not restated; the live pass names it rather than duplicating it.*
+  *The live corpus runs in the `XSS corpus` CI job rather than among the integration tests, for the
+  reason that job exists at all: "can stored content execute in a visitor's browser" is not a failure
+  to find among two hundred other red tests.*
 
 ### Accessibility — 2.5 ed
 
-- [ ] **P9-07** axe-core across all screens, backoffice and public output. — 0.5 ed
-- [ ] **P9-08** Manual keyboard pass and screen-reader passes (NVDA + VoiceOver). — 1 ed
-- [ ] **P9-09** 200% zoom and `prefers-reduced-motion` verification. — 0.25 ed
-- [ ] **P9-10** Authored-output accessibility rules [§28]: heading structure validated (`h2`–`h6` only in
+- [x] **P9-07** axe-core across all screens, backoffice and public output. — 0.5 ed
+  *The backoffice half has existed since `P1-31` and was extended screen by screen through `P2-23`
+  and `P6-36`; what P9 adds is the public half, which is the one with the wider audience. It renders
+  **`CmsDeliveryDocument` itself** rather than a re-creation — a gate that judged a look-alike would
+  go green on a shell nobody serves, and the shell is where most of what an audit looks at lives: the
+  `lang` attribute, the landmarks, the navigation, and the single `h1`. Everything the render reaches
+  for is the real implementation except the navigation reader, which is a database query; what the
+  menu contains is content, and what the component makes of it is what is judged. Two cases, because
+  they fail differently: a full page of awkward content (a captioned table with row and column
+  headers, a nested list, an h2/h3 sequence) and a page with most of its zones empty, where the
+  article template still renders every wrapper. **Zero violations on both.** It joined the
+  `Accessibility (axe)` CI job, which is a required check; the compiled-stylesheet passes — contrast
+  and reflow — stay in the E2E job, which builds the stylesheet.*
+  ***The browser matrix found a defect in this gate before the gate found one in the site.*** The
+  fixture put its table in a `richText` value, which the `Basic` profile strips — so the audit had
+  been judging a page with no table on it, and passing, because a stripped table leaves its caption
+  behind as ordinary text and the assertion was looking for the caption. `P9-24` noticed only because
+  it measures the table's bounding box and there was none. The table is now stored as `html`, which is
+  the field type one is really stored in (there is no table tool — see `P9-10`), and the assertion
+  looks for `<table` and a `scope` attribute rather than for words.*
+- [!] **P9-08** Manual keyboard pass and screen-reader passes (NVDA + VoiceOver). — 1 ed
+  *Blocked on a person, the way `P6-37` is. Nothing here is a thing an assertion supplies: the
+  question is whether a screen reader's announcement makes sense to somebody using it, and there is
+  no test that answers it. What the automated gates do cover is recorded against `P9-07` and `P9-09`.*
+- [x] **P9-09** 200% zoom and `prefers-reduced-motion` verification. — 0.25 ed
+  *Both extended from the backoffice to the public page, and both measured in a browser rather than
+  read out of the stylesheet. The reflow pass loads the **whole delivery document** rather than a
+  fragment in a wrapper, because the document writes its own viewport meta tag and that tag is half
+  of what makes a page reflow at all. Reduced motion is measured by asking a browser context that
+  requests it for every element whose computed style still has a running animation or transition — a
+  media query that exists and does not cover the animation somebody added last week passes a grep and
+  fails the reader. Both passes carry a negative control, for the reason the `P6-38` one does: an
+  assertion that nothing is too wide, or that nothing is moving, passes just as well against a page
+  that rendered nothing.*
+- [x] **P9-10** Authored-output accessibility rules [§28]: heading structure validated (`h2`–`h6` only in
   rich text; skipped-level warning at publish), link-text warnings ("click here", bare URLs), `<th
   scope>` emitted by the table tool, `color` field constrained to design-system tokens, `lang` from
   `SiteSettings.Culture`. — 0.5 ed
-- [ ] **P9-11** Remediation of all findings to zero critical/serious. — 0.25 ed
+  *Three of the section's rules are checks on markup and are answered by parsing one document, so
+  they are one service on the publish path: skipped heading levels, link text that says nothing, and
+  tables with no usable headers. **Which values to parse is asked of the field type registry rather
+  than of a list of keys** — `Sanitizable` already means "this is markup an author wrote" — and the
+  payload is walked recursively, because a rich-text property inside a block is exactly as visible as
+  one in a zone and a top-level walk would report a clean bill for a page built out of blocks. The
+  heading sequence runs across zones rather than restarting in each, since a reader moving by heading
+  does not know where a zone ends. **Every diagnostic is a warning**; the one accessibility rule that
+  blocks is alt text, because an undescribed picture is invisible rather than merely awkward.*
+  *The other three rules turned out to be structural and already true, which is worth recording
+  rather than implementing twice: `h1` is absent from every sanitization profile, so the rich-text
+  editor cannot offer one; the `color` field type takes a `palette` of design-system tokens and
+  refuses anything outside it; and there is **no table tool to fix** — the Quill toolbar is the short
+  list of `P6-08`, so a table can only arrive through the HTML source editor or a paste, which is
+  exactly what the header warnings are for. `lang` is the one that was genuinely missing: it was
+  hard-coded `en`, and now comes from `SiteSettings.Culture` through the head builder, on the settings
+  read the head already makes.*
+- [x] **P9-11** Remediation of all findings to zero critical/serious. — 0.25 ed
+  *Nothing to remediate, and that is a result rather than an omission: the backoffice findings were
+  found and fixed when the gates were written (`P6-36` turned up three landmark and heading faults,
+  `P6-38` four screens that could not reflow), and the public output passed axe, the reflow pass, and
+  the reduced-motion pass on their first green run. The finding this phase did produce was in the
+  authored-content rules, which had no implementation at all — `P9-10`.*
 
 ### Performance — 3 ed
 
@@ -4233,40 +4382,123 @@ Entry: all prior phases exit.
 
 ### Operations and documentation — 3 ed
 
-- [ ] **P9-18** Backup/restore drill **including a media-store restore**, timed against the RTO;
+- [~] **P9-18** Backup/restore drill **including a media-store restore**, timed against the RTO;
   documented runbook [§24.3]. — 1 ed
-- [ ] **P9-19** Operational documentation: deployment, configuration reference, health checks,
+  *The runbook is written ([`docs/runbooks/backup-restore.md`](./docs/runbooks/backup-restore.md));
+  **the drill itself needs an environment to restore into** and is what stays open. The runbook is
+  built around the sentence the drill exists to prove: **restoring the database does not restore the
+  site.** Content is in SQL Server and pictures are in a blob container, and a drill that restores
+  only the first produces a site whose every page renders and whose every image is a broken icon —
+  which passes any check that only asks whether pages load. The verification steps are ordered so
+  each rules out a different failure, and the media step is called out as the one a database-only
+  restore fails. Renditions are backed up rather than left to regenerate, because a site restored
+  without them re-encodes every image on the first view of each, at the moment it is under the most
+  scrutiny it will ever get.*
+- [x] **P9-19** Operational documentation: deployment, configuration reference, health checks,
   dashboards, alert thresholds, incident runbooks. — 1 ed
-- [ ] **P9-20** Verify every health check has a monitor and an alert threshold: `cms-database`,
+  *[`docs/operations.md`](./docs/operations.md), written for whoever is on call rather than whoever
+  wrote the code: each section says what breaks, what the symptom looks like from outside, and what to
+  do about it. Five runbooks for the five failures with no other symptom — invalidation that has
+  stopped, a signing key that differs between instances, a privileged account meeting the 2FA gate
+  mid-session, a build serving against a schema missing its migration, and an index that is behind
+  rather than wrong. The configuration reference lists only settings that change behaviour in
+  production, and the retention windows are called out as **`SiteSettings` columns rather than
+  configuration**, because how long an organisation's records last is its decision and not its
+  deployment's. It also carries the proxy warning the rate limiter needs: behind an ingress every
+  visitor shares one bucket, which turns the public limit into a site-wide one.*
+- [x] **P9-20** Verify every health check has a monitor and an alert threshold: `cms-database`,
   `cms-media-store`, `cms-templates`, `cms-scheduler`, `cms-outbox`. — included above
-- [ ] **P9-21** User documentation: editor guide, developer template-authoring guide, admin guide. — 1 ed
-- [ ] **P9-22** Update `README.md` with CMS setup, template authoring, and the schema sync CLI.
+  *Verifying turned up that **`cms-database` did not exist**. Aspire's `EnrichSqlServerDbContext`
+  registers a connectivity check under the context's full type name, which no runbook and no alert
+  rule refers to — a check nobody can name is a check nobody has a monitor on. It is now a real check
+  that asks two questions rather than one: connectivity, which is the loud failure, and **whether the
+  schema is the one this build expects**, which is the quiet one — an instance that connects to a
+  database missing its migration starts, serves, and fails on whichever request first touches the new
+  column. That is *degraded* rather than unhealthy, because it is the state a rolling deployment
+  passes through. `HealthCheckContractTests` asserts the registered set is exactly the documented set,
+  that no CMS check is tagged `live`, and — reading the file from disk — that every one is **named in
+  the operations document**, since an alert rule is written from a name.*
+- [x] **P9-21** User documentation: editor guide, developer template-authoring guide, admin guide. — 1 ed
+  *Three guides in [`docs/guides/`](./docs/guides/). The editor guide is the one `P9 #7` is measured
+  against, so it is written as a path from an empty tree to a published page and says plainly that a
+  place somebody gets stuck is a defect in the document. It explains the two things editors reliably
+  get wrong — that saving is not publishing, and the difference between an error and a warning in the
+  publish dialog — and gives the reason behind each accessibility warning rather than only the rule.
+  The template guide carries the three rules that are easy to get wrong (the `h1` is the title,
+  navigation belongs to the shell, nothing may stream) and the field type table. The admin guide
+  covers roles, the three that require a second factor, the ACL clause that surprises people
+  (`ADR-0023`), retention, and a closing list of the things only an administrator can break.*
+- [x] **P9-22** Update `README.md` with CMS setup, template authoring, and the schema sync CLI.
   *(Existing-code change.)* — included above
-- [ ] **P9-23** Switch migration policy to roll-forward-only after launch; retain `Down` methods as
+  *Rewritten from the template leftovers it still was — bootstrap, `dotnet ef`, and `aspire run`. It
+  now opens with a map of the other documents, and covers the content model, a worked template, the
+  three CLI verbs and what `diff` exiting non-zero is for, and the three security rules worth knowing
+  before writing anything.*
+- [-] **P9-23** Switch migration policy to roll-forward-only after launch; retain `Down` methods as
   documentation only. — 0 ed
-- [ ] **P9-24** Browser matrix verification for NFR-13 (last 2 versions of Chrome, Edge, Firefox,
+  *Deferred by its own terms: it is a policy change that happens **after** launch, and doing it now
+  would remove a test that is currently earning its keep. `MigrationsApplyFromEmptyTests` applies and
+  reverts every migration against a real container on every build, and it is what catches a rename
+  EF has modelled as drop-plus-add. Recorded in the launch checklist rather than left as a phase task
+  somebody closes early; migration #9's `Down` is tested like the eight before it.*
+- [x] **P9-24** Browser matrix verification for NFR-13 (last 2 versions of Chrome, Edge, Firefox,
   Safari). — included above
-- [ ] **P9-25** Audit-log retention: a nightly sweep and a configurable window, matching what
+  *Four browsers, **three engines**: Chrome and Edge are both Blink and differ by a shell rather than
+  a renderer. Playwright bundles all three, so `BrowserMatrixTests` runs the real public document
+  through Chromium, Firefox, and WebKit — which is Safari's engine — with the compiled stylesheet.
+  What is asserted is layout, because the public site is static HTML and CSS with no script of its
+  own, so "does it work" reduces to "does it come out the same shape": the title is present and has a
+  height, the page does not overflow its viewport, and the authored table stays inside the content
+  column. The height assertion is the one that catches a font that did not load, which is otherwise
+  invisible to a test. **The backoffice is deliberately not in the matrix** — driving a WebAssembly
+  application needs the hosted-app harness `P6-32`…`P6-34` are also waiting on.*
+- [x] **P9-25** Audit-log retention: a nightly sweep and a configurable window, matching what
   `RetentionPolicy` already does for versions [§11.7]. — 0.5 ed
-  *Raised by `P5-33`. `AuditLog` currently grows without bound and nothing prunes it, which is a
-  defensible default for an unanswered compliance question (**Q9**) and the wrong state to launch
-  in — the interceptor writes a row for every tracked change, so the table grows with editorial
-  activity forever and eventually slows every `SaveChanges`. Deliberately not sized until Q9 lands:
-  the window is the part Legal decides, and the sweep is the part that is the same either way.*
+  *Raised by `P5-33`. `AuditLog` grew without bound and nothing pruned it, which is a defensible
+  default for an unanswered compliance question (**Q9**) and the wrong state to launch in — the
+  interceptor writes a row for every tracked change, so the table grows with editorial activity
+  forever, on the same transaction as the content, and eventually every save waits for it. The window
+  is `SiteSettings.AuditLogRetentionDays` (migration #9), **zero meaning keep everything**, which is
+  the part Legal decides; the sweep is the part that is the same either way. It deletes in batches of
+  two thousand under a fifty-batch ceiling, because SQL Server escalates row locks to a table lock at
+  around five thousand and a table lock on `AuditLog` blocks every `SaveChanges` in the application.
+  There are **no exceptions to the age rule**, unlike the five clauses that spare a version: a log
+  with holes in it is worse evidence than a shorter one.*
+  ***The task turned up a second, larger finding.*** The version sweep has implemented all five
+  clauses of [§11.7] since `P2-13` and **nothing ever called it** — it was reachable from a test and
+  from nowhere else, so every deployment kept every version of every page forever while a policy that
+  said otherwise sat in the code. The new `RetentionService` runs both, each in its own scope and each
+  caught separately, and `AuditRetentionTests` asserts the host registers it so the same thing cannot
+  happen twice.*
 
 ### Acceptance criteria — Phase 9
 
-- [ ] **P9 #1** Zero critical or high findings from the security pass; all mediums triaged with owners
+- [x] **P9 #1** Zero critical or high findings from the security pass; all mediums triaged with owners
   and dates.
-- [ ] **P9 #2** WCAG 2.2 AA verified on backoffice and public output; zero critical/serious axe
+  *`P9-06`'s pass produced no critical or high finding, and the two mediums it did produce were fixed
+  rather than triaged: a refused request reaching the client as a `404` because the site's status-code
+  pages re-execute any body-less error response, and `cms-database` not existing under a name any
+  alert rule could refer to (`P9-20`). Everything the pass asserts is a standing test rather than a
+  one-time review, which is the property that matters — the corpus, the IDOR sweep, the upload fuzz,
+  the signature and token refusals, and CSRF all run on every build.*
+- [x] **P9 #2** WCAG 2.2 AA verified on backoffice and public output; zero critical/serious axe
   violations.
+  *Zero on both, and the public half is new (`P9-07`). Reflow at 200% and `prefers-reduced-motion` are
+  verified on both surfaces too, each with a negative control. **The automated half is what is
+  claimed here**; `P9-08`'s keyboard and screen-reader passes are still open and are the part no
+  assertion supplies.*
 - [ ] **P9 #3** NFR-1, NFR-2, NFR-7, and NFR-9 met under load with a 50,000-page dataset.
 - [ ] **P9 #4** Lighthouse mobile performance ≥ 90 on all reference templates.
 - [ ] **P9 #5** A full restore from backup — database and media — produces a working site, timed against
-  the RTO.
-- [ ] **P9 #6** Every health check has a monitor and an alert threshold.
+  the RTO. *The runbook is written (`P9-18`); the drill needs an environment to restore into.*
+- [x] **P9 #6** Every health check has a monitor and an alert threshold.
+  *All five of [§24.2] now exist — `cms-database` did not until `P9-20` — and each has a row in
+  [`docs/operations.md`](./docs/operations.md) saying what makes it degraded, what makes it unhealthy,
+  and which of those pages somebody. `HealthCheckContractTests` asserts the registered set is exactly
+  the documented set and reads the document from disk to check each is named in it, because an alert
+  rule is written from a name.*
 - [ ] **P9 #7** An editor unfamiliar with the system completes create → publish using only the written
-  guide.
+  guide. *The guide is written (`P9-21`); the criterion is the person, and it has not been run.*
 
 **Exit gate:** NFRs met; security and accessibility signed off; runbooks in place. — [ ] met on ____
 
@@ -4292,6 +4524,10 @@ From [`plan.md` §22](./plan.md#22-launch-and-rollout). Not counted in the phase
 - [ ] **L-08** Blue/green or slot-based cutover; previous version retained warm.
 - [ ] **L-09** Confirm the rollback plan: migrations through launch are additive-only and backward
   compatible, so an application rollback needs no database rollback.
+- [ ] **L-14** Switch the migration policy to roll-forward-only, retaining `Down` methods as
+  documentation (`P9-23`). Deferred here rather than closed in Phase 9 because it happens **after**
+  launch, and doing it early removes `MigrationsApplyFromEmptyTests` — the check that catches a rename
+  EF has modelled as drop-plus-add — while it is still earning its keep.
 
 ### Post-launch
 
@@ -4371,8 +4607,8 @@ reviewer.
 | `Data/Models/ApplicationDbContext.cs` | Constructor overload carrying `TimeProvider`, greedily selected by the container. The existing overloads stay and default to `TimeProvider.System`, so a host that registers no clock is unchanged | 3 | P3-09 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Suppress EF warning 10622: `PageVersion` deliberately carries no soft-delete filter, so a deleted page's history stays retrievable | 2 | P2-03 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [x] |
-| `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–8 | P1-30, P3-13 | [ ] |
-| `Server/Program.cs` | Tighten the Identity password policy; decide self-registration | 9 | P9-04 | [ ] |
+| `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–9 | P1-30, P3-13, P9-01…P9-04, P9-20, P9-25 | [x] |
+| `Server/Program.cs` | Tighten the Identity password policy; decide self-registration. Twelve characters, no character-class rules, lockout for new users, and a breach screen; registration answers 404 until **Q10** says otherwise | 9 | P9-04 | [x] |
 | `Server/Components/Email/IdentityNoOpEmailSender.cs` | Replaced by `IdentityCmsEmailSender` over the CMS's own transport, and deleted. `RegisterConfirmation.razor.cs` showed the confirmation link whenever the sender was the no-op one; it now shows it only when mail is unconfigured **and** the environment is Development — the old condition would have handed every visitor a working confirmation link on a production deployment that forgot to configure SMTP | 7 | P7-18 | [x] |
 | `Data/Interceptors/AuditLogInterceptor.cs` | Exclude `ScheduledJob` and `Notification` from audit capture — both are written by services rather than by a person, and the publish a job performs is audited by the ordinary path | 7 | P7-08 | [x] |
 | `Shared/Contracts/Security/ICmsAuthorization.cs` | Expose the caller's role names, which the ACL resolver needs to find the rules addressed to any of their roles | 7 | P7-04 | [x] |
@@ -4380,6 +4616,7 @@ reviewer.
 | `Core/Dashboard/DashboardService.cs` | Redact rows naming pages the caller may not read. The dashboard is the one screen that reads across the whole site, so it is the likeliest place for a hidden branch to reappear as a title — and `TotalCount` is reduced with it, or the branch leaks as a number instead | 7 | P7-06 | [x] |
 | `Client/…/Pages/PageEditor.razor` | Carry the review, schedule, and comment panels beside the properties pane. Each renders nothing when the caller cannot use it | 7 | P7-12, P7-16 | [x] |
 | `Client/…/Dashboard/DashboardScreen.razor` | Section links for review, notifications, and audit, each behind the role that can use it | 7 | P7-12, P7-19, P7-20 | [x] |
+| `Server/Components/Account/Pages/Manage/EnableAuthenticator.razor.cs` | Call `RefreshSignInAsync` after enabling the authenticator. Without it the `cms:2fa` claim the mandatory-2FA gate reads stays false until the security stamp is revalidated, so an administrator who has just enrolled is sent back to enrol for up to half an hour | 9 | P9-04 | [x] |
 | `Server/Components/App.razor` | CSP nonce propagation; split public and admin head content. The split turned out to be structural rather than a head to divide: the public site is rendered by `CmsDeliveryDocument` and never sees this file, so the nonce, the import map, and `wasm-unsafe-eval` are all backoffice-only by construction (`ADR-0026`). Bootstrap Icons moved from jsDelivr to this origin, which `default-src 'self'` required | 6, 8–9 | P6-08, P9-01 | [x] |
 | `Server/Components/Routes.razor` | Scope interactive routing to `/admin`; keep public pages static SSR | 3 | P3-14 | [ ] |
 | `aspire/…AppHost/AppHost.cs` | Add Azurite and optional Redis resources | 0 | P0-13, P0-14 | [ ] |
@@ -4394,7 +4631,7 @@ reviewer.
 | `Server/Api/Cms/CmsApiEndpoints.cs` | Map the dashboard and bulk endpoint groups | 6 | P6-27, P6-29 | [x] |
 | `Client/…/PageList.razor`, `PageVersions.razor`, `PagePreviewLinks.razor`, `ReusableLibrary.razor` | Wrap each wide table in `table-responsive`. All four overflowed a 640-pixel viewport, which is what 200% zoom reports on a 1280-pixel display — found by the zoom pass rather than by looking | 6 | P6-38 | [x] |
 | `Client/…/Dashboard/DashboardGroupList.razor` | Groups are `div`s under headings rather than labelled `section`s, and the heading level is a parameter. Four labelled sections in one card are four landmarks announced by the same name; a fixed level makes one of the two screens skip one — both found by the axe gate | 6 | P6-36 | [x] |
-| `README.md` | Document CMS setup, template authoring, schema sync CLI | 9 | P9-22 | [ ] |
+| `README.md` | Document CMS setup, template authoring, schema sync CLI. Rewritten from the template leftovers it still was — bootstrap, `dotnet ef`, `aspire run` — and now opens with a map of the other documents | 9 | P9-22 | [x] |
 | `ContentManagementSystem.slnx` | Add Core, Rendering, and four test projects | 0 | P0-07…P0-11 | [ ] |
 
 ---
@@ -4453,9 +4690,9 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #6 | Approval workflow | P7-08…P7-12 | [x] 2026-08-18 — three modes, the draft frozen while under review, and a rejection that keeps the refused version exactly as it was refused while handing the author an editable copy |
 | #7 | Granular permissions | P7-01…P7-07 | [x] 2026-08-18 — role grants from the §21.1 matrix, narrowed by section ACLs resolved as an indexed prefix match, enforced in the service layer and swept for IDOR across nineteen entry points |
 | #8 | Shareable preview links | P3-17…P3-19 | [x] 2026-08-15 |
-| #9 | Version diff & rollback | P2-13, P2-14 | [ ] |
+| #9 | Version diff & rollback | P2-13, P2-14 | [ ] — the diff and the rollback have been done since Phase 2; what `P9-25` found is that the **retention sweep beside them had no caller**, so it now runs nightly. The gap stays open on `P2 #6`/`#7` |
 | #10 | Soft delete & recycle bin | P2-08, P6-28 | [x] 2026-08-16 — the service since Phase 2, the screen since `P6-28`. The bin lists subtree roots rather than deleted rows, restores bring a page back as a draft, and the one irreversible operation is Administrator-only and asks for the name to be typed |
-| #11 | HTML sanitization / XSS defense | P1-18…P1-20, P9-06 | [ ] |
+| #11 | HTML sanitization / XSS defense | P1-18…P1-20, P9-06 | [x] 2026-08-19 — the corpus was already a merge gate against the sanitizer; `P9-06` runs the same 52 payloads through the whole path, stored and published and read back over HTTP with the delivered document re-parsed, which is what would catch a renderer that un-escaped what the sanitizer had cleaned |
 | #12 | Upload validation & safe serving | P5-05…P5-07, P5-17 | [x] 2026-08-16 — decided at the sniffer and the sanitizer, so single-request upload, replace, and chunked assembly share one set of refusals |
 | #13 | Alt text enforced | P5-21 | [x] 2026-08-16 — at upload, at `PATCH`, and at publish on both the page and reusable paths; a placement override is one of the three ways out |
 | #14 | Focal point / smart cropping | P5-12 | [x] 2026-08-16 |
@@ -4472,7 +4709,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #25 | Forms / lead capture | **v2** | [-] |
 | #26 | Headless read API + webhooks | **v2** | [-] |
 | #27 | Import/export & environment promotion | P1-26, P1-28 (structure, v1); content bundles **v2** | [ ] |
-| #28 | Rate limiting & brute-force protection | P9-03, P9-04 | [ ] |
+| #28 | Rate limiting & brute-force protection | P9-03, P9-04 | [x] 2026-08-19 — the six limits of [§20.6] as named policies on endpoint groups, two of which decide per request whether they apply; plus lockout for new users, a twelve-character minimum, a breach screen, and mandatory 2FA for the three roles that can change what the public site says |
 | #29 | Editorial metadata | P6-17, P8-20 | [x] 2026-08-18 — owner, review-by, internal notes, **and now tags**: `P8-20` gave the panel somewhere to write them, and the box completes against the vocabulary the site already uses rather than inviting a fourth spelling of one label |
 | #30 | Broken-link & orphaned-media reporting | **v2** — nightly jobs in P8/P9, UI deferred | [-] |
 

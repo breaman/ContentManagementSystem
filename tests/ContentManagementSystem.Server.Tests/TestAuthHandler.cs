@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 
+using ContentManagementSystem.Shared.Contracts.Security;
+
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -36,6 +38,15 @@ public sealed class TestAuthHandler(
     /// <summary>Header carrying the caller's user id, which fingerprinting stamps onto rows.</summary>
     public const string UserIdHeader = "X-Test-User-Id";
 
+    /// <summary>Header that withholds the second-factor claim, for the suite that tests the gate.</summary>
+    /// <remarks>
+    /// The default is enrolled, which is what makes every other suite's Administrator able to reach
+    /// anything: the mandatory-2FA rule of spec section 20.3 gates a privileged account that has not
+    /// set one up, and a handler that never issued the claim would gate all of them. A test that is
+    /// about the gate itself sets this and gets an account that has not enrolled.
+    /// </remarks>
+    public const string NoTwoFactorHeader = "X-Test-No-2fa";
+
     /// <inheritdoc />
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -52,6 +63,9 @@ public sealed class TestAuthHandler(
         {
             new(ClaimTypes.NameIdentifier, userId),
             new(ClaimTypes.Name, $"test-user-{userId}"),
+            new(
+                CmsClaimTypes.TwoFactorEnabled,
+                Request.Headers.ContainsKey(NoTwoFactorHeader) ? bool.FalseString : bool.TrueString),
         };
 
         foreach (var role in roles.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries |

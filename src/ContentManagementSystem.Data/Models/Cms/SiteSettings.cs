@@ -69,6 +69,19 @@ public class SiteSettings : FingerPrintEntityBase
     public int VersionRetentionDays { get; set; }
 
     /// <summary>
+    /// How long audit rows are kept before the nightly sweep prunes them (task P9-25).
+    /// Zero keeps everything.
+    /// </summary>
+    /// <remarks>
+    /// Zero by default, and that is the honest state while <strong>Q9</strong> is unanswered: how
+    /// long an organisation's evidence lasts is a decision for Legal, and a system that invented a
+    /// number would be making it on their behalf. What the default is <em>not</em> is a reason to
+    /// leave the sweep unbuilt — <c>AuditLog</c> is written on every <c>SaveChanges</c> an editor
+    /// causes, so without one the table grows with activity forever.
+    /// </remarks>
+    public int AuditLogRetentionDays { get; set; }
+
+    /// <summary>
     /// Fallback Open Graph image for pages that specify none. Foreign key added in Phase 5 with
     /// <c>MediaItem</c>.
     /// </summary>

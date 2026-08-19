@@ -60,7 +60,19 @@ internal static class SiteStyles
     /// <summary>Serves a document containing one screen, styled as the site styles it.</summary>
     /// <param name="page">The page to route.</param>
     /// <param name="html">The rendered screen.</param>
-    public static async Task ServeAsync(IPage page, string html)
+    public static Task ServeAsync(IPage page, string html) => ServeDocumentAsync(page, Document(html));
+
+    /// <summary>
+    /// Serves a complete document exactly as it was rendered.
+    /// </summary>
+    /// <param name="page">The page to route.</param>
+    /// <param name="document">The whole document, <c>&lt;!doctype&gt;</c> and all.</param>
+    /// <remarks>
+    /// For the public gates (tasks P9-07, P9-09), where the shell is part of what is being measured:
+    /// its viewport meta tag, its landmarks, and the stylesheet link it writes are all the delivery
+    /// document's own, and wrapping them in a test's document would measure the wrapper.
+    /// </remarks>
+    public static async Task ServeDocumentAsync(IPage page, string document)
     {
         ArgumentNullException.ThrowIfNull(page);
 
@@ -75,7 +87,7 @@ internal static class SiteStyles
                 await route.FulfillAsync(new RouteFulfillOptions
                 {
                     ContentType = "text/html; charset=utf-8",
-                    Body = Document(html),
+                    Body = document,
                 });
 
                 return;

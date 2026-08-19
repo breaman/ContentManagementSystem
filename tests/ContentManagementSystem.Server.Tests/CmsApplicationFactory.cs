@@ -65,6 +65,12 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
                 // test asked for; the scheduler's own behaviour is driven directly through
                 // ScheduledJobRunner instead, which is where the decisions are.
                 ["Cms:Scheduler:Enabled"] = "false",
+                // And the retention sweeps, for a sharper version of the same reason: they delete.
+                // The twenty-minute startup delay puts them outside any run this suite has taken so
+                // far, which makes leaving them on a bet on how long the suite stays that fast —
+                // and the failure would be a version sweep pruning history a test had just arranged
+                // (task P9-25). Registration is still asserted, by AuditRetentionTests.
+                ["Cms:Retention:Enabled"] = "false",
             });
         });
 

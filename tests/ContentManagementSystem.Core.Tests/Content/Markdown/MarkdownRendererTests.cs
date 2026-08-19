@@ -4,6 +4,7 @@ using ContentManagementSystem.Core.Tests.Security;
 
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Security;
+using ContentManagementSystem.TestSupport;
 
 namespace ContentManagementSystem.Core.Tests.Content.Markdown;
 

@@ -108,7 +108,11 @@ try
             .EnableSensitiveDataLogging()
             .AddInterceptors(CmsSaveInterceptors.Resolve(services)),
         ServiceLifetime.Scoped);
-    builder.EnrichSqlServerDbContext<ApplicationDbContext>();
+    // Aspire's own connectivity check is switched off in favour of CmsDatabaseHealthCheck below
+    // (task P9-20). Two checks reporting the same fact under two names is worse than one: an alert
+    // rule names a check, and `ApplicationDbContext` is not a name any runbook uses. The replacement
+    // asks strictly more — connectivity, and whether the schema is the one this build expects.
+    builder.EnrichSqlServerDbContext<ApplicationDbContext>(settings => settings.DisableHealthChecks = true);
     builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
     // The media blob store is provisioned by Aspire (Azurite in development). Registration is
@@ -120,16 +124,20 @@ try
         builder.AddAzureBlobServiceClient(Constants.MediaBlobConnectionString);
     }
 
+    // The sign-in hardening of spec section 20.3 (task P9-04): the password screens, the extra
+    // validator, and the options the two conventions below read. Bound before AddIdentityCore because
+    // the password policy is applied inside its callback.
+    builder.Services.AddCmsIdentityHardening(builder.Configuration);
+
+    var cmsIdentity = new CmsIdentityOptions();
+    builder.Configuration.GetSection(CmsIdentityOptions.SectionName).Bind(cmsIdentity);
+
     builder.Services.AddIdentityCore<User>(options =>
         {
-            options.Password.RequireDigit = false;
-            options.Password.RequiredLength = 6;
-            options.Password.RequireLowercase = false;
-            options.Password.RequireUppercase = false;
-            options.Password.RequireNonAlphanumeric = false;
-
-            // options.SignIn.RequireConfirmedEmail = true;
-            options.SignIn.RequireConfirmedAccount = true;
+            // Twelve characters, no character-class rules, and lockout for everybody. The template's
+            // defaults were six with every rule off, which is right for a template and not for an
+            // account that can publish to a public site.
+            options.ApplyCmsPasswordPolicy(cmsIdentity);
 
             options.Stores.SchemaVersion = IdentitySchema.Version;
         })
@@ -271,6 +279,13 @@ try
     // The cms-templates check of spec section 24.2. Degraded, never unhealthy: a bad deployment must
     // be visible without taking down a site whose pages still render.
     builder.Services.AddHealthChecks()
+        // The cms-database check of spec section 24.2 (task P9-20). It replaces Aspire's, which is
+        // registered as `ApplicationDbContext` — a name no runbook uses — and asks only whether the
+        // connection opens. This also asks whether the schema is the one this build expects, which is
+        // the failure a half-finished cutover produces and the one nothing else reports.
+        .AddCheck<CmsDatabaseHealthCheck>(
+            CmsDatabaseHealthCheck.Name,
+            tags: ["ready", "cms"])
         .AddCheck<CmsTemplatesHealthCheck>(
             CmsTemplatesHealthCheck.Name,
             tags: ["ready", "cms"])
@@ -328,6 +343,14 @@ try
     // this on every instance is correct rather than merely tolerated (risk R16).
     builder.Services.AddHostedService<PublishSchedulerService>();
 
+    // The nightly retention sweeps (task P9-25). It runs the version sweep as well as the audit one,
+    // and that is the point: the version sweep has implemented spec section 11.7 since P2-13 and was
+    // reachable from a test and from nowhere else, so every deployment kept every version forever
+    // while a policy that said otherwise sat in the code.
+    builder.Services.Configure<RetentionOptions>(
+        builder.Configuration.GetSection(RetentionOptions.SectionName));
+    builder.Services.AddHostedService<RetentionService>();
+
     // Backs the structure admin screens while they pre-render, calling the services directly rather
     // than looping back through the HTTP API (task P1-29). Scoped alongside them, the gate keeps the
     // components Blazor initializes concurrently from using this request's one DbContext at once
@@ -350,6 +373,11 @@ try
     // is the default and nothing opts into it; the two wider profiles are named on the endpoints
     // below (ADR-0026).
     builder.Services.AddCmsSecurityHeaders(builder.Configuration);
+
+    // The six limits of spec section 20.6 (task P9-03), as named policies the endpoint groups below
+    // opt into. Not a global limiter: one of those counts the WebAssembly runtime's asset requests
+    // and the health probe against the same budget as the traffic it exists to shape.
+    builder.Services.AddCmsRateLimiting();
 
     // HSTS, configured rather than left at the framework's 30-day default (task P9-02). A year with
     // subdomains included is what the preload list asks for; submission to that list is deliberately
@@ -379,6 +407,11 @@ try
     // unsupported encode with null rather than an exception, so without this a native build missing
     // the WebP encoder would serve empty image responses and log nothing (spec section 13.9.1).
     app.Services.AssertCmsMediaCapabilities();
+
+    // And that this deployment is not running on a development secret (task P9-05, spec section 20.8).
+    // Beside the capability check because it is the same kind of failure: both are things that appear
+    // to work, on one instance, until they are needed across several.
+    app.Services.AssertCmsSecrets(app.Environment, builder.Configuration);
 
     // `dotnet run -- cms schema ...` (task P1-28). Handled after Build so the verbs use exactly the
     // services the site uses, and before anything is mapped so no request pipeline is ever started.
@@ -426,12 +459,19 @@ try
     app.UseCmsSecurityHeaders();
 
     app.UseAuthentication();
+
+    // Immediately after authentication, which is where the principal it reads comes from. A privileged
+    // account with no second factor can reach account management and nothing else (task P9-04).
+    app.UseCmsTwoFactorEnrolment();
+
     app.UseAuthorization();
     app.UseAntiforgery();
 
-    // After authorization, so the limiter reads the endpoint's policy metadata. Only the shared
-    // preview routes opt in; everything else is unlimited, because a limiter in front of the whole
-    // site is a denial-of-service tool pointed at its own visitors.
+    // After authentication and authorization, and both halves matter: the limiter reads the
+    // endpoint's policy metadata, and the per-user partitions of spec section 20.6 read a principal
+    // that does not exist earlier in the pipeline. Routes opt in one group at a time; there is no
+    // limiter in front of the whole site, because that is a denial-of-service tool pointed at its own
+    // visitors (task P9-03).
     app.UseRateLimiter();
 
     // After authentication and authorization, and that ordering is the correctness rule of spec
@@ -449,9 +489,21 @@ try
     app.MapRazorComponents<App>()
         .AddInteractiveWebAssemblyRenderMode()
         .AddAdditionalAssemblies(typeof(ContentManagementSystem.Client._Imports).Assembly)
-        .WithCspProfile(CmsCspProfile.Backoffice);
+        .WithCspProfile(CmsCspProfile.Backoffice)
+        // Q10's answer, as configuration rather than as code: with nothing set the registration pages
+        // answer as though they do not exist, which is the safe reading of spec section 20.3 and the
+        // shape P5-06 used for Q7 (task P9-04).
+        .RefuseSelfRegistrationWhenDisabled(cmsIdentity.SelfRegistration)
+        // Five attempts a quarter of an hour per address, on the pages that take a password, a
+        // recovery code, a passkey assertion, or an address that produces mail. Applied by a
+        // convention that reads each page's route, because these endpoints come from @page directives
+        // and there is no per-page builder to hang it off (task P9-03).
+        .RequireCmsCredentialRateLimiting();
 
-    app.MapAdditionalIdentityEndpoints();
+    // The two passkey routes are on the credential list as well: a passkey assertion is a sign-in
+    // attempt, and it does not go through the Razor page the rest of the list is made of.
+    app.MapAdditionalIdentityEndpoints()
+        .RequireCmsCredentialRateLimiting();
     app.MapCmsApi();
 
     // Before the catch-all, like every other route. /preview is a reserved first segment

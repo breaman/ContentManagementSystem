@@ -13,6 +13,7 @@ namespace ContentManagementSystem.Server.Components.Account.Pages.Manage;
 public partial class EnableAuthenticator : ComponentBase
 {
     [Inject] private UserManager<User> UserManager { get; set; } = default!;
+    [Inject] private SignInManager<User> SignInManager { get; set; } = default!;
     [Inject] private UrlEncoder UrlEncoder { get; set; } = default!;
     [Inject] private IdentityRedirectManager RedirectManager { get; set; } = default!;
     [Inject] private ILogger<EnableAuthenticator> Logger { get; set; } = default!;
@@ -66,6 +67,12 @@ public partial class EnableAuthenticator : ComponentBase
         }
 
         await UserManager.SetTwoFactorEnabledAsync(_user, true);
+
+        // Reissues the cookie, and with it the cms:2fa claim the enrolment gate reads (task P9-04).
+        // Without this an administrator who has just enrolled keeps being sent back here until the
+        // security stamp is revalidated, which is up to half an hour away.
+        await SignInManager.RefreshSignInAsync(_user);
+
         var userId = await UserManager.GetUserIdAsync(_user);
         Logger.LogInformation("User with ID '{UserId}' has enabled 2FA with an authenticator app.", userId);
 

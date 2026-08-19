@@ -12,6 +12,7 @@ using ContentManagementSystem.Server.Api.Cms.Search;
 using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Server.Api.Cms.Workflow;
+using ContentManagementSystem.Server.Security;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Security;
 
@@ -53,6 +54,12 @@ public static class CmsApiEndpoints
         // narrow that further; this is the floor, so a new endpoint added without a policy is
         // private rather than public.
         group.RequireAuthorization();
+
+        // A hundred writes a minute per user (spec section 20.6, task P9-03). On the group rather
+        // than on each write endpoint, so a write added later is covered without anybody remembering
+        // to; the policy itself decides per request, exempting reads, because the budget is for
+        // writes and a listing screen makes a great many reads.
+        group.RequireRateLimiting(CmsRateLimits.ApiWrite);
 
         group.MapGet("/antiforgery-token", GetAntiforgeryToken)
             .WithName("GetAntiforgeryToken")

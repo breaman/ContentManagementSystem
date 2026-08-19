@@ -90,6 +90,7 @@ public interface IPublishingService
 /// <param name="indexer">Walks a payload to check the entities it points at still exist.</param>
 /// <param name="schemas">Supplies the property configuration the allowed-templates check reads.</param>
 /// <param name="media">Checks the pictures this content places — existence, alt text, and the picker settings.</param>
+/// <param name="accessibility">Warns about heading skips, uninformative link text, and headerless tables.</param>
 /// <param name="redirects">Writes the fall-back redirect a retirement may leave behind.</param>
 /// <param name="urls">Materializes the public route a publish creates and withdraws it on unpublish.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
@@ -107,6 +108,7 @@ public sealed class PublishingService(
     IReferenceIndexer indexer,
     IContentSchemaCatalog schemas,
     IMediaContentValidator media,
+    IAuthoredAccessibilityValidator accessibility,
     IUrlService urls,
     IRedirectService redirects,
     ICmsAuthorization authorization,
@@ -538,6 +540,11 @@ public sealed class PublishingService(
         // ever notice: an undescribed picture renders perfectly and is invisible until an audit
         // (spec section 13.7).
         diagnostics.AddRange(await media.ValidateAsync(payload, TemplateSchema(payload), cancellationToken));
+
+        // Warnings only, and never errors: each one describes markup that renders correctly and reads
+        // badly, and a publish an editor cannot complete because a link says "read more" is a publish
+        // that happens through whatever route skips the check (spec section 28, task P9-10).
+        diagnostics.AddRange(accessibility.Validate(payload));
 
         diagnostics.AddRange(await CheckUrlAvailableAsync(page, cancellationToken));
 

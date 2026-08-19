@@ -65,6 +65,40 @@ public class ZoomTests
     }
 
     [Test]
+    public async Task ThePublicPageReflowsAtTwoHundredPercentZoom()
+    {
+        // The other half of the reflow pass (task P9-09). The public page is the one with content
+        // nobody on this side of the deployment controls in it: an editor's table of eight columns
+        // reflows or it does not, and the template's own layout is what decides.
+        var html = await PublicPages.RenderAsync("Pricing", PublicPageAccessibilityTests.FullPage);
+
+        PlaywrightBrowsers.EnsureInstalled();
+
+        using var playwright = await Playwright.CreateAsync();
+        await using var browser = await playwright.Chromium.LaunchAsync();
+
+        var page = await browser.NewPageAsync(new BrowserNewPageOptions
+        {
+            ViewportSize = new ViewportSize { Width = ZoomedWidth, Height = ZoomedHeight },
+        });
+
+        // The whole document rather than a fragment in the test's own wrapper: the delivery
+        // document writes its own viewport meta tag, and that tag is half of what makes a page
+        // reflow at all.
+        await SiteStyles.ServeDocumentAsync(page, html);
+        await page.GotoAsync($"{SiteStyles.Origin}/");
+
+        var overflow = await page.EvaluateAsync<int>(
+            "() => document.documentElement.scrollWidth - document.documentElement.clientWidth");
+
+        overflow.Should().BeLessThanOrEqualTo(
+            0,
+            "the public page overflows its viewport by {0}px at 200% zoom, so reading one line means " +
+            "scrolling in two directions (WCAG 1.4.10)",
+            overflow);
+    }
+
+    [Test]
     public async Task TheMeasurementItselfCatchesSomethingTooWide()
     {
         // A negative control. The assertion above is the kind that passes for the wrong reason — a

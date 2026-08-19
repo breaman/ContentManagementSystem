@@ -4,6 +4,7 @@ using ContentManagementSystem.Core;
 using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Media.Upload;
+using ContentManagementSystem.Server.Security;
 using ContentManagementSystem.Shared.Common;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Media;
@@ -66,16 +67,22 @@ public static class MediaEndpoints
             .WithSummary("Uploads a file. Identical bytes return the item already in the library.")
             .RequireAuthorization(CmsPermissions.MediaUpload)
             .RequireCmsAntiforgery()
+            .RequireRateLimiting(CmsRateLimits.Upload)
             .WithMetadata(bodyLimit)
             .Accepts<IFormFile>("multipart/form-data");
 
         // Before the /{id:int} routes for the reason the folder routes are: readability. The int
         // constraint already stops "uploads" matching them.
+        // Twenty a minute per user, on the three routes that begin an upload rather than on every
+        // request one makes (spec section 20.6, task P9-03). A resumable upload of a 50 MB document
+        // is thirteen four-megabyte parts, and counting each of those as an upload would put the
+        // budget at one and a half files a minute.
         media.MapPost("/uploads", StartUploadAsync)
             .WithName("StartChunkedUpload")
             .WithSummary("Opens a resumable upload for a large file, in parts the server sizes.")
             .RequireAuthorization(CmsPermissions.MediaUpload)
-            .RequireCmsAntiforgery();
+            .RequireCmsAntiforgery()
+            .RequireRateLimiting(CmsRateLimits.Upload);
 
         media.MapGet("/uploads/{uploadId}", GetUploadAsync)
             .WithName("GetChunkedUpload")
@@ -166,7 +173,8 @@ public static class MediaEndpoints
             .RequireAuthorization(CmsPermissions.MediaUpload)
             .RequireCmsAntiforgery()
             .WithMetadata(bodyLimit)
-            .Accepts<IFormFile>("multipart/form-data");
+            .Accepts<IFormFile>("multipart/form-data")
+            .RequireRateLimiting(CmsRateLimits.Upload);
 
         media.MapDelete("/{id:int}", DeleteAsync)
             .WithName("DeleteMedia")

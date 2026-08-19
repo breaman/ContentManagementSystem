@@ -1,6 +1,7 @@
 using ContentManagementSystem.Core.Security;
 
 using ContentManagementSystem.Shared.Contracts.Security;
+using ContentManagementSystem.TestSupport;
 
 using TUnit.Core.Interfaces;
 

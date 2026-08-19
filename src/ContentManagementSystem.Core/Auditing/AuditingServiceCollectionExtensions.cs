@@ -15,6 +15,10 @@ public static class AuditingServiceCollectionExtensions
 
         services.TryAddScoped<IAuditQueryService, AuditQueryService>();
 
+        // The nightly sweep of task P9-25. Scoped, because it holds a database context; the loop that
+        // calls it takes a scope per pass.
+        services.TryAddScoped<IAuditRetentionService, AuditRetentionService>();
+
         return services;
     }
 }

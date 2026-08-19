@@ -49,6 +49,17 @@ public sealed record SeoMetaTag(string Attribute, string Key, string Content)
 /// render can take a <c>media:{id}</c> cache dependency on it — a page whose share image was
 /// replaced in the library has to be re-rendered like any other page showing it.
 /// </param>
+/// <param name="Language">
+/// What the document's <c>lang</c> attribute says, from <c>SiteSettings.Culture</c> (spec section 28,
+/// task P9-10). Positional and undefaulted, so a new construction site has to say what the page is
+/// written in rather than inheriting a guess.
+/// </param>
+/// <remarks>
+/// <c>Language</c> is here rather than passed to the document separately because it is resolved from
+/// the same settings row as everything else in this record, on the one read the head already makes.
+/// A screen reader chooses its pronunciation from it, so a page whose <c>lang</c> is wrong is read
+/// aloud in the wrong accent — a failure nobody sees and every listener hears.
+/// </remarks>
 /// <remarks>
 /// A resolved value object rather than a bag of raw fields: every fallback in spec section 18.1 has
 /// already been applied, every URL is absolute, and the JSON-LD is text. That is what lets the
@@ -62,8 +73,19 @@ public sealed record SeoMetadata(
     string Robots,
     IReadOnlyList<SeoMetaTag> Meta,
     IReadOnlyList<string> JsonLd,
-    int? OgImageMediaId)
+    int? OgImageMediaId,
+    string Language)
 {
+    /// <summary>
+    /// What <c>lang</c> says when the settings row has not been written yet.
+    /// </summary>
+    /// <remarks>
+    /// The same default <c>SiteSettings.Culture</c> carries. An absent <c>lang</c> would be worse
+    /// than a wrong one — a screen reader with nothing to go on uses the listener's own locale, so a
+    /// page with no attribute is read in whatever accent happens to be configured.
+    /// </remarks>
+    public const string DefaultLanguage = "en-US";
+
     /// <summary>The <c>robots</c> content for a page that may be indexed and followed.</summary>
     public const string IndexFollow = "index, follow";
 
@@ -80,5 +102,6 @@ public sealed record SeoMetadata(
         Robots: NoIndexNoFollow,
         Meta: [],
         JsonLd: [],
-        OgImageMediaId: null);
+        OgImageMediaId: null,
+        Language: DefaultLanguage);
 }

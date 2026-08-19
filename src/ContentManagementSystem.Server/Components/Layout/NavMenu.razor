@@ -1,3 +1,6 @@
+@using ContentManagementSystem.Server.Security
+@using Microsoft.Extensions.Options
+@inject IOptions<CmsIdentityOptions> Identity
 <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
     <div class="container-fluid">
         <a class="navbar-brand" href="/">ContentManagementSystem</a>
@@ -39,11 +42,16 @@
                         </li>
                     </Authorized>
                     <NotAuthorized>
-                        <li class="nav-item">
-                            <NavLink class="nav-link" href="/Account/Register">
-                                <span class="bi bi-person-plus" aria-hidden="true"></span> Register
-                            </NavLink>
-                        </li>
+@*  Absent when self-service registration is off (task P9-04). The route answers 404 in that
+                            state, and a navigation entry pointing at one is worse than none. *@
+                        @if (Identity.Value.SelfRegistration is not SelfRegistrationPolicy.Disabled)
+                        {
+                            <li class="nav-item">
+                                <NavLink class="nav-link" href="/Account/Register">
+                                    <span class="bi bi-person-plus" aria-hidden="true"></span> Register
+                                </NavLink>
+                            </li>
+                        }
                         <li class="nav-item">
                             <NavLink class="nav-link" href="/Account/Login">
                                 <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Log in

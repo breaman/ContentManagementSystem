@@ -1,3 +1,5 @@
+using ContentManagementSystem.Server.Security;
+
 namespace ContentManagementSystem.Server.Media;
 
 /// <summary>
@@ -37,13 +39,19 @@ public static class MediaEndpointRouteBuilderExtensions
                 "/media/{id:int}/{size}/{mode}/{name}",
                 MediaDeliveryEndpoint.HandleRenditionAsync)
             .WithName(RenditionRouteName)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            // Three hundred a minute per address (spec section 20.6, task P9-03). The signature and
+            // the size allowlist are what stop a caller inventing renditions to generate; this is
+            // what stops one replaying the ones that exist. Generous on purpose — an image-heavy
+            // article is thirty of these on first paint, and everything after that is a 304.
+            .RequireRateLimiting(CmsRateLimits.MediaDelivery);
 
         endpoints.MapGet(
                 "/media/{id:int}/file/{name}",
                 MediaDeliveryEndpoint.HandleOriginalAsync)
             .WithName(OriginalRouteName)
-            .AllowAnonymous();
+            .AllowAnonymous()
+            .RequireRateLimiting(CmsRateLimits.MediaDelivery);
 
         return endpoints;
     }

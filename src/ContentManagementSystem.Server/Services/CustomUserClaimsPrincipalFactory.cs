@@ -31,6 +31,13 @@ public class CustomUserClaimsPrincipalFactory(
 
         AddPermissionClaims(identity);
 
+        // Mandatory second factor for the privileged roles (task P9-04). Carried as a claim so the
+        // check costs a string comparison rather than a query on every request; see
+        // CmsClaimTypes.TwoFactorEnabled for why being stale here is safe.
+        identity.AddClaim(new Claim(
+            CmsClaimTypes.TwoFactorEnabled,
+            user.TwoFactorEnabled ? bool.TrueString : bool.FalseString));
+
         return identity;
     }
 

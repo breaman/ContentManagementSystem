@@ -41,7 +41,8 @@ public sealed class SeoMetadataBuilder(
                 row.SiteName,
                 row.HomePageId,
                 row.DefaultOgImageMediaId,
-                row.GoogleSiteVerification))
+                row.GoogleSiteVerification,
+                row.Culture))
             .FirstOrDefaultAsync(cancellationToken) ?? SiteFacts.Unconfigured;
 
         var canonical = site.Absolute(content.CanonicalOrOwnUrl);
@@ -71,7 +72,8 @@ public sealed class SeoMetadataBuilder(
             Robots(content, isPreview),
             meta,
             StructuredData(content, settings, canonical, title, description, image, trail, isHome),
-            image?.MediaId);
+            image?.MediaId,
+            Language(settings));
     }
 
     /// <summary>The <c>robots</c> directive pair, as the meta element spells it.</summary>
@@ -351,6 +353,17 @@ public sealed class SeoMetadataBuilder(
         return new ShareImage(item.Id, site.Absolute(url), Trimmed(item.AltText));
     }
 
+    /// <summary>The document's language, from the settings row (spec section 28, task P9-10).</summary>
+    /// <param name="settings">The site facts.</param>
+    /// <returns>The BCP-47 tag the <c>lang</c> attribute takes.</returns>
+    /// <remarks>
+    /// A blank culture falls back rather than emitting an empty attribute. <c>lang=""</c> means
+    /// "language unknown", which is a claim about the content, and it is a worse one than a default
+    /// that is right for every deployment this system has (ADR-0009: <c>en-US</c> only in v1).
+    /// </remarks>
+    private static string Language(SiteFacts settings) =>
+        string.IsNullOrWhiteSpace(settings.Culture) ? SeoMetadata.DefaultLanguage : settings.Culture.Trim();
+
     private static string? Trimmed(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -359,10 +372,12 @@ public sealed class SeoMetadataBuilder(
         string SiteName,
         int? HomePageId,
         int? DefaultOgImageMediaId,
-        string? GoogleSiteVerification)
+        string? GoogleSiteVerification,
+        string Culture)
     {
         /// <summary>What a site whose settings row has not been written yet reports.</summary>
-        public static SiteFacts Unconfigured { get; } = new(string.Empty, null, null, null);
+        public static SiteFacts Unconfigured { get; } =
+            new(string.Empty, null, null, null, SeoMetadata.DefaultLanguage);
     }
 
     /// <summary>One published ancestor, for the breadcrumb list.</summary>
