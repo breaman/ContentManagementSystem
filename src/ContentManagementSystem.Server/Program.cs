@@ -35,6 +35,7 @@ using ContentManagementSystem.Server.Delivery.Seo;
 using ContentManagementSystem.Server.HealthChecks;
 using ContentManagementSystem.Server.HostedServices;
 using ContentManagementSystem.Server.Media;
+using ContentManagementSystem.Server.Security;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
 using ContentManagementSystem.Server.Components.Email;
@@ -344,9 +345,21 @@ try
     builder.Services.AddScoped<IDashboardClient, ServerDashboardClient>();
     builder.Services.AddScoped<IToastService, ToastService>();
 
-    // One nonce per request, read by the host page and handed to CodeMirror through a meta tag
-    // (D13, task P6-08). Scoped is what makes "per request" true.
-    builder.Services.AddScoped<IStyleNonce, StyleNonce>();
+    // The three content security policies of spec section 20.5, the per-request nonce the backoffice
+    // one is written around, and the four headers that go out beside it (tasks P9-01, P9-02). Public
+    // is the default and nothing opts into it; the two wider profiles are named on the endpoints
+    // below (ADR-0026).
+    builder.Services.AddCmsSecurityHeaders(builder.Configuration);
+
+    // HSTS, configured rather than left at the framework's 30-day default (task P9-02). A year with
+    // subdomains included is what the preload list asks for; submission to that list is deliberately
+    // not automated, because it is an operational commitment that is hard to walk back and it is not
+    // this application's to make.
+    builder.Services.AddHsts(options =>
+    {
+        options.MaxAge = TimeSpan.FromDays(365);
+        options.IncludeSubDomains = true;
+    });
 
     // The shell's layout store, which can do nothing here: static rendering has no JavaScript, so it
     // answers with the default geometry and the browser restores the editor's own on hydration.
@@ -406,6 +419,12 @@ try
         branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
     app.UseHttpsRedirection();
+
+    // After routing — which WebApplication has already inserted at the head of the pipeline — so the
+    // endpoint's CSP profile is visible, and before the output cache so a cached page still carries a
+    // header written for this request (tasks P9-01, P9-02).
+    app.UseCmsSecurityHeaders();
+
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseAntiforgery();
@@ -422,9 +441,15 @@ try
 
     app.MapStaticAssets();
 
+    // The backoffice policy, and the only place it is granted (task P9-01). App.razor is the shell
+    // for /admin and for the Identity account pages alike, and it is the one document that carries
+    // the WebAssembly bootstrapper, the import map, and the editor bundles — the three things
+    // 'wasm-unsafe-eval' and the nonce exist for. The public site is rendered by
+    // CmsDeliveryDocument instead, which is why it can stay on the strict profile (ADR-0002).
     app.MapRazorComponents<App>()
         .AddInteractiveWebAssemblyRenderMode()
-        .AddAdditionalAssemblies(typeof(ContentManagementSystem.Client._Imports).Assembly);
+        .AddAdditionalAssemblies(typeof(ContentManagementSystem.Client._Imports).Assembly)
+        .WithCspProfile(CmsCspProfile.Backoffice);
 
     app.MapAdditionalIdentityEndpoints();
     app.MapCmsApi();

@@ -139,7 +139,7 @@ it needs exists and is wired, but turning the policy on today would break P5's m
 others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
 than left as a surprise.
 **Version:** 1.0
-**Last updated:** 2026-08-18
+**Last updated:** 2026-08-19
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -194,8 +194,8 @@ and record the date in the progress table.
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 26 | 14.0 | All 26 tasks done; **9 of 10 criteria met**. `P8 #10`'s 500 ms budget is asserted but has only run on an engine without full-text (arm64 Azure SQL Edge), so it waits on the same CI agent `P0 #3` does | — |
-| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **248** | **203.5** | | |
+| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 2 | 14.0 | In progress — security section started: the CSP and the companion headers are on (`P9-01`, `P9-02`) | — |
+| **v1 total** | **281** | **250** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -4169,11 +4169,33 @@ Entry: all prior phases exit.
 
 ### Security — 5.5 ed
 
-- [ ] **P9-01** CSP with per-request nonces: the strict public policy from [§20.5], and a separate
+- [x] **P9-01** CSP with per-request nonces: the strict public policy from [§20.5], and a separate
   `/admin` policy carrying `wasm-unsafe-eval` and `frame-ancestors 'self'`. Nonce propagation added to
   `Server/Components/App.razor`; public and admin head content split. *(Existing-code change.)* — 1 ed
-- [ ] **P9-02** `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
+  *Three profiles rather than two, selected from **endpoint metadata** with the strictest as the
+  default, so a route that says nothing is strict and a route that needs more says so
+  ([ADR 0026](./docs/adr/0026-three-content-security-policies-public-carries-no-nonce.md)). Preview is
+  the third: it frames its own rendered content to apply a device width, and `frame-ancestors 'none'`
+  refuses same-origin framing like any other. **The public policy carries no nonce** — a public
+  response is output-cached and replayed (`P8-06`), so a per-request value in one is a constant an
+  attacker can quote, and the public document has no inline script to spend a nonce on: its only
+  `<script>` elements are `application/ld+json` data blocks, which the parser never executes and CSP
+  never consults. `script-src 'self'` alone is the stronger policy. The backoffice nonce now covers
+  Blazor's inline import map as well as CodeMirror's injected theme, and is base64url so the header
+  and the attribute hold the same bytes rather than the same value after a `&#x2B;` is decoded.
+  `frame-src` is generated from `SanitizationOptions.AllowedIframeHosts`, so the list that decides
+  whether an authored `iframe` is stored is the list that decides whether the browser loads it.
+  Two things had to change for the policy to hold: `style-src-attr 'unsafe-inline'`, which ADR-0013
+  ruled out and six backoffice components need — the sanitizer's CSS property allowlist is what makes
+  it acceptable — and Bootstrap Icons, which was a `<link>` to jsDelivr and is now copied out of
+  `node_modules` beside the Bootstrap bundle.*
+- [x] **P9-02** `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: strict-origin-when-cross-origin`, minimal `Permissions-Policy`. — 0.5 ed
+  *HSTS configured rather than left at the framework's 30-day default: a year, subdomains included,
+  and no `preload` — submitting to that list is an operational commitment that is hard to walk back
+  and is not this application's to make. The `Permissions-Policy` denies everything except
+  `publickey-credentials-get`/`-create` and `fullscreen`, all `self`: a blanket denial would turn
+  signing in with a passkey into a `NotAllowedError` nobody would attribute to a header.*
 - [ ] **P9-03** Rate limiting across all endpoint groups per [§20.6] — login/register/reset 5 per 15 min
   per IP; API writes 100/min per user; uploads 20/min per user; renditions 300/min per IP; preview
   tokens 30/min per token; public pages 600/min per IP. — 1 ed
@@ -4358,13 +4380,14 @@ reviewer.
 | `Core/Dashboard/DashboardService.cs` | Redact rows naming pages the caller may not read. The dashboard is the one screen that reads across the whole site, so it is the likeliest place for a hidden branch to reappear as a title — and `TotalCount` is reduced with it, or the branch leaks as a number instead | 7 | P7-06 | [x] |
 | `Client/…/Pages/PageEditor.razor` | Carry the review, schedule, and comment panels beside the properties pane. Each renders nothing when the caller cannot use it | 7 | P7-12, P7-16 | [x] |
 | `Client/…/Dashboard/DashboardScreen.razor` | Section links for review, notifications, and audit, each behind the role that can use it | 7 | P7-12, P7-19, P7-20 | [x] |
-| `Server/Components/App.razor` | CSP nonce propagation; split public and admin head content | 6, 8–9 | P6-08, P9-01 | [~] |
+| `Server/Components/App.razor` | CSP nonce propagation; split public and admin head content. The split turned out to be structural rather than a head to divide: the public site is rendered by `CmsDeliveryDocument` and never sees this file, so the nonce, the import map, and `wasm-unsafe-eval` are all backoffice-only by construction (`ADR-0026`). Bootstrap Icons moved from jsDelivr to this origin, which `default-src 'self'` required | 6, 8–9 | P6-08, P9-01 | [x] |
 | `Server/Components/Routes.razor` | Scope interactive routing to `/admin`; keep public pages static SSR | 3 | P3-14 | [ ] |
 | `aspire/…AppHost/AppHost.cs` | Add Azurite and optional Redis resources | 0 | P0-13, P0-14 | [ ] |
 | `Directory.Packages.props` | Add HtmlSanitizer, Markdig, SkiaSharp, MetadataExtractor, HybridCache, rate limiting, Testcontainers, bUnit, Playwright, k6 tooling | 0–5 | P0-07, P0-12 | [ ] |
 | `Shared/Common/FieldLengths.cs` | Add CMS field length constants | 1 | P1-03 | [x] |
 | `styles/site.scss` | Add backoffice and content typography layers | 6 | P6-40 | [x] |
 | `Server/package.json`, `Server/…Server.csproj` | Add esbuild and the two editor bundles to the front-end build, so a missing bundle fails the build rather than the page (`D13`) | 6 | P6-08 | [x] |
+| `Server/package.json`, `Server/…Server.csproj` | Add Bootstrap Icons to the front-end build. It was a CDN `<link>`, which the strict `default-src 'self'` refuses; the alternative was a third-party host in the policy, for a font | 9 | P9-01 | [x] |
 | `Core/Fields/Types/TextFieldTypeBase.cs`, `RichTextFieldType.cs` | Declare the `softLimit` setting the counter honours. Configuration is closed (`ADR-0015`), so an undeclared setting is refused on save | 6 | P6-12 | [x] |
 | `Client/Components/Admin/PlainSlotValues.cs` | Reduced to a raw envelope round trip: each field type's storage shape now lives in its own editor rather than in a switch shared by every form | 6 | P6-06…P6-15 | [x] |
 | `Server/Program.cs`, `Client/Program.cs` | Register the dashboard service and its two client halves, and replace `Core`'s identity-free bulk scope factory with the one that captures the signed-in editor — without which a background batch is refused on its first item or recorded as having been done by nobody | 6 | P6-24…P6-29 | [x] |

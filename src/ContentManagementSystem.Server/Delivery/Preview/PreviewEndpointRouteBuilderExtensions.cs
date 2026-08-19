@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 
 using ContentManagementSystem.Core.Preview;
+using ContentManagementSystem.Server.Security;
 using ContentManagementSystem.Shared.Contracts.Security;
 
 using Microsoft.AspNetCore.OutputCaching;
@@ -96,6 +97,11 @@ public static class PreviewEndpointRouteBuilderExtensions
         var preview = endpoints.MapGroup(PreviewEndpoint.BasePath);
 
         preview.WithMetadata(new OutputCacheAttribute { NoStore = true });
+
+        // The public policy with one directive changed: frame-ancestors 'self' rather than 'none'
+        // (task P9-01). The chrome frames the content to apply a device width to it, and the editing
+        // canvas frames the chrome again — both from this origin, which 'none' refuses all the same.
+        preview.WithCspProfile(CmsCspProfile.Preview);
 
         // The shared routes are mapped before the editor ones so that `/preview/s/{token}` is read
         // as a token and never as page id "s" — routing prefers the literal segment, and the order

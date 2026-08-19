@@ -51,6 +51,10 @@ base-uri 'self'; form-action 'self'; frame-ancestors 'self'
   attributes, verified against the link tooltip. This is a property of the current version — re-run
   the S3 checks on any Quill upgrade, and if a future version needs inline style attributes, that is
   a policy change requiring its own decision.
+  **Amended by [ADR 0026](0026-three-content-security-policies-public-carries-no-nonce.md):** the
+  clause about Quill still holds and is still worth re-checking on an upgrade, but the directive is
+  relaxed anyway — six of the backoffice's own components position with a computed `style`
+  attribute, and CSP has no nonce for one.
 - Bundle weight lands in the backoffice only: 696 KB raw, 231 KB gzipped for both editors. `P6-08`
   should split it per editor so a page with only plain-text zones loads neither.
 - CI must run the front-end bundle build, so a missing bundle fails the build rather than the page.

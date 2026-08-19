@@ -25,6 +25,21 @@
     <ProjectReference Include="..\ContentManagementSystem.Rendering\ContentManagementSystem.Rendering.csproj" />
   </ItemGroup>
 
+  <!--
+    Bootstrap Icons, served from this origin (task P9-01). It used to be a <link> to jsDelivr, which
+    the strict `default-src 'self'` of spec section 20.5 refuses; the alternative to copying it here
+    is a CDN host in the policy, for a font. The stylesheet asks for `fonts/*` relative to itself, so
+    the two copies below have to keep that shape — css alongside css, fonts beneath it.
+  -->
+  <Target Name="CopyBootstrapIcons" BeforeTargets="Build">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\css\fonts" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\node_modules\bootstrap-icons\font\bootstrap-icons.min.css" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\css" SkipUnchangedFiles="true" />
+    <ItemGroup>
+      <BootstrapIconFont Include="$(MSBuildProjectDirectory)\node_modules\bootstrap-icons\font\fonts\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(BootstrapIconFont)" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\css\fonts" SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="CopyBootstrapJs" BeforeTargets="Build">
     <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\js" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\node_modules\bootstrap\dist\js\bootstrap.bundle.min.js" DestinationFolder="$(MSBuildProjectDirectory)\wwwroot\js" SkipUnchangedFiles="true" />
