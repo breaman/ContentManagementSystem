@@ -1,3 +1,4 @@
+@using ContentManagementSystem.Rendering.Seo
 @* The whole HTML document a public request receives. Static SSR only: there is no @@rendermode
    anywhere beneath this, no blazor.web.js, and no circuit — which is the decision that makes the
    response cacheable at all (spec section 5.3).
@@ -10,13 +11,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@Content.DocumentTitle</title>
-    @if (Content.MetaDescription is { Length: > 0 } description)
-    {
-        <meta name="description" content="@description" />
-    }
-    <link rel="canonical" href="@Content.CanonicalOrOwnUrl" />
-    <meta name="robots" content="@Robots" />
+    <CmsSeoHead Metadata="Seo" Context="Context" />
     <link rel="stylesheet" href="/css/site.css" />
 </head>
 <body>

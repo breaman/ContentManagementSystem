@@ -236,7 +236,7 @@ public static class DeliveryEndpoint
         int statusCode,
         CancellationToken cancellationToken)
     {
-        var rendered = await renderer.RenderAsync(content, CmsRenderMode.Live);
+        var rendered = await renderer.RenderAsync(content, CmsRenderMode.Live, cancellationToken);
         var etag = ETagOf(rendered.Html);
 
         // Left for the Phase 8 output cache policy to read on the way out. Nothing consumes it yet.

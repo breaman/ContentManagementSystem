@@ -89,6 +89,23 @@ public sealed record RenditionSpec(
     /// <summary>Highest quality a caller may ask for.</summary>
     public const int MaxQuality = 95;
 
+    /// <summary>Width of the Open Graph share image (spec section 18.2).</summary>
+    public const int SocialWidth = 1200;
+
+    /// <summary>Height of the Open Graph share image, giving the 1.91:1 ratio the crawlers want.</summary>
+    public const int SocialHeight = 630;
+
+    /// <summary>
+    /// The widths a <c>srcset</c> is built from (spec section 13.6).
+    /// </summary>
+    /// <remarks>
+    /// A subset of <see cref="AllowedWidths"/>, and the difference is deliberate. Adding a width
+    /// here adds a candidate to every responsive image on the site — one more encode, one more
+    /// stored rendition, one more entry a browser has to weigh — so the social share width, which is
+    /// a fixed crop nothing chooses between, is allowed without being offered.
+    /// </remarks>
+    public static IReadOnlyList<int> ResponsiveWidths { get; } = [320, 640, 960, 1280, 1920, 2560];
+
     /// <summary>
     /// Widths the delivery endpoint serves without further registration (spec section 13.5).
     /// </summary>
@@ -97,7 +114,7 @@ public sealed record RenditionSpec(
     /// impossible for an outsider to request; the allowlist bounds what the application itself can
     /// ask for, so a bug in a template cannot turn one page into a thousand distinct encodes.
     /// </remarks>
-    public static IReadOnlyList<int> AllowedWidths { get; } = [320, 640, 960, 1280, 1920, 2560];
+    public static IReadOnlyList<int> AllowedWidths { get; } = [.. ResponsiveWidths, SocialWidth];
 
     /// <summary>Whether every value is one the endpoint offers.</summary>
     /// <remarks>

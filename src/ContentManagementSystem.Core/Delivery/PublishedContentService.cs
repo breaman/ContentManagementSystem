@@ -54,11 +54,18 @@ public sealed class PublishedContentService(
                 page.PublishedVersion.TemplateRevision,
                 page.PublishedVersion.PublishedOn,
                 page.PublishedVersion.ModifiedOn,
-                page.PublishedVersion.MetaTitle,
-                page.PublishedVersion.MetaDescription,
-                page.PublishedVersion.CanonicalUrl,
-                page.PublishedVersion.RobotsIndex,
-                page.PublishedVersion.RobotsFollow,
+                new PublishedSeo(
+                    page.PublishedVersion.MetaTitle,
+                    page.PublishedVersion.MetaDescription,
+                    page.PublishedVersion.CanonicalUrl,
+                    page.PublishedVersion.RobotsIndex,
+                    page.PublishedVersion.RobotsFollow,
+                    page.PublishedVersion.OgTitle,
+                    page.PublishedVersion.OgDescription,
+                    page.PublishedVersion.OgImageMediaId,
+                    page.PublishedVersion.OgType,
+                    page.PublishedVersion.TwitterCard,
+                    page.PublishedVersion.StructuredDataJson),
                 page.PublishedVersion.ContentJson,
                 context.PageRoutes
                     .Where(route => route.PageId == page.Id && route.IsPublished)
@@ -110,11 +117,7 @@ public sealed class PublishedContentService(
             IsPublished: true,
             row.PublishedOn,
             row.ModifiedOn,
-            row.MetaTitle,
-            row.MetaDescription,
-            row.CanonicalUrl,
-            row.RobotsIndex,
-            row.RobotsFollow,
+            row.Seo,
             payload,
             schema);
     }
@@ -139,11 +142,7 @@ public sealed class PublishedContentService(
         int TemplateRevision,
         DateTimeOffset? PublishedOn,
         DateTimeOffset? ModifiedOn,
-        string? MetaTitle,
-        string? MetaDescription,
-        string? CanonicalUrl,
-        bool RobotsIndex,
-        bool RobotsFollow,
+        PublishedSeo Seo,
         string ContentJson,
         string? Url);
 }

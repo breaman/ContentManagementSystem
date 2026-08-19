@@ -1,6 +1,7 @@
 using System.Diagnostics;
 
 using ContentManagementSystem.Core.Delivery;
+using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Rendering;
 
@@ -26,6 +27,7 @@ public sealed record RenderedPage(string Html, IReadOnlyList<string> CacheTags);
 /// a root provider here would give every request the same one.
 /// </param>
 /// <param name="loggerFactory">Passed to the component renderer, which requires one.</param>
+/// <param name="seo">Resolves the document head this page is served with (task P8-01).</param>
 /// <param name="metrics">Records how long the render took, tagged by template (task P3-28).</param>
 /// <remarks>
 /// <strong>Render to a string, then set headers, then write.</strong> Cache tags accumulate
@@ -44,6 +46,7 @@ public sealed record RenderedPage(string Html, IReadOnlyList<string> CacheTags);
 public sealed class CmsPageRenderer(
     IServiceProvider services,
     ILoggerFactory loggerFactory,
+    ISeoMetadataBuilder seo,
     CmsMetrics metrics)
 {
     /// <summary>
@@ -51,19 +54,28 @@ public sealed class CmsPageRenderer(
     /// </summary>
     /// <param name="content">The loaded version.</param>
     /// <param name="mode">Which audience the render is for.</param>
+    /// <param name="cancellationToken">Token observed while the head's metadata is queried.</param>
     /// <returns>The document and the cache tags it depends on.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="content"/> is null.</exception>
     /// <remarks>
-    /// Takes no cancellation token, and that is not an oversight. The document is rendered into a
-    /// buffer that has not been written anywhere; abandoning it half-way would leave the caller with
-    /// a partial page and nothing useful to do about it, and the work being abandoned is measured in
-    /// microseconds. Cancellation belongs on the database reads that come before this.
+    /// The token reaches the head's queries and stops there: the render itself is not cancellable,
+    /// and that is not an oversight. The document is built into a buffer that has not been written
+    /// anywhere, so abandoning it half-way would leave the caller with a partial page and nothing
+    /// useful to do about it, and the work being abandoned is measured in microseconds.
     /// </remarks>
-    public async Task<RenderedPage> RenderAsync(PublishedContent content, CmsRenderMode mode)
+    public async Task<RenderedPage> RenderAsync(
+        PublishedContent content,
+        CmsRenderMode mode,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(content);
 
         var context = RenderContext.For(content, mode);
+
+        // Resolved before the render rather than during it. The head reads site settings, the
+        // ancestor trail, and the share image's library record, and a component that queried while
+        // rendering would make what the head says depend on when it happened to run.
+        var metadata = await seo.BuildAsync(content, context.IsPreview, cancellationToken);
         var started = Stopwatch.GetTimestamp();
 
         await using var renderer = new HtmlRenderer(services, loggerFactory);
@@ -72,8 +84,8 @@ public sealed class CmsPageRenderer(
         {
             var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
             {
-                [nameof(CmsDeliveryDocument.Content)] = content,
                 [nameof(CmsDeliveryDocument.Context)] = context,
+                [nameof(CmsDeliveryDocument.Seo)] = metadata,
             });
 
             var output = await renderer.RenderComponentAsync<CmsDeliveryDocument>(parameters);

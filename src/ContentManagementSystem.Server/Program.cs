@@ -5,6 +5,7 @@ using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Auditing;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Dashboard;
+using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Media;
 using ContentManagementSystem.Core.Media.Delivery;
@@ -26,6 +27,7 @@ using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
 using ContentManagementSystem.Server.Delivery.Preview;
+using ContentManagementSystem.Server.Delivery.Seo;
 using ContentManagementSystem.Server.HealthChecks;
 using ContentManagementSystem.Server.HostedServices;
 using ContentManagementSystem.Server.Media;
@@ -175,6 +177,11 @@ try
     // The read-only public delivery path (tasks P3-12 and P3-13): the published-content service and
     // the component renderer the catch-all endpoint serves pages through.
     builder.Services.AddCmsDeliveryEndpoint();
+    // The public address the canonical links, Open Graph URLs, and sitemap are written against, and
+    // the sitemap's own shape (tasks P8-01 and P8-04). Everything an editor decides lives on the
+    // page or in SiteSettings; what is left here is what only the deployment can know.
+    builder.Services.Configure<SeoOptions>(
+        builder.Configuration.GetSection(SeoOptions.SectionName));
     // Preview (tasks P3-16 to P3-19). It renders through the delivery pipeline registered above and
     // differs only in which version it loads, which is what makes preview fidelity structural
     // (spec section 12.1). Also registers the rate limiter the shared-link routes require.
@@ -384,6 +391,10 @@ try
     // static file middleware — which is what makes content-type pinning and nosniff universal
     // rather than per-path (spec section 20.7).
     app.MapCmsMedia();
+
+    // sitemap.xml and robots.txt (tasks P8-04 and P8-05). Also before the catch-all, and also
+    // reserved slugs, so neither can be shadowed by content.
+    app.MapCmsSeo();
 
     // Last, and it must stay last (task P3-13, spec section 15.1). This is the catch-all that serves
     // every content URL, and anything mapped after it is a route a visitor could shadow with a page

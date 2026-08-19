@@ -38,11 +38,7 @@ namespace ContentManagementSystem.Core.Delivery;
 /// <param name="IsPublished">Whether this exact version is the one anonymous visitors see.</param>
 /// <param name="PublishedOn">When the version was published, or null while it never has been.</param>
 /// <param name="ModifiedOn">When the version last changed, for <c>Last-Modified</c>.</param>
-/// <param name="MetaTitle">Overrides the document title; null falls back to <paramref name="Title"/>.</param>
-/// <param name="MetaDescription">Meta description for the document head.</param>
-/// <param name="CanonicalUrl">Explicit canonical URL; null falls back to <paramref name="Url"/>.</param>
-/// <param name="RobotsIndex">Whether search engines may index the page.</param>
-/// <param name="RobotsFollow">Whether search engines may follow links out of the page.</param>
+/// <param name="Seo">Search and social metadata, as the editor left it.</param>
 /// <param name="Payload">The version's content.</param>
 /// <param name="Schema">
 /// The captured schema of the template revision the payload names, or null when the revision could
@@ -63,11 +59,7 @@ public sealed record PublishedContent(
     bool IsPublished,
     DateTimeOffset? PublishedOn,
     DateTimeOffset? ModifiedOn,
-    string? MetaTitle,
-    string? MetaDescription,
-    string? CanonicalUrl,
-    bool RobotsIndex,
-    bool RobotsFollow,
+    PublishedSeo Seo,
     ContentPayload Payload,
     ContentSchema? Schema)
 {
@@ -76,9 +68,13 @@ public sealed record PublishedContent(
     /// Falls back rather than defaulting at write time, so that renaming a page changes its document
     /// title unless an editor has deliberately overridden it (spec section 18.1).
     /// </remarks>
-    public string DocumentTitle => string.IsNullOrWhiteSpace(MetaTitle) ? Title : MetaTitle;
+    public string DocumentTitle => string.IsNullOrWhiteSpace(Seo.MetaTitle) ? Title : Seo.MetaTitle;
 
-    /// <summary>The URL the canonical link element points at.</summary>
+    /// <summary>The URL the canonical link element points at, as stored — relative or absolute.</summary>
+    /// <remarks>
+    /// Absolute form is the head's job, not this record's: making it absolute here would need a
+    /// request or a configured host, and this object is cached across both (spec section 16.1).
+    /// </remarks>
     public string CanonicalOrOwnUrl =>
-        string.IsNullOrWhiteSpace(CanonicalUrl) ? Url : CanonicalUrl;
+        string.IsNullOrWhiteSpace(Seo.CanonicalUrl) ? Url : Seo.CanonicalUrl;
 }

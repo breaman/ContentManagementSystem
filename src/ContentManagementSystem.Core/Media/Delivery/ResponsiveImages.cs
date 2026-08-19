@@ -58,7 +58,7 @@ public sealed record ResponsiveImage(
 /// have it choose the larger file on a screen that needed the smaller one.
 /// </description></item>
 /// <item><description>
-/// The candidate set is drawn from <see cref="RenditionSpec.AllowedWidths"/> and nowhere else. The
+/// The candidate set is drawn from <see cref="RenditionSpec.ResponsiveWidths"/> and nowhere else. The
 /// signature already makes an arbitrary width unrequestable by an outsider; the allowlist is what
 /// stops the <em>application</em> asking for a thousand distinct encodes of one photograph.
 /// </description></item>
@@ -222,10 +222,10 @@ public static class ResponsiveImages
     /// </remarks>
     private static List<Candidate> Candidates(PixelSize source)
     {
-        var candidates = new List<Candidate>(RenditionSpec.AllowedWidths.Count);
+        var candidates = new List<Candidate>(RenditionSpec.ResponsiveWidths.Count);
         var widths = new HashSet<int>();
 
-        foreach (var width in RenditionSpec.AllowedWidths)
+        foreach (var width in RenditionSpec.ResponsiveWidths)
         {
             var height = (int)Math.Round((double)width * source.Height / source.Width);
 

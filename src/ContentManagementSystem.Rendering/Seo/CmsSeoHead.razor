@@ -1,0 +1,33 @@
+@using ContentManagementSystem.Core.Delivery.Seo
+@* Everything spec section 18.2 puts in the head of a public page, written from a metadata record
+   that has already resolved it. There is no fallback logic here and no query: this component is a
+   loop, deliberately, so that "what does this page emit" is answered by SeoMetadataBuilder alone
+   rather than by two halves that can disagree.
+
+   The JSON-LD blocks are written as raw markup, element and all. That is safe here and nowhere
+   else: every document was produced by System.Text.Json with the default encoder, which escapes the
+   angle brackets that could otherwise close the element. The element itself is raw because the
+   component renderer HTML-encodes attribute values — it would emit the type as
+   application/ld&#x2B;json, which every conformant parser decodes and not every crawler's does. *@
+<title>@Metadata.Title</title>
+@if (Metadata.Description is { Length: > 0 } description)
+{
+    <meta name="description" content="@description" />
+}
+<link rel="canonical" href="@Metadata.CanonicalUrl" />
+<meta name="robots" content="@Metadata.Robots" />
+@foreach (var tag in Metadata.Meta)
+{
+    @if (tag.Attribute == SeoMetaTag.PropertyAttribute)
+    {
+        <meta property="@tag.Key" content="@tag.Content" />
+    }
+    else
+    {
+        <meta name="@tag.Key" content="@tag.Content" />
+    }
+}
+@foreach (var script in Metadata.JsonLd)
+{
+    @((MarkupString)$"<script type=\"application/ld+json\">{script}</script>")
+}

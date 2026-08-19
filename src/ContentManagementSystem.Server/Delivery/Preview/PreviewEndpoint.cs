@@ -295,7 +295,7 @@ public static class PreviewEndpoint
             return;
         }
 
-        var rendered = await renderer.RenderAsync(content, CmsRenderMode.Preview);
+        var rendered = await renderer.RenderAsync(content, CmsRenderMode.Preview, cancellationToken);
 
         // The accumulated cache tags are deliberately not published on HttpContext.Items the way the
         // delivery endpoint publishes them. Nothing may cache this response, so a tag set inviting

@@ -164,9 +164,9 @@ and record the date in the progress table.
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
-| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 0 | 14.0 | Not started | — |
+| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 5 | 14.0 | In progress — SEO output done (`P8-01`…`P8-05`); caching, navigation, and search remain | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **222** | **203.5** | | |
+| **v1 total** | **281** | **227** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3877,18 +3877,39 @@ declared met on the strength of the layer beneath.*
 
 ### SEO — 3.5 ed
 
-- [ ] **P8-01** Surface the SEO fields already on `PageVersion` end to end in `Rendering/Seo/`:
+- [x] **P8-01** Surface the SEO fields already on `PageVersion` end to end in `Rendering/Seo/`:
   `<title>`, meta description, `<link rel="canonical">`, robots directives [§18.1–18.2]. — 0.75 ed
-- [ ] **P8-02** Open Graph and Twitter Card tags, with the OG image rendered through a `1200x630` crop
+  *(`SeoMetadataBuilder` resolves every [§18.1] fallback and every URL to absolute form; `CmsSeoHead`
+  writes them and does nothing else, so preview and delivery cannot emit different heads for one
+  version. The absolute address comes from `ISiteAddress` — configured `Cms:Seo:PublicBaseUrl` first,
+  the request second — because behind a proxy the request's own host is an internal address. Preview
+  is forced to `noindex, nofollow` whatever the page says.)*
+- [x] **P8-02** Open Graph and Twitter Card tags, with the OG image rendered through a `1200x630` crop
   rendition. — 0.5 ed
-- [ ] **P8-03** JSON-LD: `WebSite` + `Organization` on the home page, `BreadcrumbList` from the content
+  *(JPEG rather than WebP: the crawlers fetching a share image are not browsers. 1200 joined
+  `RenditionSpec.AllowedWidths` without joining the new `ResponsiveWidths`, so it is requestable
+  without adding a candidate to every `srcset` on the site. The card type degrades to `summary` when
+  no image resolved, since `summary_large_image` with no image renders as an empty box.)*
+- [x] **P8-03** JSON-LD: `WebSite` + `Organization` on the home page, `BreadcrumbList` from the content
   tree, `WebPage`/`Article` per page, all overridable via `StructuredDataJson`. — 0.75 ed
-- [ ] **P8-04** `sitemap.xml` in `Server/Delivery/Seo/`: published indexable pages only, `<lastmod>` from
+  *(A hand-authored document **replaces** the generated set rather than joining it — two `WebPage`
+  nodes at one URL is the failure. Editor-authored JSON is re-parsed and re-serialized through the
+  same encoder as the generated documents, which is what stops a `</script>` in stored text.
+  Breadcrumbs walk the materialized `Page.Path` in one query and skip unpublished ancestors.)*
+- [x] **P8-04** `sitemap.xml` in `Server/Delivery/Seo/`: published indexable pages only, `<lastmod>` from
   the publish timestamp, configurable `changefreq`/`priority`, **index splitting above 40,000 URLs**,
   cached with the `content` tag. — 1 ed
-- [ ] **P8-05** Editable `robots.txt` from `SiteSettings` with a sensible default disallowing `/admin`,
+  *(The exclusions are in the query rather than applied afterwards: no published route, `noindex`, or
+  the configured 404 page. Above the threshold the response becomes a `sitemapindex` over
+  `/sitemap-{n}.xml`, each a page of the same URL-ordered query so a crawler fetching file 3 an hour
+  later is not handed a reshuffled set; a file past the end is a 404, not an empty `urlset`.)*
+- [x] **P8-05** Editable `robots.txt` from `SiteSettings` with a sensible default disallowing `/admin`,
   `/api`, `/preview` and pointing at the sitemap; **non-production serves `Disallow: /`
   unconditionally**. — 0.5 ed
+  *(The environment override is not a setting and cannot be reached by editing the text box — the
+  environment name is the one fact a copied production database cannot carry with it. A hand-written
+  body keeps its own rules and gains the `Sitemap:` line if it has none, since that is the line whose
+  absence is silent.)*
 
 ### Caching — 7 ed
 

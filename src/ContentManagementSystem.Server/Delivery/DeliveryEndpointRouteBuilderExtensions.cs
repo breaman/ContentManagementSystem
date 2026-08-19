@@ -1,5 +1,7 @@
 using ContentManagementSystem.Core.Delivery;
+using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Telemetry;
+using ContentManagementSystem.Server.Delivery.Seo;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -23,6 +25,13 @@ public static class DeliveryEndpointRouteBuilderExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddCmsDelivery();
+
+        // The head, the sitemap, and robots.txt all need the site's absolute address, and only the
+        // host knows it — from configuration when a deployment sets one, and from the request
+        // otherwise (task P8-01). Singleton because it holds no state of its own: the request it
+        // reads comes from the accessor, per call.
+        services.AddHttpContextAccessor();
+        services.TryAddSingleton<ISiteAddress, HttpSiteAddress>();
 
         // Scoped, because it is constructed with the request's service provider and hands that to
         // the component renderer — a singleton here would give every request the root provider and
