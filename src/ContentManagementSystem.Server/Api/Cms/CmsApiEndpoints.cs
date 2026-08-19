@@ -4,9 +4,11 @@ using System.Security.Claims;
 using ContentManagementSystem.Server.Api.Cms.Auditing;
 using ContentManagementSystem.Server.Api.Cms.Dashboard;
 using ContentManagementSystem.Server.Api.Cms.Media;
+using ContentManagementSystem.Server.Api.Cms.Navigation;
 using ContentManagementSystem.Server.Api.Cms.Pages;
 using ContentManagementSystem.Server.Api.Cms.Preview;
 using ContentManagementSystem.Server.Api.Cms.Reusable;
+using ContentManagementSystem.Server.Api.Cms.Search;
 using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
 using ContentManagementSystem.Server.Api.Cms.Workflow;
@@ -79,6 +81,10 @@ public static class CmsApiEndpoints
         group.MapMediaEndpoints();
 
         group.MapRedirectEndpoints();
+
+        group.MapNavigationEndpoints();
+
+        group.MapSearchEndpoints();
 
         group.MapPreviewTokenEndpoints();
         group.MapMarkupPreviewEndpoints();

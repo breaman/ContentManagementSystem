@@ -13,7 +13,9 @@ namespace ContentManagementSystem.Core.Caching;
 /// (task P8-09, spec section 16.3).
 /// </summary>
 /// <param name="context">The database.</param>
-/// <param name="invalidator">Evicts the tags a message names.</param>
+/// <param name="handlers">
+/// What applies each message type — cache eviction, and the search index (task P8-18).
+/// </param>
 /// <param name="state">This instance's watermark and last-pass reading.</param>
 /// <param name="options">Batch size, retention, and whether to run.</param>
 /// <param name="clock">Source of the current time.</param>
@@ -39,7 +41,7 @@ namespace ContentManagementSystem.Core.Caching;
 /// </remarks>
 public sealed class OutboxRunner(
     ApplicationDbContext context,
-    ICacheInvalidator invalidator,
+    IEnumerable<IOutboxMessageHandler> handlers,
     OutboxState state,
     IOptions<OutboxOptions> options,
     TimeProvider clock,
@@ -136,29 +138,24 @@ public sealed class OutboxRunner(
 
     private async Task ApplyAsync(OutboxMessage message, CancellationToken cancellationToken)
     {
-        if (!string.Equals(message.Type, CacheInvalidationMessage.MessageType, StringComparison.Ordinal))
-        {
-            // An unknown type is not an error to retry. v1 enqueues one kind of message; anything
-            // else arrived from a newer deployment writing to the same database, and dropping it is
-            // better than failing every pass over it.
-            logger.LogWarning(
-                "Outbox message {MessageId} has unknown type {MessageType} and was skipped.",
-                message.Id,
-                message.Type);
+        var applied = false;
 
-            return;
+        foreach (var handler in handlers)
+        {
+            if (!string.Equals(handler.MessageType, message.Type, StringComparison.Ordinal)) continue;
+
+            await handler.HandleAsync(message, cancellationToken);
+            applied = true;
         }
 
-        if (CacheInvalidationMessage.FromJson(message.PayloadJson) is not { Tags.Count: > 0 } payload)
-        {
-            logger.LogWarning(
-                "Outbox message {MessageId} carried no readable cache tags and was skipped.",
-                message.Id);
+        if (applied) return;
 
-            return;
-        }
-
-        await invalidator.InvalidateAsync(payload.Tags, cancellationToken);
+        // A type nothing handles is not an error to retry. It arrived from a newer deployment
+        // writing to the same database, and dropping it is better than failing every pass over it.
+        logger.LogWarning(
+            "Outbox message {MessageId} has unhandled type {MessageType} and was skipped.",
+            message.Id,
+            message.Type);
     }
 
     private async Task PruneAsync(OutboxOptions settings, CancellationToken cancellationToken)

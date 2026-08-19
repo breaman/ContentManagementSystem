@@ -56,6 +56,13 @@ internal static class BackofficeScreens
         // what the landing screen shows.
         services.AddScoped<ICurrentUserClient, FakeCurrentUserClient>();
         services.AddScoped<IDashboardClient, FakeDashboardClient>();
+
+        // The properties panel's tag box completes against the site's vocabulary (task P8-20), and
+        // the review panel beside it reads where the page stands (task P7-12). Both resolve their
+        // client as a property, so a missing registration throws mid-render rather than degrading —
+        // which is what the page editor's gates were failing on before either was registered.
+        services.AddScoped<ISearchClient, FakeSearchClient>();
+        services.AddScoped<IWorkflowClient, FakeWorkflowClient>();
         services.AddScoped<IToastService, SilentToastService>();
 
         // Two hosting services a real pre-render supplies and a bare collection does not: the

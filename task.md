@@ -1,7 +1,9 @@
 # Content Management System — Implementation Task List
 
-**Status:** In progress — **Phase 7 is complete**: all 26 tasks, all 10 acceptance criteria, and its
-exit gate. **Phase 6 is built out**, with 12 of its 14 criteria met and its gate open
+**Status:** In progress — **Phase 8's 26 tasks are all done** and its exit gate is met; nine of its
+ten criteria are met, and the tenth (`P8 #10`, search latency) is asserted but has only ever run on
+an engine without full-text. **Phase 7 is complete**: all 26 tasks, all 10 acceptance criteria, and
+its exit gate. **Phase 6 is built out**, with 12 of its 14 criteria met and its gate open
 on the browser journeys and the manual keyboard pass alone. Phase 0 complete; **Phase 1's 33 tasks all done**, its exit gate open on
 `P1 #1` alone, which needs a browser driving the admin form; **Phase 2 complete**; **Phase 3's three
 sections all finished** and all 11 criteria met, with the perf harness (`P3-27`), visual regression
@@ -105,6 +107,33 @@ no longer a no-op**: `Q5` is answered as configuration — SMTP, which every can
 difference. **The scheduler test found a real defect**: `new SqlParameter("@pending", 0)` binds to
 the `SqlDbType` overload, because the literal zero converts to any enum, and the claim query failed
 saying a parameter it had been given was never supplied.
+**Phase 8 makes the public site fast, discoverable, and navigable.** The SEO head, `sitemap.xml`, and
+`robots.txt` come from one builder, so preview and delivery cannot emit different heads for one
+version, and staging serves `Disallow: /` from the environment name rather than from a setting a
+copied production database could carry with it. **Caching is opt-in per endpoint** rather than a base
+policy with exclusions, which is the version somebody adding a route cannot undo; what a page depends
+on is recorded as cache tags *while it renders*, so evicting a reusable item reaches every page
+showing it with no query at all. Invalidation is enqueued **inside the publish transaction** and
+applied by every instance, because each node has its own in-process cache to evict.
+**Navigation is two mechanisms with one filter**: generated from the content tree and hand-managed,
+both dropping anything an anonymous visitor could not reach, and both taking a `nav:` tag on the
+pages that render them — so unpublishing a page removes it from the menu on every *other* page within
+a cache generation. **Search is asynchronous by construction.** A save enqueues an id, and the outbox
+rebuilds the document afterwards, so extracting text from every zone is never on the path an editor
+waits on; the index describes *working* content, with published state as a column, which is what
+makes an editor able to find the paragraph they wrote this morning and what makes v2's public search
+a filter rather than a second index. The outbox now carries two message types, and they claim
+differently on purpose: cache eviction runs on every node and claims nothing, while the index handler
+claims its row, because one is per-node memory and the other is a shared table.
+**The arm64 full-text question raised in Phase 0 is answered**: the service probes for the engine and
+falls back to a scan, so Azure SQL Edge is a supported deployment rather than a broken test
+environment — only the 500 ms budget is gated on the index existing. **Tags landed as page metadata,
+not payload**, which corrects a note left on `TagsFieldType` in Phase 1: two writers would mean a tag
+removed on the properties panel reappearing on the next payload save. That closes `P6-17`'s open
+half. **Multi-site was assessed and declined for v1** ([ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md)):
+the column was never the cost — the twenty-odd uniqueness rules are, each of them a product question
+nobody has been asked, and a discriminator nothing filters by has a failure mode no single-site test
+can catch.
 **The `Content-Security-Policy` header itself is not switched on**: the nonce
 it needs exists and is wired, but turning the policy on today would break P5's media control and
 others that position with inline `style` attributes, so it is recorded as Phase 9 hardening rather
@@ -164,9 +193,9 @@ and record the date in the progress table.
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
-| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 18 | 14.0 | In progress — SEO, caching, and invalidation done (8 of 10 criteria); navigation and search remain | — |
+| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 26 | 14.0 | All 26 tasks done; **9 of 10 criteria met**. `P8 #10`'s 500 ms budget is asserted but has only run on an engine without full-text (arm64 Azure SQL Edge), so it waits on the same CI agent `P0 #3` does | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **240** | **203.5** | | |
+| **v1 total** | **281** | **248** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -336,12 +365,14 @@ thrown away** — nothing is promoted directly into the solution.
 
 **Risks:** R1 (spike failure), R9 (Testcontainers in CI).
 
-**Raised during Phase 0 — needs a decision by Phase 8:** the arm64 test fallback runs **Azure SQL
-Edge**, which has no full-text search. `P8-18` builds `SearchIndexService` on a SQL Server full-text
-index, so those tests cannot run on an arm64 developer machine under the current fallback. Either the
-full-text tests get gated to amd64/CI, or arm64 developers run SQL Server under emulation (verified
-working on Apple Silicon via Docker Desktop), or the search backend changes. Recording it now because
-it is cheap to plan for and expensive to discover in Phase 8.
+**Raised during Phase 0 — decided in Phase 8:** the arm64 test fallback runs **Azure SQL Edge**,
+which has no full-text search, so `P8-18`'s tests could not run on an arm64 developer machine under
+the current fallback. **Answered 2026-08-18, and by none of the three options as stated:** the
+service asks the same question the migration does — `SERVERPROPERTY('IsFullTextInstalled')` plus the
+index's existence — and falls back to a `LIKE` scan, so Azure SQL Edge became a supported deployment
+rather than a test-only compromise. The correctness suite therefore runs everywhere; only `P8-25`'s
+500 ms budget is gated, and it skips with a message naming `CMS_TEST_SQL_IMAGE` for an arm64
+developer who wants to run it under emulation.
 
 ---
 
@@ -3981,17 +4012,73 @@ declared met on the strength of the layer beneath.*
   no full-text engine at all**, where an unguarded `CREATE FULLTEXT CATALOG` fails the whole
   migration. A navigation item's "page or URL, never both" is a check constraint written as a count,
   since T-SQL has no exclusive-or over predicates.)*
-- [ ] **P8-15** Structural navigation generated from the content tree, filtered by
+- [x] **P8-15** Structural navigation generated from the content tree, filtered by
   `Page.ShowInNavigation` and publish state [§10.7]. — 0.5 ed
-- [ ] **P8-16** Managed menus (ordered items, internal page reference or external link) + menu admin UI.
+  *(`NavigationService` reads the whole tree in one query and assembles it in memory, because a
+  query per level is the N+1 that only appears once a site has a real tree. The two filters are
+  different switches — `ShowInNavigation` is an editor saying "not in the menu", `PublishedVersionId`
+  is the site saying "not yet" — and a page failing either takes its subtree with it, since an entry
+  whose parent cannot be reached is a link into a hole. Depth is clamped at four: beyond that it is a
+  sitemap, and building one on every render is a cost nobody asked for.)*
+- [x] **P8-16** Managed menus (ordered items, internal page reference or external link) + menu admin UI.
   — 0.5 ed
-- [ ] **P8-17** `nav:{menuKey}` cache tags invalidated on any publish/unpublish/move. — 0.25 ed
-- [ ] **P8-18** `SearchDocument` + SQL Server full-text index + `SearchIndexService` in `Core/Search/`,
+  *(`NavigationMenuService` + `/api/cms/v1/navigation/menus` + the `/admin/navigation` screens. Writes
+  need **`Content.Publish`**, not `Content.Edit`, for the reason redirects do: a menu reaches
+  anonymous visitors the moment it is saved, with no draft and no publish step in between [§21.1].
+  An entry whose page is not published resolves to nothing and is dropped along with anything nested
+  under it — a dead link is the failure an editor is least likely to notice.)*
+- [x] **P8-17** `nav:{menuKey}` cache tags invalidated on any publish/unpublish/move. — 0.25 ed
+  *(Every page eviction carries `nav:*tree` with it, since publish state is what the generated menu
+  is filtered by, plus a query for the managed menus naming that page — a footer linking to a page
+  renders its title, so changing the page changes every page showing the footer. `CmsNavigation` adds
+  its tag **before** the read rather than after, so a menu that resolved to nothing still leaves the
+  page depending on it; otherwise the first entry added to an empty menu would evict nothing.)*
+- [x] **P8-18** `SearchDocument` + SQL Server full-text index + `SearchIndexService` in `Core/Search/`,
   populated via `IFieldType.ExtractSearchText` on save and publish, **asynchronously through the
   outbox** with a nightly reconcile *(mitigates R18)* [§17.1]. — 1 ed
-- [ ] **P8-19** Backoffice search UI with filters: template, status, owner, tag, modified date range,
+  *(The outbox gained a second message type and `OutboxRunner` now dispatches through
+  `IOutboxMessageHandler` rather than knowing one payload. The two handlers differ in a way worth
+  stating: **cache eviction runs on every instance and claims nothing** — each node has its own
+  in-process cache — while **the index handler claims its row first**, because the index is one
+  shared table and N nodes rebuilding the same document is N−1 wasted passes and a real chance of two
+  inserts racing on the unique key. The message carries ids, not text, so a message applied late
+  indexes what the page says now rather than what it said when it was saved. The index describes
+  **working content**: an editor looking for the paragraph they wrote this morning would not find it
+  in an index of what is live, so `IsPublished` is a column instead — which is also what makes the v2
+  public search a filter rather than a second index. **The Phase 0 arm64 question is answered here**:
+  `SearchCapabilities` probes `SERVERPROPERTY('IsFullTextInstalled')` plus the index's existence once
+  per process and falls back to a `LIKE` scan, so Azure SQL Edge is a supported deployment rather
+  than a broken one, and the correctness suite runs on both engines. `SearchResults.FullText` reports
+  which path answered, because "search is slow" should be visible on the screen rather than measured
+  with a stopwatch.)*
+- [x] **P8-19** Backoffice search UI with filters: template, status, owner, tag, modified date range,
   "has unpublished changes," "past review date." — 0.5 ed
-- [ ] **P8-20** `tags` field type completed + `Tag`/`PageTag` management. — included above
+  *(`/admin/search`, over `GET /api/cms/v1/search`. The filters are query-string parameters bound with
+  `[SupplyParameterFromQuery]`, so a search is a URL an editor can bookmark and send to somebody —
+  most of what "saved search" would otherwise have to be built for. **Every page-only filter narrows
+  the result to pages by construction** rather than by a separate clause: asking for a template and a
+  media item at once is a query with no answer, and it says so by returning nothing. Access rules cut
+  the hits after the page is taken, the way every list endpoint does it, so a page of results can come
+  back shorter than the count beside it — the alternative is translating "deeper beats shallower, deny
+  beats allow" into SQL and keeping two copies of it in step.)*
+- [x] **P8-20** `tags` field type completed + `Tag`/`PageTag` management. — included above
+  *(**Tags are page metadata, not payload** — [§14.7] lists them beside owner, review date, and
+  internal notes — so `PatchPageMetadataRequest.Tags` is the one writer and `ITagService` owns the
+  rows. This **corrects the note on `TagsFieldType`**, which said the rows would be projected from the
+  field's values: two writers would mean a tag removed on the properties panel reappearing the next
+  time somebody saved the payload. The field type keeps contributing searchable text. Slug is
+  identity and name is label, which is what makes "Product" and "product" one tag and what makes a
+  rename onto an existing name a **merge** rather than a duplicate-key error — refusing it would leave
+  an editor merging by hand on every page. `/admin/tags` does the housekeeping a free-form vocabulary
+  needs, with each page count linking into the search screen's tag filter so "what is actually tagged
+  this" is one click from the decision to rename or delete it. The properties panel's tag box
+  completes against the existing vocabulary and commits on Enter only — not on blur, because an
+  editor clicking away from a half-typed word has not decided to tag the page with it. This closes
+  `P6-17`'s open half. **Registering the tag box's client uncovered a stale gate**: the page editor's
+  axe and 200%-zoom passes (`P6-36`, `P6-38`) had been failing on a missing `IWorkflowClient`
+  registration since `P7-12` — the review panel resolves it as a property, so the screen threw
+  mid-render rather than degrading — which means neither gate had actually judged that screen. Both
+  fakes are registered now and all 34 render gates pass, tag chips included.)*
 
 ### Tests — Phase 8
 
@@ -4012,8 +4099,16 @@ declared met on the strength of the layer beneath.*
   store covers the rendered HTML, each node's own poller covers its in-process content cache.)*
 - [x] **P8-24** Integration: an authenticated editor's request is never served from the anonymous cache,
   and vice versa.
-- [ ] **P8-25** Performance: backoffice search returns by title, body, and slug across 50,000 seeded
+- [x] **P8-25** Performance: backoffice search returns by title, body, and slug across 50,000 seeded
   pages in under 500 ms.
+  *(`SearchPerformanceTests`. The 50,000 documents are one set-based insert rather than 50,000
+  publishes: this measures the query, and creating them through the services would measure the
+  writer and take longer than the rest of the suite. **The correctness half runs on both engines and
+  the 500 ms budget is asserted only where a full-text index exists** — holding the fallback scan to a
+  full-text budget would be asserting the fallback is something never claimed for it. On an engine
+  with the index, the test waits for `CHANGE_TRACKING AUTO` to finish populating before starting the
+  clock, so what is timed is the query rather than the crawl; on Azure SQL Edge it reports the
+  elapsed time and skips with a message naming `CMS_TEST_SQL_IMAGE`.)*
 
 ### Acceptance criteria — Phase 8
 
@@ -4032,19 +4127,38 @@ declared met on the strength of the layer beneath.*
   instance B.
 - [x] **P8 #8** An invalidation enqueued in a transaction that then fails is not dispatched; one in a
   committed transaction is dispatched even if the process is killed immediately after commit.
-- [ ] **P8 #9** Navigation reflects publish state within one cache generation; unpublishing removes the
+- [x] **P8 #9** Navigation reflects publish state within one cache generation; unpublishing removes the
   item.
-- [ ] **P8 #10** Backoffice search returns a page by title, body text, and slug across 50,000 seeded
+  *(`NavigationTests` asserts it on a **different** page from the one unpublished: the menu is
+  rendered by every page, so the removal has to be visible on a neighbour's cached response rather
+  than only in a fresh query.)*
+- [~] **P8 #10** Backoffice search returns a page by title, body text, and slug across 50,000 seeded
   pages in under 500 ms.
+  *The three lookups are asserted at that scale by `SearchPerformanceTests`, on both engines. **The
+  timing half has not been observed on a full-text engine yet**: the development machine is arm64 and
+  runs Azure SQL Edge, which has none, so the budget assertion is live but has only ever been skipped
+  here. It runs unskipped on CI's amd64 agent — see `P0 #3`, which is the same "no GitHub runner has
+  executed this yet" gap.*
 
-**Exit gate:** publish invalidates exactly the right cache entries; SEO output correct. — [ ] met on ____
+**Exit gate:** publish invalidates exactly the right cache entries; SEO output correct. — [x] met on
+**2026-08-18** — both halves are asserted by `CachingTests`, `RedisOutputCacheTests`, and `SeoTests`;
+the one criterion still open (`P8 #10`) is about search latency and bears on neither.
 
 **Risks:** R17 (cache invalidation correctness — highest-severity functional risk), R18 (full-text index
 maintenance cost).
 
 > **Scheduling constraint:** decide during this phase whether multi-site is plausible within 18 months.
 > Adding a `SiteId` discriminator is dramatically cheaper before v2 adds tables than after.
-> - [ ] **P8-26** Multi-site assessment recorded as an ADR. — 0 ed
+> - [x] **P8-26** Multi-site assessment recorded as an ADR. — 0 ed
+>   *([ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md).* ***v1 stays
+>   single-site.*** *The column was never the cost — the ~20 uniqueness rules are, and each one is a
+>   product question nobody has been asked: is `/about` one page or one per site, are templates shared
+>   infrastructure or site content, is the taxonomy shared. A discriminator nothing sets and nothing
+>   filters by is not insurance; it is a column every query must remember for two years, whose failure
+>   mode — a missing site filter leaking another site's content — no single-site test can catch. The
+>   ADR records the reversal in full, and the three properties that keep it affordable: `ISiteAddress`
+>   is the only place the site's address is decided, `SiteSettings` is a row rather than
+>   configuration, and every URL read or write goes through `RouteResolver`/`UrlService`.)*
 
 ---
 
@@ -4212,7 +4326,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 5 | `AddCmsReusableContent` | 4 | P4-02 | `ReusableContent`, `ReusableContentVersion` | [x] |
 | 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [x] |
 | 7 | `AddCmsWorkflow` | 7 | P7-08 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob`, `Notification` (+ the seven seeded roles and `SiteSettings.RedirectToParentOnUnpublish`) | [x] |
-| 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [ ] |
+| 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [x] |
 
 **Rules:** data backfills are separate, idempotent, resumable, and batched — never inline in a schema
 migration. Full-text catalog creation in migration 8 requires raw SQL and must handle Azure SQL vs.
@@ -4310,8 +4424,8 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 |---|---|---|:--:|
 | #1 | URL management | P3-03, P3-04 | [x] 2026-08-14 |
 | #2 | Redirects | P3-05, P3-06 | [x] 2026-08-15, serving over HTTP since P3-13 |
-| #3 | SEO metadata | P8-01…P8-03, P6-17 | [ ] |
-| #4 | `sitemap.xml` & `robots.txt` | P8-04, P8-05 | [ ] |
+| #3 | SEO metadata | P8-01…P8-03, P6-17 | [x] 2026-08-18 — one builder resolves every fallback and every absolute URL, so preview and delivery cannot emit different heads for one version; hand-authored JSON-LD **replaces** the generated set rather than joining it |
+| #4 | `sitemap.xml` & `robots.txt` | P8-04, P8-05 | [x] 2026-08-18 — exclusions live in the query rather than being applied afterwards, and non-production serves `Disallow: /` from the environment name, which is the one fact a copied production database cannot carry with it |
 | #5 | Scheduled publish/unpublish | P7-13…P7-16 | [x] 2026-08-18 — claimed with one atomic `UPDATE … OUTPUT`, so running the poller on every instance is correct rather than merely tolerated; a failure is terminal and notifies its owner rather than retrying every thirty seconds |
 | #6 | Approval workflow | P7-08…P7-12 | [x] 2026-08-18 — three modes, the draft frozen while under review, and a rejection that keeps the refused version exactly as it was refused while handing the author an editable copy |
 | #7 | Granular permissions | P7-01…P7-07 | [x] 2026-08-18 — role grants from the §21.1 matrix, narrowed by section ACLs resolved as an indexed prefix match, enforced in the service layer and swept for IDOR across nineteen entry points |
@@ -4324,19 +4438,19 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #14 | Focal point / smart cropping | P5-12 | [x] 2026-08-16 |
 | #15 | Renditions, `srcset`, WebP | P5-13…P5-16, P5-20 | [x] 2026-08-16 — every descriptor is the width the browser will actually receive, because the pipeline never upscales |
 | #16 | Where-used / link integrity | P4-07, P4-08 | [x] 2026-08-16 — transitive, split by pinned, and the delete guard is built on it |
-| #17 | Output caching + invalidation | P8-06…P8-13 | [ ] |
+| #17 | Output caching + invalidation | P8-06…P8-13 | [x] 2026-08-18 — caching is opt-in per endpoint rather than a base policy with exclusions, and invalidation is enqueued inside the publish transaction and applied by every instance |
 | #18 | Concurrency control | P2-03, P2-15, P6-19 | [x] 2026-08-16 — both layers, and the UI that makes the authoritative one usable: the `rowversion` decides, the advisory lock warns, and a lost race now hands the losing editor the draft that won so keep-mine, take-theirs, and open-diff are real choices rather than a banner |
-| #19 | Backoffice search & content tree | P6-02…P6-04, P8-18, P8-19 | [ ] |
+| #19 | Backoffice search & content tree | P6-02…P6-04, P8-18, P8-19 | [x] 2026-08-18 — full-text over titles, extracted body text, and keywords where the engine exists and a scan where it does not, with the filters [§17.1] lists and a URL an editor can keep |
 | #20 | Audit trail surfaced in the UI | P7-20 | [x] 2026-08-18 — read-only by construction, filtered by entity, id, user, and date, and gated on `Audit.View` rather than on user management |
 | #21 | Template change / schema evolution safety | P1-25, P1-26, P1-32 | [ ] |
-| #22 | Public site search | **v2** — index built by P8-18 | [-] |
+| #22 | Public site search | **v2** — index built by P8-18 | [-] *the index and its `IsPublished` column exist, so v2 is a filter and a results page rather than infrastructure* |
 | #23 | Localization | **out of scope** — Q1 resolved, [§19] | [-] |
-| #24 | Navigation/menu management | P8-14…P8-17 | [ ] |
+| #24 | Navigation/menu management | P8-14…P8-17 | [x] 2026-08-18 — generated from the tree and hand-managed, both filtered to published content, both cache-tagged |
 | #25 | Forms / lead capture | **v2** | [-] |
 | #26 | Headless read API + webhooks | **v2** | [-] |
 | #27 | Import/export & environment promotion | P1-26, P1-28 (structure, v1); content bundles **v2** | [ ] |
 | #28 | Rate limiting & brute-force protection | P9-03, P9-04 | [ ] |
-| #29 | Editorial metadata | P6-17 | [ ] 2026-08-16 — owner, review-by, and internal notes are stored, patchable, and editable in the properties panel. **Tags are not**: there is no `Tag`/`PageTag` to write to until `P8-20`, and the panel says so rather than drawing a control that discards what is typed into it |
+| #29 | Editorial metadata | P6-17, P8-20 | [x] 2026-08-18 — owner, review-by, internal notes, **and now tags**: `P8-20` gave the panel somewhere to write them, and the box completes against the vocabulary the site already uses rather than inviting a fourth spelling of one label |
 | #30 | Broken-link & orphaned-media reporting | **v2** — nightly jobs in P8/P9, UI deferred | [-] |
 
 ---
@@ -4355,7 +4469,7 @@ Ordered by expected value, not effort. Not started; listed so nothing is lost.
 | 6 | Broken-link and orphaned-media reporting UI | gap #30 | 4 ed |
 | 7 | Nested blocks beyond one level | [§29.3] | 5 ed |
 | 8 | Per-template workflow configuration | [§11.9] | 4 ed |
-| 9 | Multi-site support | [§29.3] | 25 ed — **assess in Phase 8 (P8-26) before v2 locks the schema** |
+| 9 | Multi-site support | [§29.3] | 25 ed — **assessed 2026-08-18, [ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md): v1 stays single-site.** The estimate roughly doubles once v2 adds tables, which the ADR states outright |
 
 Localization is **not** on this list — it was removed from scope entirely (Q1, [§19]). If it ever
 returns it is a re-planning event costing ~25–35 ed, not a backlog item.
@@ -4384,7 +4498,7 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**. `P6-31a` has now run — ten mount/unmount cycles of each editor in Chromium, created equal to disposed, and no surviving editor node, toolbar included — which is the instrument reading zero on a short run. `P9-16`'s two-hour soak is what the trigger actually names, and it has not |
 | R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | **Mitigated and measured 2026-08-18** — the caller's rules are read once per request and every node after that is a string prefix comparison in memory (`P7-05`), so resolution cost is independent of how many nodes are being decided. `AclPerformanceTests` loads a depth-10 tree with rules at several depths inside the budget. Kept **open** because the trigger names a wall-clock figure on a loaded system, and the only load test in the plan is `P9-16` |
 | R16 | Duplicate scheduled publishes under scale-out | Med | 7 | Any duplicate observed | **Closed 2026-08-18** — a job leaves `Pending` only through a single `UPDATE … OUTPUT`, which is atomic against every other writer: the row is claimed and its identity returned in one statement, so there is no read-then-write window to lose. `PublishSchedulerTests` runs two uncoordinated passes over the same rows and asserts exactly one claim and exactly one published version. A claim abandoned by a dying instance is reclaimed after ten minutes rather than stranding the page |
-| R17 | Cache invalidation misses a dependent page | **High** | 8 | Any stale page reported after publish | Open |
-| R18 | Full-text index degrades write throughput | Med | 8 | Save latency exceeds NFR-6 | Open |
-| R19 | Requirements shift mid-build (multi-site, multilingual) | **High** | any | Either raised → stop and re-plan | Open |
+| R17 | Cache invalidation misses a dependent page | **High** | 8 | Any stale page reported after publish | **Mitigated 2026-08-18, still open** — the fan-out is not computed at eviction time: every renderer declares what it used as a cache tag *while* rendering, so evicting `ru:{id}` reaches every page showing that item with no query and nothing to forget (`P8-07`, `P8-10`). A response that published no tags is stored under `content` rather than untagged, so even a render that forgot its dependencies is reachable by a purge-all, and a one-hour backstop TTL bounds anything that still slips (`P8-12`). `CachingTests` asserts the negative half by rewriting a bystander's stored content behind the cache's back. Kept **open** because the trigger is a *stale page reported in production*, and nothing has run in production |
+| R18 | Full-text index degrades write throughput | Med | 8 | Save latency exceeds NFR-6 | **Mitigated 2026-08-18, still open** — indexing was moved off the save entirely: a write enqueues an id in its own transaction and the outbox rebuilds the document afterwards, so extracting text from every zone is never on the path an editor waits on (`P8-18`). What that buys in latency it pays for in a window where a just-saved page is not yet findable, which the nightly reconcile repairs — and `SearchTests` asserts the reconcile fixes both a lost document and an orphaned one. Kept **open** because the trigger is a **measured** save latency against NFR-6, and the only load test in the plan is `P9-16` |
+| R19 | Requirements shift mid-build (multi-site, multilingual) | **High** | any | Either raised → stop and re-plan | **Assessed for multi-site 2026-08-18, still open** — [ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md) records what the reversal costs and what keeps it affordable, so if the requirement is raised the re-plan starts from a written estimate rather than from a survey. Neither requirement has been raised, which is why the risk stays open rather than closing |
 | R20 | Key-person dependency on Blazor/EF expertise | Med | 1–3 | Either engineer unavailable >1 week | Open |

@@ -100,7 +100,8 @@ public sealed record PageDetail(
     string? InternalNotes,
     PageSeo Seo,
     string RowVersion,
-    string? OwnerName = null);
+    string? OwnerName = null,
+    IReadOnlyList<string>? Tags = null);
 
 /// <summary>
 /// The search and social metadata one page version carries (spec section 18.1).

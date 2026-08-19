@@ -42,3 +42,4 @@ holds, without reading `spec.md` end to end.
 | [0022](0022-pre-render-shims-serialize-their-service-calls.md) | D22 — One request's `DbContext` is used once at a time: the pre-render shims serialize, the delivery readers open their own | Accepted |
 | [0023](0023-one-allow-rule-makes-a-permission-an-allowlist.md) | D23 — One allow rule turns a permission into an allowlist for that principal | Accepted |
 | [0024](0024-mail-is-smtp-configuration-not-a-provider-choice.md) | D24 — Mail is SMTP configuration, not a provider chosen in code | Accepted |
+| [0025](0025-single-site-in-v1-no-siteid-discriminator.md) | D25 — v1 stays single-site; no `SiteId` discriminator, and the migration path if that changes | Accepted |

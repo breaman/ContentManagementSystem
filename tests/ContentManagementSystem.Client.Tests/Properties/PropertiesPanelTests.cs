@@ -28,6 +28,7 @@ public class PropertiesPanelTests : IDisposable
     public PropertiesPanelTests()
     {
         _bunit.Services.AddSingleton<IPageClient>(_client);
+        _bunit.Services.AddSingleton<ISearchClient>(new EmptySearchClient());
         _bunit.Services.AddSingleton<ICurrentUserClient>(new StubCurrentUserClient(
             new CurrentUser(7, "Elena")));
     }
@@ -209,6 +210,66 @@ public class PropertiesPanelTests : IDisposable
         _client.Resolved.Should().ContainSingle().Which.Should().Be(4);
     }
 
+    [Test]
+    public void ATagIsAddedOnEnterAndTheSameLabelTwiceIsOneTag()
+    {
+        var page = Page();
+        var model = PageProperties.From(page);
+        var panel = Render(page, model);
+
+        AddTag(panel, "Release notes");
+        AddTag(panel, "release NOTES");
+
+        // Slug is identity on the server, so a panel that showed both spellings would be showing a
+        // state that cannot exist (task P8-20).
+        model.Tags.Should().Equal("Release notes");
+        panel.FindAll(".cms-properties__tag").Should().ContainSingle();
+    }
+
+    [Test]
+    public void AHalfTypedTagIsNotCommittedByAnyKeyButEnter()
+    {
+        var page = Page();
+        var model = PageProperties.From(page);
+        var panel = Render(page, model);
+
+        panel.Find("#page-tag-entry").Input("relea");
+        panel.Find("#page-tag-entry").KeyDown("Tab");
+
+        // The box carries no blur handler at all, which is the other half of this: an editor who
+        // clicks away from a half-typed word has not decided to tag the page with it, and a tag
+        // added by accident is one that has to be found again to be removed.
+        model.Tags.Should().BeEmpty();
+    }
+
+    [Test]
+    public void TagsAreSentAsTheWholeSetAndOnlyWhenTheyMoved()
+    {
+        var page = Page(tags: ["alpha", "beta"]);
+        var model = PageProperties.From(page);
+
+        model.ToPatch(page).Tags.IsSet.Should().BeFalse("nothing was touched");
+
+        // Reordering is not an edit: the server returns them alphabetically and the panel appends.
+        model.Tags = ["beta", "alpha"];
+        model.ToPatch(page).Tags.IsSet.Should().BeFalse();
+
+        model.Tags.Remove("alpha");
+
+        var patch = model.ToPatch(page);
+
+        patch.Tags.IsSet.Should().BeTrue();
+        patch.Tags.Value.Should().ContainSingle("the patch carries what the page should end up with")
+            .Which.Should().Be("beta");
+    }
+
+    /// <summary>Types a tag into the box and commits it the way an editor does.</summary>
+    private static void AddTag(IRenderedComponent<PropertiesPanel> panel, string tag)
+    {
+        panel.Find("#page-tag-entry").Input(tag);
+        panel.Find("#page-tag-entry").KeyDown("Enter");
+    }
+
     private IRenderedComponent<PropertiesPanel> Render(
         PageDetail page,
         PageProperties model,
@@ -223,7 +284,8 @@ public class PropertiesPanelTests : IDisposable
     private static PageDetail Page(
         string? metaTitle = null,
         int? ownerUserId = null,
-        string? ownerName = null) =>
+        string? ownerName = null,
+        IReadOnlyList<string>? tags = null) =>
         new(
             StubPageClient.Page(4, "Pricing"),
             """{"templateKey":"marketing-landing","templateRevision":2,"zones":{}}""",
@@ -235,7 +297,8 @@ public class PropertiesPanelTests : IDisposable
             InternalNotes: null,
             Seo: new PageSeo(metaTitle, null, null, true, true, null, null, null, null, null, null, null, null),
             RowVersion: "AAAAAAAAB9M=",
-            OwnerName: ownerName);
+            OwnerName: ownerName,
+            Tags: tags);
 
     /// <summary>Resolves the page's URL and records that it was asked once.</summary>
     private sealed class PanelPageClient : StubPageClient

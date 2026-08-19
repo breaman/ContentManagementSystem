@@ -37,6 +37,12 @@ public static class CachingServiceCollectionExtensions
         services.TryAddScoped<OutboxRunner>();
         services.TryAddSingleton<OutboxState>();
 
+        // The runner dispatches by message type, and this is the type it was built for. Registered
+        // as an enumerable so the search indexer can add its own without either knowing about the
+        // other (task P8-18).
+        services.TryAddEnumerable(
+            ServiceDescriptor.Scoped<IOutboxMessageHandler, CacheInvalidationHandler>());
+
         // The readers the decorators wrap. Registered as their concrete types so that resolving
         // IPublishedContentService gives the cache and resolving PublishedContentService gives the
         // query — which is what preview and the invalidation-free paths want.

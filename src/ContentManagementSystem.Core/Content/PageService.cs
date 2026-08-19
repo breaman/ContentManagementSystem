@@ -3,6 +3,8 @@ using System.Text.Json;
 using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Search;
+using ContentManagementSystem.Core.Tags;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
@@ -24,6 +26,9 @@ namespace ContentManagementSystem.Core.Content;
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="clock">Reads the current time, so a lock's expiry is testable.</param>
+/// <param name="cacheInvalidation">Enqueues cache eviction inside the transaction that earned it.</param>
+/// <param name="search">Enqueues the search reindex, in the same transaction (task P8-18).</param>
+/// <param name="tags">Writes the page's tag rows from the metadata patch (task P8-20).</param>
 /// <param name="logger">Log for page creation and for saves that lost a race.</param>
 /// <remarks>
 /// Every entry point asks two questions in the same order: may this caller do this at all, and may
@@ -45,6 +50,8 @@ public sealed class PageService(
     IAclService acl,
     TimeProvider clock,
     ICacheInvalidationQueue cacheInvalidation,
+    ISearchIndexQueue search,
+    ITagService tags,
     ILogger<PageService> logger) : IPageService
 {
     /// <summary>Escape character used with <c>LIKE</c>, so a search term's wildcards are literal.</summary>
@@ -533,6 +540,16 @@ public sealed class PageService(
         draft.Title = title!.Trim();
         WriteSeo(draft, seo);
 
+        // Tags are page metadata rather than payload (spec section 14.7), so they are written here
+        // and not by a projection over the content. Inside the same transaction as the rest of the
+        // patch, so a save that is refused for a duplicate slug leaves the tags alone too.
+        var applied = request.Tags.IsSet
+            ? await tags.ApplyAsync(page.Id, request.Tags.Value, cancellationToken)
+            : null;
+
+        // The document holds the title and the tags this patch may have just changed.
+        search.EnqueuePage(page.Id);
+
         if (RowVersions.TryApply(context.Entry(draft), expectedRowVersion) is false)
         {
             return CmsResult<PageDetail>.Invalid(
@@ -585,7 +602,8 @@ public sealed class PageService(
                 draft,
                 hasChildren,
                 LockedBy(locks, page.Id),
-                await OwnerNameAsync(page.OwnerUserId, cancellationToken)),
+                await OwnerNameAsync(page.OwnerUserId, cancellationToken),
+                applied ?? await tags.ForPageAsync(page.Id, cancellationToken)),
             checks);
     }
 
@@ -727,6 +745,9 @@ public sealed class PageService(
             await cacheInvalidation.EnqueuePagesAsync(
                 sync.Changes.Select(change => change.PageId),
                 cancellationToken);
+
+            // Their documents carry the URL that just moved.
+            search.EnqueuePages(sync.Changes.Select(change => change.PageId));
 
             await context.SaveChangesAsync(cancellationToken);
 
@@ -933,6 +954,11 @@ public sealed class PageService(
             // moment it is first published (spec section 10.4). It cannot collide with anything:
             // the filtered unique index governs published routes alone.
             await urls.SyncAsync(page.Id, cancellationToken);
+
+            // Indexed from the moment it exists, inside the same transaction: a page created and
+            // then not saved again is still one an editor expects to find by its title.
+            search.EnqueuePage(page.Id);
+
             await context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
@@ -978,7 +1004,8 @@ public sealed class PageService(
             page.DraftVersion,
             hasChildren,
             LockedBy(locks, page.Id),
-            await OwnerNameAsync(page.OwnerUserId, cancellationToken));
+            await OwnerNameAsync(page.OwnerUserId, cancellationToken),
+            await tags.ForPageAsync(page.Id, cancellationToken));
     }
 
     /// <summary>Places a new page after its existing siblings.</summary>
@@ -1368,7 +1395,8 @@ public sealed class PageService(
         PageVersion draft,
         bool hasChildren,
         string? lockedBy = null,
-        string? ownerName = null) =>
+        string? ownerName = null,
+        IReadOnlyList<string>? tags = null) =>
         new(
             ToSummary(page, draft, hasChildren, lockedBy),
             draft.ContentJson,
@@ -1380,7 +1408,8 @@ public sealed class PageService(
             page.InternalNotes,
             ReadSeo(draft),
             Convert.ToBase64String(draft.RowVersion ?? []),
-            ownerName);
+            ownerName,
+            tags);
 
     /// <summary>
     /// Whether the draft has moved on from what is published.

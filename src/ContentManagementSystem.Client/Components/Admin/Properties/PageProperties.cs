@@ -50,6 +50,16 @@ public sealed class PageProperties
     /// <summary>Note to other editors. Never rendered publicly.</summary>
     public string? InternalNotes { get; set; }
 
+    /// <summary>
+    /// The labels this page carries (task P8-20, spec section 14.7).
+    /// </summary>
+    /// <remarks>
+    /// A list rather than a comma-separated string, because a tag may contain a comma and the panel
+    /// should not be the place that decides it may not. The chips are the editing surface; this is
+    /// what they add to and remove from.
+    /// </remarks>
+    public List<string> Tags { get; set; } = [];
+
     /// <summary>Overrides the page's <c>&lt;title&gt;</c> element.</summary>
     public string? MetaTitle { get; set; }
 
@@ -106,6 +116,7 @@ public sealed class PageProperties
             OwnerUserId = page.OwnerUserId,
             ReviewByDate = page.ReviewByDate,
             InternalNotes = page.InternalNotes,
+            Tags = [.. page.Tags ?? []],
             MetaTitle = page.Seo.MetaTitle,
             MetaDescription = page.Seo.MetaDescription,
             CanonicalUrl = page.Seo.CanonicalUrl,
@@ -146,6 +157,7 @@ public sealed class PageProperties
             OwnerUserId = Set<int?>(changed, nameof(OwnerUserId), OwnerUserId),
             ReviewByDate = Set<DateOnly?>(changed, nameof(ReviewByDate), ReviewByDate),
             InternalNotes = Set<string?>(changed, nameof(InternalNotes), Clean(InternalNotes)),
+            Tags = Set<IReadOnlyList<string>>(changed, nameof(Tags), [.. Tags]),
             MetaTitle = Set<string?>(changed, nameof(MetaTitle), Clean(MetaTitle)),
             MetaDescription = Set<string?>(changed, nameof(MetaDescription), Clean(MetaDescription)),
             CanonicalUrl = Set<string?>(changed, nameof(CanonicalUrl), Clean(CanonicalUrl)),
@@ -192,6 +204,15 @@ public sealed class PageProperties
         Compare(nameof(OwnerUserId), OwnerUserId, page.OwnerUserId);
         Compare(nameof(ReviewByDate), ReviewByDate, page.ReviewByDate);
         Compare(nameof(InternalNotes), Clean(InternalNotes), Clean(page.InternalNotes));
+
+        // Order is not a change: the server returns them alphabetically and the panel appends to the
+        // end, so comparing the sequences would report an edit every time a tag was added and
+        // reloaded.
+        if (!Tags.Order(StringComparer.OrdinalIgnoreCase).SequenceEqual(
+                (page.Tags ?? []).Order(StringComparer.OrdinalIgnoreCase), StringComparer.OrdinalIgnoreCase))
+        {
+            changed.Add(nameof(Tags));
+        }
         Compare(nameof(MetaTitle), Clean(MetaTitle), Clean(page.Seo.MetaTitle));
         Compare(nameof(MetaDescription), Clean(MetaDescription), Clean(page.Seo.MetaDescription));
         Compare(nameof(CanonicalUrl), Clean(CanonicalUrl), Clean(page.Seo.CanonicalUrl));

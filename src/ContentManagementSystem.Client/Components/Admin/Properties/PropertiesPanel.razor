@@ -319,10 +319,41 @@
                 <FieldMessages Diagnostics="For(nameof(PageProperties.InternalNotes))" />
             </div>
 
-            <p class="cms-properties__fact">
-                Tags arrive with the tag management the <code>tags</code> field type needs
-                (task P8-20); there is nowhere to store one yet.
-            </p>
+            <div class="mb-3">
+                <label class="form-label" for="page-tag-entry">Tags</label>
+                @if (Model.Tags.Count > 0)
+                {
+                    <ul class="list-inline mb-2">
+                        @foreach (var tag in Model.Tags)
+                        {
+                            <li class="list-inline-item">
+                                <span class="badge text-bg-secondary cms-properties__tag">
+                                    @tag
+                                    <button type="button" class="btn-close btn-close-white btn-sm ms-1"
+                                            disabled="@Disabled"
+                                            aria-label="@($"Remove tag {tag}")"
+                                            @onclick="() => RemoveTagAsync(tag)"></button>
+                                </span>
+                            </li>
+                        }
+                    </ul>
+                }
+                <input id="page-tag-entry" class="form-control" list="page-tag-options"
+                       placeholder="Add a tag and press Enter" disabled="@Disabled"
+                       @bind="TagEntry" @bind:event="oninput" @onkeydown="OnTagKeyDownAsync"
+                       aria-describedby="page-tags-help" />
+                <datalist id="page-tag-options">
+                    @foreach (var suggestion in TagSuggestions)
+                    {
+                        <option value="@suggestion.Name">@suggestion.PageCount page(s)</option>
+                    }
+                </datalist>
+                <div class="form-text" id="page-tags-help">
+                    Suggested from the tags the site already uses, because "Product", "products", and
+                    "product-page" are three filters nobody meant to create.
+                </div>
+                <FieldMessages Diagnostics="For(nameof(PageProperties.Tags))" />
+            </div>
         </details>
 
     </fieldset>

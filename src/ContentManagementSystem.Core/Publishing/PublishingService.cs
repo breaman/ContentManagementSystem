@@ -5,6 +5,7 @@ using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
@@ -96,6 +97,7 @@ public interface IPublishingService
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
 /// <param name="clock">Source of the current time.</param>
 /// <param name="cacheInvalidation">Enqueues the cache eviction, inside the publish's transaction.</param>
+/// <param name="search">Enqueues the search reindex, in the same transaction (task P8-18).</param>
 /// <param name="metrics">Counter and histogram of publish attempts (spec section 24.1).</param>
 /// <param name="logger">Log for every publish and every failure to publish.</param>
 public sealed class PublishingService(
@@ -112,6 +114,7 @@ public sealed class PublishingService(
     IUserService users,
     TimeProvider clock,
     ICacheInvalidationQueue cacheInvalidation,
+    ISearchIndexQueue search,
     CmsMetrics metrics,
     ILogger<PublishingService> logger) : IPublishingService
 {
@@ -336,6 +339,10 @@ public sealed class PublishingService(
         // route lookup that found it, and any navigation showing it all stop being true here.
         await cacheInvalidation.EnqueuePageAsync(pageId, cancellationToken);
 
+        // The index carries whether a thing is published, so an unpublish changes it too — which is
+        // what lets the backoffice offer "unpublished only" without a second query.
+        search.EnqueuePage(pageId);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
@@ -479,6 +486,11 @@ public sealed class PublishingService(
             // always has an eviction waiting for it, even if this process dies on the next line
             // (acceptance criterion P8 #8).
             await cacheInvalidation.EnqueuePageAsync(page.Id, cancellationToken);
+
+            // And the index, which the same argument covers: a publish that commits must leave a
+            // reindex behind it, because the document carries the URL and the published flag that
+            // this publish just changed.
+            search.EnqueuePage(page.Id);
 
             await context.SaveChangesAsync(cancellationToken);
 

@@ -60,6 +60,18 @@ public sealed record PatchPageMetadataRequest
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public Patch<string?> InternalNotes { get; init; }
 
+    /// <summary>
+    /// The labels this page carries, replacing whatever it carried before (task P8-20).
+    /// </summary>
+    /// <remarks>
+    /// The whole set, not a delta: a tag editor knows what the page should end up with and nothing
+    /// about what it had, and an add/remove pair would need both sides to agree on a state neither
+    /// can see. Sending an empty list clears them; omitting the member leaves them alone, like every
+    /// other member here.
+    /// </remarks>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public Patch<IReadOnlyList<string>> Tags { get; init; }
+
     /// <summary>Overrides the <c>&lt;title&gt;</c> element. Falls back to the page title.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public Patch<string?> MetaTitle { get; init; }

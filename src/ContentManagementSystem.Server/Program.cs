@@ -11,9 +11,11 @@ using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Media;
 using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Media.Stores;
+using ContentManagementSystem.Core.Navigation;
 using ContentManagementSystem.Core.Notifications;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Core.Scheduling;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Telemetry;
@@ -188,6 +190,10 @@ try
     // The published-content and route caches, the invalidation queue, and the outbox runner
     // (tasks P8-08 to P8-10). Registered after delivery and routing, because two of these are
     // decorators over registrations those calls made.
+    // Structural navigation and managed menus (tasks P8-15, P8-16). Read-only, and registered
+    // beside delivery because the public site is what renders them.
+    builder.Services.AddCmsNavigation();
+
     builder.Services.AddCmsCaching();
     builder.Services.Configure<DeliveryCacheOptions>(
         builder.Configuration.GetSection(DeliveryCacheOptions.SectionName));
@@ -201,6 +207,15 @@ try
 
     // Dispatches what publishing enqueued, on every instance rather than on one (task P8-09).
     builder.Services.AddHostedService<OutboxProcessorService>();
+
+    // Backoffice search and the tag vocabulary (tasks P8-18 to P8-20). Registered after caching,
+    // whose outbox runner dispatches the index messages this adds a handler for.
+    builder.Services.AddCmsSearch();
+    builder.Services.Configure<SearchOptions>(
+        builder.Configuration.GetSection(SearchOptions.SectionName));
+
+    // The nightly repair pass that makes asynchronous indexing safe to rely on (risk R18).
+    builder.Services.AddHostedService<SearchReconcileService>();
     // Preview (tasks P3-16 to P3-19). It renders through the delivery pipeline registered above and
     // differs only in which version it loads, which is what makes preview fidelity structural
     // (spec section 12.1). Also registers the rate limiter the shared-link routes require.
@@ -318,6 +333,8 @@ try
     // (ADR-0022).
     builder.Services.AddScoped<PrerenderGate>();
     builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
+    builder.Services.AddScoped<INavigationClient, ServerNavigationClient>();
+    builder.Services.AddScoped<ISearchClient, ServerSearchClient>();
     builder.Services.AddScoped<IPageClient, ServerPageClient>();
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();

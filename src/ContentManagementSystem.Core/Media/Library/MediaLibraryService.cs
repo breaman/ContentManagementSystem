@@ -1,6 +1,7 @@
 using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Media.Stores;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
@@ -31,6 +32,7 @@ public sealed class MediaLibraryService(
     IUserService users,
     TimeProvider clock,
     ICacheInvalidationQueue cacheInvalidation,
+    ISearchIndexQueue search,
     ILogger<MediaLibraryService> logger) : IMediaLibraryService
 {
     /// <inheritdoc />
@@ -329,6 +331,9 @@ public sealed class MediaLibraryService(
         // every page showing it has changed.
         cacheInvalidation.EnqueueMedia(id);
 
+        // The indexer will find the query filter hiding it and remove its document.
+        search.EnqueueMedia(id);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Media item {MediaItemId} was moved to the recycle bin.", id);
@@ -513,6 +518,10 @@ public sealed class MediaLibraryService(
         // rather than four at the call sites is what keeps a later fifth writer from forgetting
         // (task P8-09, spec section 16.2).
         cacheInvalidation.EnqueueMedia(item.Id);
+
+        // And its search document, for the same reason: file name, alt text, caption and credit are
+        // exactly what somebody searches the library by (task P8-18).
+        search.EnqueueMedia(item.Id);
 
         try
         {

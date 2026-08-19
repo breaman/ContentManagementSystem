@@ -1,0 +1,113 @@
+@page "/admin/navigation/{Id:int}"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentPublishers)]
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Navigation
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>@(Menu?.Name ?? "Menu")</PageTitle>
+
+<nav aria-label="Breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/admin/navigation">Navigation</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@(Menu?.Key ?? "Menu")</li>
+    </ol>
+</nav>
+
+<DiagnosticList Diagnostics="Errors" Heading="The entry was not saved" />
+
+@if (Menu is null)
+{
+    <p role="status">Loading the menu…</p>
+}
+else
+{
+    <h1>@Menu.Name</h1>
+    <p class="text-body-secondary"><code>@Menu.Key</code> — @(Menu.Description ?? "No description.")</p>
+
+    @if (Menu.Items.Count == 0)
+    {
+        <p>This menu has no entries yet.</p>
+    }
+    else
+    {
+        <table class="table align-middle">
+            <caption>@Menu.Items.Count entr@(Menu.Items.Count == 1 ? "y" : "ies")</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Order</th>
+                    <th scope="col">Label</th>
+                    <th scope="col">Goes to</th>
+                    <th scope="col">Nested under</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Menu.Items)
+                {
+                    <tr>
+                        <td>@item.SortOrder</td>
+                        <th scope="row">@item.Label</th>
+                        <td>
+                            @if (item.ExternalUrl is { Length: > 0 } external)
+                            {
+                                <a href="@external" rel="noopener noreferrer" target="_blank">@external</a>
+                            }
+                            else if (item.PageUrl is { Length: > 0 } url)
+                            {
+                                <span>@item.PageTitle <code>@url</code></span>
+                            }
+                            else
+                            {
+                                @* The public menu drops this entry rather than rendering a dead
+                                   link, so the editor is told here instead of finding out from a
+                                   visitor. *@
+                                <span class="badge text-bg-warning">Page not published — hidden</span>
+                            }
+                        </td>
+                        <td>@(Label(item.ParentId) ?? "—")</td>
+                        <td class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-danger"
+                                    disabled="@IsBusy"
+                                    @onclick="() => DeleteItemAsync(item)">
+                                Remove
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h2 class="h5 mt-4">Add an entry</h2>
+    <EditForm Model="Draft" OnValidSubmit="AddItemAsync" FormName="add-menu-item">
+        <DataAnnotationsValidator />
+        <div class="row g-2 align-items-end">
+            <div class="col-sm-3">
+                <label class="form-label" for="item-label">Label</label>
+                <InputText id="item-label" class="form-control" @bind-Value="Draft.Label" />
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label" for="item-page">Page id</label>
+                <InputNumber id="item-page" class="form-control" @bind-Value="Draft.PageId" />
+                <div class="form-text">Or leave empty and give a URL.</div>
+            </div>
+            <div class="col-sm-3">
+                <label class="form-label" for="item-url">External URL</label>
+                <InputText id="item-url" class="form-control" @bind-Value="Draft.ExternalUrl" />
+            </div>
+            <div class="col-sm-2">
+                <label class="form-label" for="item-order">Order</label>
+                <InputNumber id="item-order" class="form-control" @bind-Value="Draft.SortOrder" />
+            </div>
+            <div class="col-sm-2">
+                <button type="submit" class="btn btn-primary w-100" disabled="@IsBusy">Add</button>
+            </div>
+        </div>
+        <div class="form-check mt-2">
+            <InputCheckbox id="item-new-tab" class="form-check-input" @bind-Value="Draft.OpenInNewTab" />
+            <label class="form-check-label" for="item-new-tab">Open in a new tab</label>
+        </div>
+        <ValidationSummary class="mt-2" />
+    </EditForm>
+}

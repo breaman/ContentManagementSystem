@@ -92,7 +92,11 @@ public class RedisOutputCacheTests(SqlServerFixture sql, RedisFixture redis)
 
         await storeA.EvictByTagAsync(tag, cancellationToken);
 
-        (await storeB.GetAsync(key, cancellationToken)).Should().BeNull();
+        // Polled rather than asserted outright. Tag eviction in the Redis store is a write that the
+        // reading side observes on its next lookup, and "next" is not the same instant on another
+        // connection — a bare assertion here passes alone and fails under a loaded test run, which
+        // is the worst kind of test to leave behind.
+        await WaitUntilEvictedAsync(storeB, key, cancellationToken);
     }
 
     [Test]
@@ -133,6 +137,24 @@ public class RedisOutputCacheTests(SqlServerFixture sql, RedisFixture redis)
         await DrainAsync(instanceB, cancellationToken);
 
         (await clientB.GetStringAsync("/pricing", cancellationToken)).Should().Contain("Second words");
+    }
+
+    /// <summary>Waits for a key to disappear from a store, up to a few seconds.</summary>
+    private static async Task WaitUntilEvictedAsync(
+        IOutputCacheStore store,
+        string key,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (await store.GetAsync(key, cancellationToken) is null) return;
+
+            await Task.Delay(50, cancellationToken);
+        }
+
+        (await store.GetAsync(key, cancellationToken)).Should().BeNull();
     }
 
     private static async Task DrainAsync(CmsApplicationFactory instance, CancellationToken cancellationToken)

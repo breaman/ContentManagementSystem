@@ -4,6 +4,7 @@ using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Publishing;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Data.Interfaces;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
@@ -30,6 +31,8 @@ namespace ContentManagementSystem.Core.Content;
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="users">Identity of the caller, recorded on the published version and the audit row.</param>
 /// <param name="clock">Source of the current time.</param>
+/// <param name="cacheInvalidation">Enqueues cache eviction inside the transaction that earned it.</param>
+/// <param name="search">Enqueues the search reindex, in the same transaction (task P8-18).</param>
 /// <param name="logger">Log for every publish, delete, and refusal.</param>
 public sealed class ReusableContentService(
     ApplicationDbContext context,
@@ -43,6 +46,7 @@ public sealed class ReusableContentService(
     IUserService users,
     TimeProvider clock,
     ICacheInvalidationQueue cacheInvalidation,
+    ISearchIndexQueue search,
     ILogger<ReusableContentService> logger) : IReusableContentService
 {
     /// <summary>
@@ -339,6 +343,10 @@ public sealed class ReusableContentService(
             payload,
             cancellationToken);
 
+        // Reusable items are searchable in the backoffice like pages are, and from their working
+        // content for the same reason (task P8-18).
+        search.EnqueueReusable(id);
+
         if (RowVersions.TryApply(context.Entry(draft), request.ExpectedRowVersion) is false)
         {
             return CmsResult<ReusableDraftSaveResult>.Invalid(
@@ -584,6 +592,7 @@ public sealed class ReusableContentService(
 
         WriteAudit(UnpublishAuditType, item.Id, retired.VersionNumber, blastRadius);
         cacheInvalidation.EnqueueReusable(item.Id);
+        search.EnqueueReusable(item.Id);
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -787,6 +796,7 @@ public sealed class ReusableContentService(
             // has to walk the reference table to find them (spec section 16.2).
             WriteAudit(PublishAuditType, item.Id, published.VersionNumber, blastRadius);
             cacheInvalidation.EnqueueReusable(item.Id);
+            search.EnqueueReusable(item.Id);
             await context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);

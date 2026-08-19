@@ -1,0 +1,86 @@
+@page "/admin/tags"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentEditors)]
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Content
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Tags</PageTitle>
+
+<h1>Tags</h1>
+<p class="text-body-secondary">
+    The site's vocabulary. Renaming a tag renames it on every page carrying it; renaming it to a name
+    that already exists merges the two, which is usually what an editor looking at a near-duplicate
+    actually wants.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The tag was not changed" />
+
+@if (Items is null)
+{
+    <p role="status">Loading tags…</p>
+}
+else if (Items.Count == 0)
+{
+    <p>No tags yet. They are added on a page's properties panel.</p>
+}
+else
+{
+    <table class="table align-middle">
+        <caption>@Items.Count tag(s)</caption>
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Slug</th>
+                <th scope="col">Pages</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var tag in Items)
+            {
+                <tr>
+                    <th scope="row">
+                        @if (EditingId == tag.Id)
+                        {
+                            <input class="form-control form-control-sm" aria-label="New name"
+                                   @bind="NewName" @bind:event="oninput" />
+                        }
+                        else
+                        {
+                            @tag.Name
+                        }
+                    </th>
+                    <td><code>@tag.Slug</code></td>
+                    <td>
+                        <a href="@($"/admin/search?tag={tag.Slug}")">@tag.PageCount</a>
+                    </td>
+                    <td class="text-end">
+                        @if (EditingId == tag.Id)
+                        {
+                            <button type="button" class="btn btn-sm btn-primary" disabled="@IsBusy"
+                                    @onclick="() => RenameAsync(tag)">
+                                Save
+                            </button>
+                            <button type="button" class="btn btn-sm btn-link" disabled="@IsBusy"
+                                    @onclick="CancelRename">
+                                Cancel
+                            </button>
+                        }
+                        else
+                        {
+                            <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@IsBusy"
+                                    @onclick="() => StartRename(tag)">
+                                Rename
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" disabled="@IsBusy"
+                                    @onclick="() => DeleteAsync(tag)">
+                                Delete
+                            </button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}

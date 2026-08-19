@@ -49,6 +49,7 @@ public class VersionLabelTests : IDisposable
         _bunit.Services.AddSingleton<IToastService>(new SilentToastService());
         _bunit.Services.AddSingleton<TimeProvider>(
             new FakeTimeProvider(new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero)));
+        _bunit.Services.AddSingleton<ISearchClient>(new EmptySearchClient());
         _bunit.Services.AddSingleton<ICurrentUserClient>(new SignedInClient());
         // The page editor carries the review, schedule, and comment panels since P7-12. They ask
         // the server what to draw and draw nothing when the answer is nothing, which is what this

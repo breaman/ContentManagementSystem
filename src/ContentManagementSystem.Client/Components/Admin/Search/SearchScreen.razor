@@ -1,0 +1,137 @@
+@page "/admin/search"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentReaders)]
+@using ContentManagementSystem.Shared.Contracts.Search
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Search</PageTitle>
+
+<h1>Search</h1>
+<p class="text-body-secondary">
+    Everything: pages, media, and reusable content, over titles, body text, file names, and tags.
+    Draft text is searchable — this looks at what is being worked on, not only at what is live.
+</p>
+
+<form class="row g-2 align-items-end" @onsubmit="RunAsync" @onsubmit:preventDefault>
+    <div class="col-sm-4">
+        <label class="form-label" for="search-text">Words</label>
+        <input id="search-text" class="form-control" type="search" @bind="Text" @bind:event="oninput" />
+    </div>
+    <div class="col-sm-2">
+        <label class="form-label" for="search-kind">Kind</label>
+        <select id="search-kind" class="form-select" @bind="Kind">
+            <option value="">Anything</option>
+            <option value="@nameof(SearchResultKind.Page)">Pages</option>
+            <option value="@nameof(SearchResultKind.Media)">Media</option>
+            <option value="@nameof(SearchResultKind.Reusable)">Reusable</option>
+        </select>
+    </div>
+    <div class="col-sm-2">
+        <label class="form-label" for="search-status">Status</label>
+        <select id="search-status" class="form-select" @bind="Status">
+            <option value="">Any status</option>
+            @foreach (var status in Statuses)
+            {
+                <option value="@status">@status</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-2">
+        <label class="form-label" for="search-template">Template</label>
+        <select id="search-template" class="form-select" @bind="TemplateId">
+            <option value="">Any template</option>
+            @foreach (var template in Templates)
+            {
+                <option value="@template.Id">@template.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-sm-2">
+        <label class="form-label" for="search-tag">Tag</label>
+        <input id="search-tag" class="form-control" list="search-tag-options" @bind="Tag" />
+        <datalist id="search-tag-options">
+            @foreach (var tag in Tags)
+            {
+                <option value="@tag.Slug">@tag.Name (@tag.PageCount)</option>
+            }
+        </datalist>
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label" for="search-modified-from">Modified from</label>
+        <input id="search-modified-from" class="form-control" type="date" @bind="ModifiedFrom" />
+    </div>
+    <div class="col-sm-3">
+        <label class="form-label" for="search-modified-to">Modified to</label>
+        <input id="search-modified-to" class="form-control" type="date" @bind="ModifiedTo" />
+    </div>
+    <div class="col-sm-3 form-check ms-2">
+        <input id="search-unpublished" class="form-check-input" type="checkbox" @bind="HasUnpublishedChanges" />
+        <label class="form-check-label" for="search-unpublished">Has unpublished changes</label>
+    </div>
+    <div class="col-sm-2 form-check">
+        <input id="search-review" class="form-check-input" type="checkbox" @bind="PastReviewDate" />
+        <label class="form-check-label" for="search-review">Past review date</label>
+    </div>
+    <div class="col-sm-12">
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">Search</button>
+        <button type="button" class="btn btn-link" disabled="@IsBusy" @onclick="ResetAsync">Clear filters</button>
+    </div>
+</form>
+
+<DiagnosticList Diagnostics="Errors" Heading="That search could not be run" />
+
+@if (Results is null)
+{
+    <p role="status" class="mt-3">Searching…</p>
+}
+else
+{
+    <p role="status" class="mt-3">
+        @Results.TotalCount result(s).
+        @if (!Results.FullText)
+        {
+            <span class="text-body-secondary">
+                This database has no full-text index, so the search is a scan — correct, and slow on
+                a large site.
+            </span>
+        }
+    </p>
+
+    @if (Results.Hits.Count > 0)
+    {
+        <ul class="list-group">
+            @foreach (var hit in Results.Hits)
+            {
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                        <a href="@Link(hit)">@hit.Title</a>
+                        <span class="badge text-bg-secondary">@hit.Kind</span>
+                    </div>
+                    @if (!string.IsNullOrWhiteSpace(hit.Url))
+                    {
+                        <div><code>@hit.Url</code></div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(hit.Excerpt))
+                    {
+                        <p class="mb-0 text-body-secondary">@hit.Excerpt</p>
+                    }
+                    <small class="text-body-secondary">
+                        @(hit.IsPublished ? "Published" : "Not published") · indexed @hit.UpdatedOn.ToString("g")
+                    </small>
+                </li>
+            }
+        </ul>
+
+        <nav class="mt-3" aria-label="Result pages">
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    disabled="@(IsBusy || Skip == 0)" @onclick="PreviousAsync">
+                Previous
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm"
+                    disabled="@(IsBusy || Skip + Results.Hits.Count >= Results.TotalCount)"
+                    @onclick="NextAsync">
+                Next
+            </button>
+        </nav>
+    }
+}

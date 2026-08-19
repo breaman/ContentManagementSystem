@@ -1,0 +1,13 @@
+@using ContentManagementSystem.Core.Navigation
+@* The site's navigation, from the content tree or from a managed menu (tasks P8-15, P8-16).
+
+   Plain nested lists inside a landmark, with an aria-label, because that is what a screen reader
+   user navigates a site by (spec section 28). No classes beyond cms-nav: the document is styled by
+   whoever built the site, and markup that needs a stylesheet to be usable is markup that is broken
+   on the deployment that has not written one yet. *@
+@if (Nodes.Count > 0)
+{
+    <nav class="cms-nav" aria-label="@Label">
+        @Render(Nodes)
+    </nav>
+}

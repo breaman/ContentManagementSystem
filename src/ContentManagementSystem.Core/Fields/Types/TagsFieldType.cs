@@ -10,9 +10,16 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// </summary>
 /// <remarks>
 /// Stored as <c>{ "type": "tags", "value": ["release-notes", "v2"] }</c> — the tag text itself, not
-/// ids. The <c>Tag</c> and <c>PageTag</c> rows that P8 introduces are a projection built from these
-/// values on save, in the same way <c>ContentReference</c> is: the payload stays the record, and the
-/// relational side stays derivable from it.
+/// ids.
+/// <para>
+/// <strong>These values are not the page's taxonomy.</strong> Spec section 14.7 makes tags editorial
+/// metadata on the page — beside owner, review date, and internal notes — so the <c>Tag</c> and
+/// <c>PageTag</c> rows are written from the metadata patch by <c>ITagService</c> (task P8-20) and
+/// not projected from here. Two writers would mean a tag removed on the properties panel reappearing
+/// the next time somebody saved the payload. What this field type contributes is text: a zone of
+/// tags is indexed like any other content, so a template that renders a per-item tag list still
+/// makes those words findable.
+/// </para>
 /// <para>
 /// Configuration keys: <c>min</c> / <c>max</c> counts, <c>maxLength</c> per tag.
 /// </para>
@@ -23,9 +30,9 @@ namespace ContentManagementSystem.Core.Fields.Types;
 /// <see cref="ContentReferenceTargetType"/>.
 /// </para>
 /// <para>
-/// <strong>Completed in P8</strong> with search and taxonomy: autocomplete against the existing
-/// vocabulary, the tag projection, merge and rename of a tag across every page that carries it, and
-/// tag-filtered listings.
+/// <strong>Completed in P8</strong> with search and taxonomy (task P8-20): the vocabulary is
+/// autocompleted from the tags a site already uses, a tag can be renamed or merged across every page
+/// carrying it, and the backoffice search filters by one.
 /// </para>
 /// </remarks>
 public sealed class TagsFieldType : ListFieldTypeBase

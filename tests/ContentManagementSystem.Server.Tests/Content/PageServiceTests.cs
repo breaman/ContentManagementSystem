@@ -4,7 +4,9 @@ using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Core.Security;
+using ContentManagementSystem.Core.Tags;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Content;
@@ -514,6 +516,10 @@ public class PageServiceTests(SqlServerFixture fixture)
             // The real queue over the same context: a move writes an outbox row, and a suite that
             // stubbed it would not notice a move that stopped enqueuing one.
             new CacheInvalidationQueue(context, TimeProvider.System),
+            // Likewise real and over the same context: a page write enqueues an index message, and
+            // a stub here would hide a write path that stopped doing so.
+            new SearchIndexQueue(context, TimeProvider.System),
+            scope.ServiceProvider.GetRequiredService<ITagService>(),
             NullLogger<PageService>.Instance);
     }
 

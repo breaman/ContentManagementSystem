@@ -72,35 +72,69 @@ public class CachingTests(SqlServerFixture fixture)
     }
 
     [Test]
-    public async Task PublishingOnePageLeavesEveryOtherPagesCacheEntryAlone()
+    public async Task PublishingOnePageEvictsItsOwnEntryAndTheNavigationItChanged()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var subject = await PublishedPageAsync("Pricing", "Subject content", cancellationToken);
         var bystander = await PublishedPageAsync("Support", "Bystander content", cancellationToken);
 
-        // Drained before anything is cached. Each of those publishes enqueued its own eviction, and
-        // dispatching them afterwards would evict entries created after the publish they describe —
-        // which is what the poller's five-second cadence makes a non-issue in a running site and a
-        // false failure in a test that batches its fixtures.
+        await DispatchAsync(cancellationToken);
+
+        await SaveDraftAsync(subject.Summary.Id, "Subject republished", cancellationToken);
+        await PublishAsync(subject.Summary.Id, cancellationToken);
+
+        _bench.Context.ChangeTracker.Clear();
+
+        // Invalidation messages only. The same outbox also carries the search reindex a publish
+        // enqueues (task P8-18), and this test is about which caches a publish evicts.
+        var enqueued = await _bench.Context.OutboxMessages
+            .AsNoTracking()
+            .Where(message =>
+                message.ProcessedOn == null &&
+                message.Type == CacheInvalidationMessage.MessageType)
+            .Select(message => message.PayloadJson)
+            .ToListAsync(cancellationToken);
+
+        // Its own tag and the tree navigation, which every page renders and which this publish
+        // genuinely changed — and nothing at all about the page next to it. The navigation tag is
+        // breadth the spec asks for rather than over-eviction: a site whose menu is generated from
+        // the tree has every page depending on the tree (spec section 16.2).
+        enqueued.Should().ContainSingle();
+        enqueued[0].Should().Contain(Core.Caching.CacheTags.Page(subject.Summary.Id))
+            .And.Contain(Core.Caching.CacheTags.Navigation(Core.Caching.CacheTags.StructuralMenuKey))
+            .And.NotContain(Core.Caching.CacheTags.Page(bystander.Summary.Id));
+    }
+
+    [Test]
+    public async Task EvictingOneMediaItemLeavesThePagesThatDoNotShowItCached()
+    {
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
+        var bystander = await PublishedPageAsync("Support", "Bystander content", cancellationToken);
+
         await DispatchAsync(cancellationToken);
 
         using var client = _bench.CreateClient();
 
-        await client.GetStringAsync("/pricing", cancellationToken);
         await client.GetStringAsync("/support", cancellationToken);
 
-        // The bystander's stored content is changed behind the cache's back, with no publish and so
-        // no eviction. Its response can only stay the same if its entry survived the subject's
-        // publish — which is the half of "exactly its own entry" that a positive test cannot show.
+        // Rewritten behind the cache's back, so the response can only stay the same if the entry
+        // survived the eviction below.
         await RewriteStoredContentAsync(bystander.Summary.Id, "Bystander rewritten", cancellationToken);
 
-        await SaveDraftAsync(subject.Summary.Id, "Subject republished", cancellationToken);
-        await PublishAsync(subject.Summary.Id, cancellationToken);
+        await using (var scope = _bench.NewScope())
+        {
+            var queue = scope.ServiceProvider.GetRequiredService<ICacheInvalidationQueue>();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            queue.EnqueueMedia(4242);
+            await context.SaveChangesAsync(cancellationToken);
+        }
+
         await DispatchAsync(cancellationToken);
 
-        (await client.GetStringAsync("/pricing", cancellationToken)).Should().Contain("Subject republished");
-        (await client.GetStringAsync("/support", cancellationToken))
-            .Should().Contain("Bystander content").And.NotContain("Bystander rewritten");
+        // The "and nothing else" half: a page carries `media:{id}` only if it rendered that image,
+        // so a library edit reaches exactly the pages showing it.
+        (await client.GetStringAsync("/support", cancellationToken)).Should().Contain("Bystander content");
     }
 
     [Test]
@@ -197,7 +231,7 @@ public class CachingTests(SqlServerFixture fixture)
 
         var restarted = new OutboxRunner(
             scope.ServiceProvider.GetRequiredService<ApplicationDbContext>(),
-            scope.ServiceProvider.GetRequiredService<ICacheInvalidator>(),
+            scope.ServiceProvider.GetServices<IOutboxMessageHandler>(),
             new OutboxState(),
             scope.ServiceProvider.GetRequiredService<IOptions<OutboxOptions>>(),
             TimeProvider.System,

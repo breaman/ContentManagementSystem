@@ -2,6 +2,7 @@ using System.Globalization;
 
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
+using ContentManagementSystem.Shared.Contracts.Search;
 using ContentManagementSystem.Shared.Contracts.Security;
 using ContentManagementSystem.Shared.Services;
 
@@ -40,6 +41,10 @@ public partial class PropertiesPanel : ComponentBase
     /// <summary>Who is signed in, so "take ownership" has an id to write.</summary>
     [Inject]
     private ICurrentUserClient CurrentUser { get; set; } = default!;
+
+    /// <summary>Supplies the tag vocabulary the tag box completes against (task P8-20).</summary>
+    [Inject]
+    private ISearchClient Search { get; set; } = default!;
 
     /// <summary>The page as the server last reported it, or null while loading.</summary>
     [Parameter]
@@ -116,6 +121,11 @@ public partial class PropertiesPanel : ComponentBase
             // result and a result shows the whole address. A page that has never been published
             // still has one; it resolves against the tree, not against what is live.
             Url = (await Client.ResolveLinkAsync(Page.Summary.Id))?.Url;
+
+            // Fetched once per page rather than per keystroke. The vocabulary of a site is small
+            // and changes slowly, and a request behind every letter typed into the tag box would be
+            // a lot of traffic for a list that is the same each time.
+            TagSuggestions = await Search.SuggestTagsAsync(prefix: null, limit: 50);
         }
     }
 
@@ -161,6 +171,47 @@ public partial class PropertiesPanel : ComponentBase
 
     /// <summary>Reports an edit upwards.</summary>
     private Task ChangedAsync() => OnChanged.InvokeAsync();
+
+    /// <summary>What has been typed into the tag box but not yet committed.</summary>
+    private string? TagEntry { get; set; }
+
+    /// <summary>The tags this site already uses, offered as completions.</summary>
+    private IReadOnlyList<TagSummary> TagSuggestions { get; set; } = [];
+
+    /// <summary>Commits the tag box on Enter, and only on Enter.</summary>
+    /// <remarks>
+    /// Not on blur. An editor who clicks away from a half-typed word has not decided to tag the
+    /// page with it, and a tag added by accident is one that has to be found again to be removed.
+    /// </remarks>
+    private async Task OnTagKeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key is not ("Enter" or ",")) return;
+
+        var tag = TagEntry?.Trim();
+
+        TagEntry = null;
+
+        if (string.IsNullOrEmpty(tag) || Model is null) return;
+
+        // Case-insensitively, because the server folds "Product" and "product" into one tag and a
+        // panel that showed both would be showing a state that cannot exist.
+        if (Model.Tags.Any(existing => string.Equals(existing, tag, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        Model.Tags.Add(tag);
+
+        await ChangedAsync();
+    }
+
+    /// <summary>Takes one tag off the page.</summary>
+    private async Task RemoveTagAsync(string tag)
+    {
+        if (Model is null || !Model.Tags.Remove(tag)) return;
+
+        await ChangedAsync();
+    }
 
     /// <summary>Applies a checkbox and reports the edit.</summary>
     private Task SetAsync(Action<bool> assign, ChangeEventArgs args)

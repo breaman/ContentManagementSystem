@@ -1,0 +1,81 @@
+@page "/admin/navigation"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentPublishers)]
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Navigation
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Navigation</PageTitle>
+
+<h1>Navigation</h1>
+<p class="text-body-secondary">
+    Menus for the parts of a site that do not mirror the content tree — a footer, a utility bar.
+    The main menu is generated from the tree itself and needs nothing here: a page appears in it when
+    it is published, and leaves when it is not.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The menu was not saved" />
+
+@if (Items is null)
+{
+    <p role="status">Loading menus…</p>
+}
+else if (Items.Count == 0)
+{
+    <p>No managed menus yet.</p>
+}
+else
+{
+    <table class="table">
+        <caption>@Items.Count menu(s)</caption>
+        <thead>
+            <tr>
+                <th scope="col">Key</th>
+                <th scope="col">Name</th>
+                <th scope="col">Entries</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var menu in Items)
+            {
+                <tr>
+                    <th scope="row"><a href="@($"/admin/navigation/{menu.Id}")"><code>@menu.Key</code></a></th>
+                    <td>@menu.Name</td>
+                    <td>@menu.ItemCount</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-outline-danger"
+                                disabled="@IsBusy"
+                                @onclick="() => DeleteAsync(menu)">
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2 class="h5 mt-4">Add a menu</h2>
+<EditForm Model="Draft" OnValidSubmit="CreateAsync" FormName="create-menu">
+    <DataAnnotationsValidator />
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-3">
+            <label class="form-label" for="menu-key">Key</label>
+            <InputText id="menu-key" class="form-control" @bind-Value="Draft.Key" />
+            <div class="form-text">What a template asks for the menu by. It cannot be changed later.</div>
+        </div>
+        <div class="col-sm-3">
+            <label class="form-label" for="menu-name">Name</label>
+            <InputText id="menu-name" class="form-control" @bind-Value="Draft.Name" />
+        </div>
+        <div class="col-sm-4">
+            <label class="form-label" for="menu-description">Description</label>
+            <InputText id="menu-description" class="form-control" @bind-Value="Draft.Description" />
+        </div>
+        <div class="col-sm-2">
+            <button type="submit" class="btn btn-primary w-100" disabled="@IsBusy">Create</button>
+        </div>
+    </div>
+    <ValidationSummary class="mt-2" />
+</EditForm>

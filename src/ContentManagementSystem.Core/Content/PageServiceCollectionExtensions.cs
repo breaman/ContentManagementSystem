@@ -25,6 +25,13 @@ public static class PageServiceCollectionExtensions
     /// <remarks>
     /// Call alongside <c>AddCmsContent()</c> and <c>AddCmsFieldTypes()</c>: the draft and publishing
     /// services validate payloads and project reference rows, and both of those come from there.
+    /// <para>
+    /// Since task P8-18 these services also enqueue search indexing and write tag rows, so a host
+    /// calling this must also call <c>AddCmsCaching()</c> and <c>AddCmsSearch()</c>. Nothing here
+    /// registers those on the caller's behalf: the outbox needs a poller to drain it, and a
+    /// registration that quietly supplied the queue without one would leave a host writing messages
+    /// nobody dispatches.
+    /// </para>
     /// </remarks>
     public static IServiceCollection AddCmsPages(this IServiceCollection services)
     {

@@ -2,6 +2,7 @@ using System.Text.Json;
 
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Publishing;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Common;
@@ -83,6 +84,7 @@ public interface IDraftService
 /// <param name="context">The application database context.</param>
 /// <param name="validator">Checks a payload against the schema it was authored against.</param>
 /// <param name="references">Rewrites the draft's reference rows from its payload.</param>
+/// <param name="search">Asks for the page's search document to be rebuilt (task P8-18).</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="logger">Log for saves that lost a race and for checkpoints.</param>
@@ -90,6 +92,7 @@ public sealed class DraftService(
     ApplicationDbContext context,
     IContentSchemaValidator validator,
     IContentReferenceProjector references,
+    ISearchIndexQueue search,
     ICmsAuthorization authorization,
     IAclService acl,
     ILogger<DraftService> logger) : IDraftService
@@ -191,6 +194,11 @@ public sealed class DraftService(
             payload,
             cancellationToken);
 
+        // The backoffice index describes working content, so a draft save changes it even though
+        // nothing public moved. Enqueued in this transaction and applied by the outbox: extracting
+        // text from every zone is not work an editor should wait through (task P8-18).
+        search.EnqueuePage(pageId);
+
         if (RowVersions.TryApply(context.Entry(draft), request.ExpectedRowVersion) is false)
         {
             return CmsResult<DraftSaveResult>.Invalid(
@@ -271,6 +279,8 @@ public sealed class DraftService(
                 payload,
                 cancellationToken);
         }
+
+        search.EnqueuePage(pageId);
 
         await context.SaveChangesAsync(cancellationToken);
 

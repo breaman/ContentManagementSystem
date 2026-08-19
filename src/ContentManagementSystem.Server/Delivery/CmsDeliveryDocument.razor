@@ -1,3 +1,4 @@
+@using ContentManagementSystem.Rendering.Navigation
 @using ContentManagementSystem.Rendering.Seo
 @* The whole HTML document a public request receives. Static SSR only: there is no @@rendermode
    anywhere beneath this, no blazor.web.js, and no circuit — which is the decision that makes the
@@ -15,6 +16,11 @@
     <link rel="stylesheet" href="/css/site.css" />
 </head>
 <body>
+@* The site's primary navigation belongs to the shell rather than to a template: it is the same on
+   every page by definition, and a template that had to render it would be a template that can
+   forget to. It takes a nav:*tree cache dependency on this render, so publishing anywhere in the
+   tree evicts every page showing it (task P8-17). *@
+<CmsNavigation Context="Context" Label="Main" />
 <main class="cms-delivery">
     <CmsPageHost Context="Context" />
 </main>

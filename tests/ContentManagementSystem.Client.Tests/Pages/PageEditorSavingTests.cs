@@ -41,6 +41,7 @@ public class PageEditorSavingTests : IDisposable
         _bunit.Services.AddSingleton<IPageClient>(_client);
         _bunit.Services.AddSingleton<IToastService>(new SilentToastService());
         _bunit.Services.AddSingleton<TimeProvider>(_clock);
+        _bunit.Services.AddSingleton<ISearchClient>(new EmptySearchClient());
         _bunit.Services.AddSingleton<ICurrentUserClient>(new NobodyCurrentUserClient());
         // The page editor carries the review, schedule, and comment panels since P7-12. They ask
         // the server what to draw and draw nothing when the answer is nothing, which is what this

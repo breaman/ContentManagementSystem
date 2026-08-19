@@ -31,6 +31,8 @@ builder.Services.AddScoped<IShellLayoutStore, BrowserShellLayoutStore>();
 // The structure admin screens talk to the management API from the browser. Its server-side twin,
 // ServerStructureClient, backs the same screens during pre-render.
 builder.Services.AddScoped<IStructureClient, HttpStructureClient>();
+builder.Services.AddScoped<INavigationClient, HttpNavigationClient>();
+builder.Services.AddScoped<ISearchClient, HttpSearchClient>();
 
 // The page admin screens, likewise, with ServerPageClient behind the same interface on the server.
 builder.Services.AddScoped<IPageClient, HttpPageClient>();

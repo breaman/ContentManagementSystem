@@ -1,5 +1,6 @@
 using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Search;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Contracts.Api;
@@ -89,6 +90,8 @@ public interface IRecycleBinService
 /// <param name="urls">Withdraws the public routes a delete retires, and refreshes them on restore.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
 /// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
+/// <param name="cacheInvalidation">Enqueues cache eviction inside the transaction that earned it.</param>
+/// <param name="search">Enqueues the search reindex, in the same transaction (task P8-18).</param>
 /// <param name="logger">Log for every delete, restore, and purge.</param>
 public sealed class RecycleBinService(
     ApplicationDbContext context,
@@ -96,6 +99,7 @@ public sealed class RecycleBinService(
     ICmsAuthorization authorization,
     IAclService acl,
     ICacheInvalidationQueue cacheInvalidation,
+    ISearchIndexQueue search,
     ILogger<RecycleBinService> logger) : IRecycleBinService
 {
     /// <inheritdoc />
@@ -251,6 +255,10 @@ public sealed class RecycleBinService(
             subtree.Select(node => node.Id),
             cancellationToken);
 
+        // A recycled page must stop turning up in the backoffice search as well; the indexer finds
+        // the query filter hiding it and removes its document.
+        search.EnqueuePages(subtree.Select(node => node.Id));
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
@@ -356,6 +364,8 @@ public sealed class RecycleBinService(
         // Restored as drafts, so nothing comes back on the public site — but the tree changed shape
         // and the pages' cached 404s and route misses have to go.
         await cacheInvalidation.EnqueuePagesAsync(restored, cancellationToken);
+
+        search.EnqueuePages(restored);
 
         await context.SaveChangesAsync(cancellationToken);
 
