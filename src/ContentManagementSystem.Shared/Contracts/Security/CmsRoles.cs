@@ -38,6 +38,25 @@ public static class CmsRoles
     public const string ContentPublishers = $"{Administrator},{Developer},{Editor},{Approver}";
 
     /// <summary>
+    /// The roles that may approve or reject a submission. Mirrors
+    /// <see cref="CmsPermissions.ContentApprove"/>.
+    /// </summary>
+    /// <remarks>
+    /// Narrower than <see cref="ContentPublishers"/> by <see cref="Editor"/>, following the section
+    /// 21.1 matrix. That gap is the whole point of a two-step workflow: an editor may push the
+    /// button, but somebody else has to say the content is ready.
+    /// </remarks>
+    public const string ContentApprovers = $"{Administrator},{Developer},{Approver}";
+
+    /// <summary>
+    /// The roles that may submit a draft for review. Mirrors <see cref="CmsPermissions.ContentSubmit"/>.
+    /// </summary>
+    public const string ContentSubmitters = $"{Administrator},{Developer},{Editor},{Author}";
+
+    /// <summary>The roles that may read the audit log. Mirrors <see cref="CmsPermissions.AuditView"/>.</summary>
+    public const string AuditViewers = $"{Administrator},{Developer}";
+
+    /// <summary>
     /// The roles that may move content to the recycle bin and restore it. Mirrors
     /// <see cref="CmsPermissions.ContentDelete"/>.
     /// </summary>

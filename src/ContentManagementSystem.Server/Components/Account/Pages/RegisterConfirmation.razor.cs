@@ -1,7 +1,7 @@
 using System.Text;
 
+using ContentManagementSystem.Core.Notifications;
 using ContentManagementSystem.Data.Models;
-using ContentManagementSystem.Server.Components.Email;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Identity;
@@ -12,7 +12,8 @@ namespace ContentManagementSystem.Server.Components.Account.Pages;
 public partial class RegisterConfirmation : ComponentBase
 {
     [Inject] private UserManager<User> UserManager { get; set; } = default!;
-    [Inject] private IEmailSender<User> EmailSender { get; set; } = default!;
+    [Inject] private ICmsEmailSender EmailSender { get; set; } = default!;
+    [Inject] private IHostEnvironment Environment { get; set; } = default!;
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
     [Inject] private IdentityRedirectManager RedirectManager { get; set; } = default!;
 
@@ -42,9 +43,14 @@ public partial class RegisterConfirmation : ComponentBase
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
             _statusMessage = "Error finding user for unspecified email";
         }
-        else if (EmailSender is IdentityNoOpEmailSender)
+        else if (!EmailSender.IsConfigured && Environment.IsDevelopment())
         {
-            // Once you add a real email sender, you should remove this code that lets you confirm the account
+            // The developer's way in while no mail transport is configured (task P7-18): the
+            // confirmation link is shown on the page because nothing is going to deliver it.
+            //
+            // Gated on the environment as well as on the transport, which the scaffolded version was
+            // not. A production deployment that forgot to configure SMTP would otherwise hand every
+            // visitor a working confirmation link for any address they cared to type.
             var userId = await UserManager.GetUserIdAsync(user);
             var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
             code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));

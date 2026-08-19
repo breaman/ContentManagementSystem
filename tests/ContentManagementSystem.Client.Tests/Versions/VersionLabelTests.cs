@@ -50,6 +50,10 @@ public class VersionLabelTests : IDisposable
         _bunit.Services.AddSingleton<TimeProvider>(
             new FakeTimeProvider(new DateTimeOffset(2026, 8, 18, 9, 0, 0, TimeSpan.Zero)));
         _bunit.Services.AddSingleton<ICurrentUserClient>(new SignedInClient());
+        // The page editor carries the review, schedule, and comment panels since P7-12. They ask
+        // the server what to draw and draw nothing when the answer is nothing, which is what this
+        // stub says — so a suite about the editor stays about the editor.
+        _bunit.Services.AddSingleton<IWorkflowClient>(new SilentWorkflowClient());
         _bunit.Services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
         _bunit.Services.AddSingleton<IPageClient>(new VersionPageClient());
         _bunit.Services.AddSingleton<IReusableClient>(new VersionReusableClient());

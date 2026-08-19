@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 
+using ContentManagementSystem.Server.Api.Cms.Auditing;
 using ContentManagementSystem.Server.Api.Cms.Dashboard;
 using ContentManagementSystem.Server.Api.Cms.Media;
 using ContentManagementSystem.Server.Api.Cms.Pages;
@@ -8,6 +9,7 @@ using ContentManagementSystem.Server.Api.Cms.Preview;
 using ContentManagementSystem.Server.Api.Cms.Reusable;
 using ContentManagementSystem.Server.Api.Cms.Routing;
 using ContentManagementSystem.Server.Api.Cms.Structure;
+using ContentManagementSystem.Server.Api.Cms.Workflow;
 using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Security;
 
@@ -80,6 +82,13 @@ public static class CmsApiEndpoints
 
         group.MapPreviewTokenEndpoints();
         group.MapMarkupPreviewEndpoints();
+
+        group.MapWorkflowEndpoints();
+        group.MapCommentEndpoints();
+        group.MapScheduleEndpoints();
+        group.MapNotificationEndpoints();
+
+        group.MapAuditEndpoints();
 
         return group;
     }

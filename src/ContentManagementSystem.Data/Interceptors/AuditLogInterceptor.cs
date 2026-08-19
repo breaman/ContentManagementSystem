@@ -52,6 +52,13 @@ public sealed class AuditLogInterceptor(IUserService? users, TimeProvider clock)
         // table by the number of references on a page, per autosave, to record something already
         // recoverable from the payload that is audited beside it.
         "ContentReference",
+
+        // Also beyond spec section 23.5. A ScheduledJob row is written by the poller — claimed,
+        // completed, failed — with no person behind any of it, and the publish it performs is
+        // audited by the ordinary path. Notification rows are the same: derived from an audited
+        // event, one per recipient, and read once.
+        "ScheduledJob",
+        "Notification",
     };
 
     /// <inheritdoc />

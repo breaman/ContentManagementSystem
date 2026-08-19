@@ -40,3 +40,5 @@ holds, without reading `spec.md` end to end.
 | [0020](0020-catch-all-route-ordering-and-reserved-prefixes.md) | D20 — The content catch-all is mapped last; reserved prefixes are refused at both ends | Accepted |
 | [0021](0021-reusable-content-stored-as-a-payload-envelope.md) | D21 — A reusable item's content is an ordinary payload envelope over its block type's properties | Accepted |
 | [0022](0022-pre-render-shims-serialize-their-service-calls.md) | D22 — One request's `DbContext` is used once at a time: the pre-render shims serialize, the delivery readers open their own | Accepted |
+| [0023](0023-one-allow-rule-makes-a-permission-an-allowlist.md) | D23 — One allow rule turns a permission into an allowlist for that principal | Accepted |
+| [0024](0024-mail-is-smtp-configuration-not-a-provider-choice.md) | D24 — Mail is SMTP configuration, not a provider chosen in code | Accepted |

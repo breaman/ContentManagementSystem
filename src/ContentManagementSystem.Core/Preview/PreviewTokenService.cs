@@ -13,6 +13,7 @@ namespace ContentManagementSystem.Core.Preview;
 /// <inheritdoc cref="IPreviewTokenService" />
 /// <param name="context">The application database context.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="users">Who the caller is, for the revocation stamp.</param>
 /// <param name="clock">Source of the current time, so expiry is testable without waiting.</param>
 /// <param name="logger">Log for issuance and revocation, which are auditable acts.</param>
@@ -25,6 +26,7 @@ namespace ContentManagementSystem.Core.Preview;
 public sealed class PreviewTokenService(
     ApplicationDbContext context,
     ICmsAuthorization authorization,
+    IAclService acl,
     IUserService users,
     TimeProvider clock,
     ILogger<PreviewTokenService> logger) : IPreviewTokenService
@@ -40,6 +42,15 @@ public sealed class PreviewTokenService(
         {
             return CmsResult<IssuedPreviewToken>.Forbidden(
                 "Issuing preview links is not permitted.",
+                PreviewCodes.Forbidden);
+        }
+
+        // A preview link is a disclosure of one page, so it is governed by the rules on that page.
+        // Without this, a branch an editor may not read is one they may hand to the public.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, request.PageId, cancellationToken))
+        {
+            return CmsResult<IssuedPreviewToken>.Forbidden(
+                $"Issuing preview links for page {request.PageId} is not permitted.",
                 PreviewCodes.Forbidden);
         }
 
@@ -159,7 +170,7 @@ public sealed class PreviewTokenService(
             .IgnoreQueryFilters()
             .AnyAsync(candidate => candidate.Id == pageId, cancellationToken);
 
-        if (!exists)
+        if (!exists || !await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
         {
             return CmsResult<IReadOnlyList<PreviewTokenSummary>>.NotFound(
                 $"No page has id {pageId}.",
@@ -203,7 +214,8 @@ public sealed class PreviewTokenService(
         var token = await context.PreviewTokens
             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
-        if (token is null)
+        if (token is null
+            || !await acl.IsAllowedAsync(CmsPermissions.ContentEdit, token.PageId, cancellationToken))
         {
             return CmsResult<PreviewTokenSummary>.NotFound(
                 $"No preview link has id {id}.",
@@ -248,6 +260,13 @@ public sealed class PreviewTokenService(
         {
             return CmsResult<int>.Forbidden(
                 "Revoking preview links is not permitted.",
+                PreviewCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return CmsResult<int>.Forbidden(
+                $"Revoking preview links for page {pageId} is not permitted.",
                 PreviewCodes.Forbidden);
         }
 

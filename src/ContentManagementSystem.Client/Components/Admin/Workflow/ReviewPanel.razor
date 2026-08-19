@@ -1,0 +1,125 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Workflow
+
+@if (State is null)
+{
+    @* Nothing at all rather than an empty card. A page opened by somebody who cannot review, or on
+       a site running without approval, should not carry a heading for a thing that never happens. *@
+}
+else if (!IsEnabled)
+{
+    <section class="cms-review" aria-labelledby="cms-review-heading">
+        <h2 class="h6" id="cms-review-heading">Review</h2>
+        <p class="text-body-secondary">
+            This site publishes without approval, so there is nothing to submit.
+        </p>
+    </section>
+}
+else
+{
+    <section class="cms-review" aria-labelledby="cms-review-heading">
+
+        <h2 class="h6" id="cms-review-heading">Review</h2>
+
+        <p class="cms-review__status" role="status">@StatusLine</p>
+
+        @if (State.Pending is { } pending)
+        {
+            <dl class="cms-review__pending">
+                <dt>Submitted by</dt>
+                <dd>@(pending.SubmittedByName ?? $"user {pending.SubmittedByUserId}")</dd>
+
+                @if (pending.DueDate is { } due)
+                {
+                    <dt>Wanted by</dt>
+                    <dd>@due.ToString("d MMMM yyyy")</dd>
+                }
+
+                @if (pending.SubmissionNote is { Length: > 0 } note)
+                {
+                    <dt>They said</dt>
+                    <dd>@note</dd>
+                }
+            </dl>
+        }
+
+        @if (Error is { Length: > 0 } error)
+        {
+            <p class="alert alert-warning" role="alert">@error</p>
+        }
+
+        @if (State.CanSubmit)
+        {
+            <div class="cms-review__action">
+                <label class="form-label" for="cms-review-note">
+                    Anything the reviewer should know
+                </label>
+                <textarea class="form-control" id="cms-review-note" rows="2"
+                          @bind="_note" @bind:event="oninput"></textarea>
+
+                <button type="button" class="btn btn-primary mt-2"
+                        disabled="@IsBusy" @onclick="SubmitAsync">
+                    Submit for review
+                </button>
+            </div>
+        }
+
+        @if (State.CanDecide)
+        {
+            <div class="cms-review__action">
+                <label class="form-label" for="cms-review-decision">
+                    Why — required when sending it back
+                </label>
+                <textarea class="form-control" id="cms-review-decision" rows="2"
+                          @bind="_note" @bind:event="oninput"></textarea>
+
+                <div class="cms-review__buttons mt-2">
+                    <button type="button" class="btn btn-success"
+                            disabled="@IsBusy" @onclick="ApproveAsync">
+                        Approve
+                    </button>
+                    <button type="button" class="btn btn-outline-danger"
+                            disabled="@(IsBusy || string.IsNullOrWhiteSpace(_note))"
+                            @onclick="RejectAsync">
+                        Send back
+                    </button>
+                </div>
+            </div>
+        }
+        else if (State.Pending is not null && IsApprover)
+        {
+            @* The self-approval clause, said out loud. A disabled button with no explanation is a
+               screen an editor reloads twice before asking somebody (criterion P7 #3). *@
+            <p class="text-body-secondary">
+                You submitted this, and this site asks for a second pair of eyes before publishing.
+            </p>
+        }
+
+        @if (State.History.Count > 0)
+        {
+            <details class="cms-review__history">
+                <summary>Earlier rounds (@State.History.Count)</summary>
+                <ul>
+                    @foreach (var round in State.History)
+                    {
+                        <li>
+                            <strong>@round.State</strong>
+                            @if (round.DecidedByName is { Length: > 0 } who)
+                            {
+                                <text> by @who</text>
+                            }
+                            @if (round.DecidedOn is { } when)
+                            {
+                                <text> on @when.ToLocalTime().ToString("d MMM yyyy HH:mm")</text>
+                            }
+                            @if (round.DecisionNote is { Length: > 0 } said)
+                            {
+                                <div class="text-body-secondary">@said</div>
+                            }
+                        </li>
+                    }
+                </ul>
+            </details>
+        }
+
+    </section>
+}

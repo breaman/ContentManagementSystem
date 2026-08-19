@@ -30,17 +30,35 @@ namespace ContentManagementSystem.Server.Tests.Content;
 public sealed class StubAuthorization(params string[] permissions) : ICmsAuthorization
 {
     /// <summary>Everything the services these suites drive check, for the tests that are not about permissions.</summary>
-    public static StubAuthorization Everything { get; } = new(
+    /// <remarks>
+    /// A fresh instance per read rather than one shared singleton. <see cref="Roles"/> is settable,
+    /// TUnit runs these classes in parallel, and a shared default one test could write to is a
+    /// cross-test channel waiting to be used by accident.
+    /// </remarks>
+    public static StubAuthorization Everything => new(
         CmsPermissions.ContentRead,
         CmsPermissions.ContentEdit,
         CmsPermissions.ContentPublish,
+        CmsPermissions.ContentSubmit,
+        CmsPermissions.ContentApprove,
         CmsPermissions.ContentDelete,
 
         // The media pair joined the list in P5, when fixtures started putting pictures on pages
         // through the real upload pipeline rather than inserting rows.
         CmsPermissions.MediaUpload,
         CmsPermissions.MediaDelete,
-        CmsPermissions.UsersManage);
+        CmsPermissions.UsersManage,
+        CmsPermissions.AuditView);
+
+    /// <summary>
+    /// Roles the caller holds, which only the access-rule resolver reads.
+    /// </summary>
+    /// <remarks>
+    /// Settable rather than derived from <paramref name="permissions"/>: a suite testing section
+    /// ACLs needs a caller who holds a permission globally and is then narrowed by a rule, which is
+    /// two independent facts about them.
+    /// </remarks>
+    public IReadOnlyCollection<string> Roles { get; set; } = [];
 
     /// <inheritdoc />
     public bool HasPermission(string permission) => permissions.Contains(permission);
@@ -95,6 +113,20 @@ public sealed class PageWorkbench : IAsyncDisposable
     public T Resolve<T>() where T : notnull => _scope.ServiceProvider.GetRequiredService<T>();
 
     /// <summary>
+    /// Opens a second scope, standing in for a second request.
+    /// </summary>
+    /// <returns>The scope, which the caller disposes.</returns>
+    /// <remarks>
+    /// The workbench's own scope is one request's worth of services, and some of them cache for
+    /// exactly that long on purpose — <c>AclService</c> reads the access rules once and answers from
+    /// them for the rest of the request (task P7-05). A test that arranges rules and then acts
+    /// through the same scope is asking a resolver that has already made up its mind, which is not
+    /// what a second HTTP request would do. Arranging in the workbench's scope and acting in one of
+    /// these is.
+    /// </remarks>
+    public AsyncServiceScope NewScope() => _factory.Services.CreateAsyncScope();
+
+    /// <summary>
     /// An HTTP client against the same application and the same database this workbench arranges.
     /// </summary>
     /// <param name="followRedirects">
@@ -134,11 +166,17 @@ public sealed class PageWorkbench : IAsyncDisposable
     /// <param name="interceptor">
     /// An EF interceptor to add, for the suite that injects a failure mid-transaction.
     /// </param>
+    /// <param name="configure">
+    /// Extra registrations, applied last. For a suite that has to observe something the application
+    /// only talks to across a boundary — the mail transport, say — rather than replace part of the
+    /// graph under test.
+    /// </param>
     public static async Task<PageWorkbench> CreateAsync(
         SqlServerFixture fixture,
         StubAuthorization? authorization = null,
         CancellationToken cancellationToken = default,
-        IInterceptor? interceptor = null)
+        IInterceptor? interceptor = null,
+        Action<IServiceCollection>? configure = null)
     {
         var granted = authorization ?? StubAuthorization.Everything;
         var clock = new FakeTimeProvider();
@@ -167,6 +205,8 @@ public sealed class PageWorkbench : IAsyncDisposable
                     .AddInterceptors(CmsSaveInterceptors.Resolve(provider))
                     .AddInterceptors(interceptor));
             }
+
+            configure?.Invoke(services);
         });
 
         return new PageWorkbench(factory, granted, clock);

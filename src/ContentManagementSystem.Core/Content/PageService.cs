@@ -21,13 +21,27 @@ namespace ContentManagementSystem.Core.Content;
 /// <param name="tree">Owns the materialized path; nothing else may write it.</param>
 /// <param name="urls">Owns the route table; every change to a slug or an explicit URL goes through it.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="clock">Reads the current time, so a lock's expiry is testable.</param>
 /// <param name="logger">Log for page creation and for saves that lost a race.</param>
+/// <remarks>
+/// Every entry point asks two questions in the same order: may this caller do this at all, and may
+/// they do it <em>here</em>. The second is asked on the id the caller supplied rather than on
+/// anything derived from it, because an id in a request is a guess until something has checked it —
+/// which is exactly what the IDOR sweep in task P7-07 goes looking for.
+/// <para>
+/// A refusal of <c>Content.Read</c> answers <em>not found</em> rather than <em>forbidden</em>: spec
+/// section 21.2 says a subtree with read denied is hidden entirely, and a 403 that a 404 would not
+/// have produced tells the caller the page exists. Refusals of every other permission answer
+/// forbidden, because by then the caller has already been told the page is there.
+/// </para>
+/// </remarks>
 public sealed class PageService(
     ApplicationDbContext context,
     IPageTreeService tree,
     IUrlService urls,
     ICmsAuthorization authorization,
+    IAclService acl,
     TimeProvider clock,
     ILogger<PageService> logger) : IPageService
 {
@@ -89,6 +103,22 @@ public sealed class PageService(
                 nameof(CreatePageRequest.ParentId));
         }
 
+        // A new page inherits its parent's access rules the moment it exists, so the rule that
+        // governs creating it is the parent's. Creating at the root has no parent to ask and is
+        // therefore governed by the global grant alone — which is the correct reading: an editor
+        // confined to /products has an allow rule, and an allow rule refuses everywhere it does not
+        // reach, the site root included.
+        if (parent is not null
+            && !await acl.IsAllowedAsync(CmsPermissions.ContentEdit, parent.Id, cancellationToken))
+        {
+            return Forbidden($"Adding pages under page {parent.Id} is not permitted.");
+        }
+
+        if (parent is null && !await acl.IsAllowedAtRootAsync(CmsPermissions.ContentEdit, cancellationToken))
+        {
+            return Forbidden("Adding pages at the root of the site is not permitted.");
+        }
+
         var diagnostics = new List<ValidationDiagnostic>();
         diagnostics.AddRange(ValidateTitle(request.Title, nameof(CreatePageRequest.Title)));
 
@@ -146,6 +176,12 @@ public sealed class PageService(
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
             return Forbidden("Reading pages is not permitted.");
+        }
+
+        // Read refusals are indistinguishable from absence on purpose; see the class remarks.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, id, cancellationToken))
+        {
+            return NotFound(id);
         }
 
         var detail = await LoadDetailAsync(id, cancellationToken);
@@ -254,6 +290,24 @@ public sealed class PageService(
         var hasMore = found.Count > limit;
         if (hasMore) found.RemoveAt(found.Count - 1);
 
+        // Taken before the access rules cut the list, because the cursor has to name the last row
+        // that was *read*. Naming the last row that survived filtering would hand back a cursor
+        // pointing at a page already served, and the client would loop over it forever whenever the
+        // tail of a page was hidden.
+        var lastRead = found.Count > 0 ? found[^1].Id : (int?)null;
+
+        // Applied after the page has been cut rather than pushed into the query, which would mean
+        // translating "deeper beats shallower, deny beats allow" into SQL and keeping two copies of
+        // the precedence rules in step. The cost is that a page of results can come back short when
+        // rules hide part of it; the cursor still advances by the last row read, so paging stays
+        // correct and the client simply follows it.
+        var readable = await acl.GetFilterAsync(CmsPermissions.ContentRead, cancellationToken);
+
+        if (!readable.IsUnrestricted)
+        {
+            found = [.. found.Where(page => readable.Allows(page.Id, page.Path))];
+        }
+
         var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
         var locks = await LiveLocksAsync([.. found.Select(page => page.Id)], cancellationToken);
 
@@ -266,7 +320,7 @@ public sealed class PageService(
                 LockedBy(locks, page.Id)))
             .ToList();
 
-        var next = hasMore && found.Count > 0 ? Cursor.Encode(found[^1].Id) : null;
+        var next = hasMore && lastRead is { } cursor ? Cursor.Encode(cursor) : null;
 
         return CmsResult<CursorPage<PageSummary>>.Success(new CursorPage<PageSummary>(items, next));
     }
@@ -293,7 +347,7 @@ public sealed class PageService(
                 .AsNoTracking()
                 .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
-            if (parent is null)
+            if (parent is null || !await acl.IsAllowedAsync(CmsPermissions.ContentRead, id, cancellationToken))
             {
                 return CmsResult<IReadOnlyList<PageTreeNode>>.NotFound(
                     $"No page has id {id}.",
@@ -328,6 +382,18 @@ public sealed class PageService(
             .ThenBy(candidate => candidate.SortOrder)
             .ThenBy(candidate => candidate.Id)
             .ToListAsync(cancellationToken);
+
+        // A subtree the caller may not read is gone from the tree, not greyed out in it (criterion
+        // P7 #6). Filtering the flat list is enough to take the descendants with it: the nodes below
+        // a hidden page are only ever attached to the answer through their parent, so a parent that
+        // never gets built is a branch that never appears. They are dropped here anyway, because an
+        // inherited rule reaches them and this is one prefix test each rather than a query.
+        var readable = await acl.GetFilterAsync(CmsPermissions.ContentRead, cancellationToken);
+
+        if (!readable.IsUnrestricted)
+        {
+            found = [.. found.Where(page => readable.Allows(page.Id, page.Path))];
+        }
 
         var withChildren = await ParentsWithChildrenAsync(found, cancellationToken);
         var locks = await LiveLocksAsync([.. found.Select(page => page.Id)], cancellationToken);
@@ -389,6 +455,11 @@ public sealed class PageService(
             .FirstOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
         if (page?.DraftVersion is null) return NotFound(id);
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, id, cancellationToken))
+        {
+            return Forbidden($"Editing page {id} is not permitted.");
+        }
 
         var draft = page.DraftVersion;
         var diagnostics = new List<ValidationDiagnostic>();
@@ -538,6 +609,29 @@ public sealed class PageService(
         if (subject is null)
         {
             return CmsResult<PageMoveResult>.NotFound($"No page has id {id}.", PageCodes.NotFound);
+        }
+
+        // Both ends of the move are checked. Only asking about the page being moved would let an
+        // editor confined to /products take a page out of it and drop it anywhere, and only asking
+        // about the destination would let them take one out of a branch they may not touch.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, id, cancellationToken))
+        {
+            return CmsResult<PageMoveResult>.Forbidden(
+                $"Moving page {id} is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        var allowedAtDestination = request.ParentId is { } destination
+            ? await acl.IsAllowedAsync(CmsPermissions.ContentEdit, destination, cancellationToken)
+            : await acl.IsAllowedAtRootAsync(CmsPermissions.ContentEdit, cancellationToken);
+
+        if (!allowedAtDestination)
+        {
+            return CmsResult<PageMoveResult>.Forbidden(
+                request.ParentId is { } refused
+                    ? $"Moving pages under page {refused} is not permitted."
+                    : "Moving pages to the root of the site is not permitted.",
+                PageCodes.Forbidden);
         }
 
         if (request.ParentId is { } parentId &&

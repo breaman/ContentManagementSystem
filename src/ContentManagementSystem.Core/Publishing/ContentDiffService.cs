@@ -65,10 +65,12 @@ public interface IContentDiffService
 /// <param name="context">The application database context.</param>
 /// <param name="registry">The field types, which is what renders a value comparably.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 public sealed class ContentDiffService(
     ApplicationDbContext context,
     IFieldTypeRegistry registry,
-    ICmsAuthorization authorization) : IContentDiffService
+    ICmsAuthorization authorization,
+    IAclService acl) : IContentDiffService
 {
     /// <summary>
     /// The comparison itself, which needs no database and is tested without one (task P2-25).
@@ -85,6 +87,11 @@ public sealed class ContentDiffService(
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
             return CmsResult<ContentDiff>.Forbidden("Reading pages is not permitted.", PageCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<ContentDiff>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
 
         var versions = await context.PageVersions
@@ -122,6 +129,11 @@ public sealed class ContentDiffService(
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
             return CmsResult<ContentDiff>.Forbidden("Reading pages is not permitted.", PageCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<ContentDiff>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
 
         if (!ContentPayload.TryParse(contentJson, out var mine) || !mine.IsObject)

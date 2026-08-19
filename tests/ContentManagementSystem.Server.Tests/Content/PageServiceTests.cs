@@ -3,6 +3,7 @@ using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
 using ContentManagementSystem.Shared.Content;
@@ -491,17 +492,26 @@ public class PageServiceTests(SqlServerFixture fixture)
     private static PageService Service(
         IServiceScope scope,
         ApplicationDbContext context,
-        string[] permissions) =>
-        new(
+        string[] permissions)
+    {
+        var authorization = new StubAuthorization(permissions);
+
+        return new PageService(
             context,
             scope.ServiceProvider.GetRequiredService<IPageTreeService>(),
             // Resolved rather than stubbed. It shares this scope's ApplicationDbContext — the same
             // instance the test asserts against — so the route rows it writes are committed by the
             // page service's own SaveChanges, which is the arrangement production runs.
             scope.ServiceProvider.GetRequiredService<IUrlService>(),
-            new StubAuthorization(permissions),
+            authorization,
+            // The real resolver over the same context, not a permissive stub. These tests write no
+            // access rules, so it answers "allowed" for everything — which is the point: the rules
+            // are additive, and a suite about page CRUD should be reading the same code path a site
+            // with no ACLs configured runs.
+            new AclService(context, authorization, new StubUserService(), NullLogger<AclService>.Instance),
             TimeProvider.System,
             NullLogger<PageService>.Instance);
+    }
 
     /// <summary>Builds a validator over the field types this deployment registered.</summary>
     private static ContentSchemaValidator Validator(IServiceScope scope, Template template) =>
@@ -564,9 +574,11 @@ public class PageServiceTests(SqlServerFixture fixture)
         string.Join("; ", result.Diagnostics.Diagnostics.Select(
             diagnostic => $"{diagnostic.Code}: {diagnostic.Message}"));
 
-    /// <summary>Grants exactly the permissions it was given.</summary>
+    /// <summary>Grants exactly the permissions it was given, and holds no roles.</summary>
     private sealed class StubAuthorization(string[] permissions) : ICmsAuthorization
     {
+        public IReadOnlyCollection<string> Roles => [];
+
         public bool HasPermission(string permission) => permissions.Contains(permission);
     }
 }

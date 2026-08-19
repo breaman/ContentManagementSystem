@@ -37,6 +37,23 @@ public class SiteSettings : FingerPrintEntityBase
     public WorkflowMode WorkflowMode { get; set; } = WorkflowMode.None;
 
     /// <summary>
+    /// Whether retiring a page leaves a redirect to its parent behind instead of a 404
+    /// (spec section 11.6).
+    /// </summary>
+    /// <remarks>
+    /// Off by default, and that is the conservative reading rather than the lazy one. A redirect
+    /// invented by the system is a URL the site now promises to serve forever, and inventing them
+    /// automatically on a site with a deep tree produces chains nobody wrote and nobody can audit.
+    /// A deployment that would rather keep the traffic turns it on; either way the choice is
+    /// recorded rather than implied by whichever branch somebody coded.
+    /// <para>
+    /// It applies to scheduled and manual retirement alike, so an editor cannot be surprised by the
+    /// difference between pressing the button and asking for it to be pressed at midnight.
+    /// </para>
+    /// </remarks>
+    public bool RedirectToParentOnUnpublish { get; set; }
+
+    /// <summary>
     /// Page served at the site root. Untyped <c>int</c> until <c>Page</c> arrives in Phase 2, when
     /// the foreign key is added.
     /// </summary>

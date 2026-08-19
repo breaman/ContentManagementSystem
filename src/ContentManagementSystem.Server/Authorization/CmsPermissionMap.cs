@@ -36,6 +36,14 @@ public static class CmsPermissionMap
             [
                 CmsRoles.Administrator, CmsRoles.Developer, CmsRoles.Editor, CmsRoles.Approver,
             ],
+            [CmsPermissions.ContentSubmit] =
+            [
+                CmsRoles.Administrator, CmsRoles.Developer, CmsRoles.Editor, CmsRoles.Author,
+            ],
+            [CmsPermissions.ContentApprove] =
+            [
+                CmsRoles.Administrator, CmsRoles.Developer, CmsRoles.Approver,
+            ],
             [CmsPermissions.ContentDelete] =
             [
                 CmsRoles.Administrator, CmsRoles.Developer, CmsRoles.Editor,
@@ -61,5 +69,40 @@ public static class CmsPermissionMap
             [
                 CmsRoles.Administrator,
             ],
+            [CmsPermissions.AuditView] =
+            [
+                CmsRoles.Administrator, CmsRoles.Developer,
+            ],
         };
+
+    /// <summary>Every permission the given roles hold between them.</summary>
+    /// <param name="roles">Role names, as they appear on the caller's principal.</param>
+    /// <returns>The union of their grants, in the order the permissions are declared above.</returns>
+    /// <remarks>
+    /// The inverse of <see cref="RolesByPermission"/>, computed rather than declared so the two
+    /// cannot disagree. Its caller is <c>CustomUserClaimsPrincipalFactory</c>, which stamps the
+    /// result onto the principal so the WebAssembly backoffice can hide controls the server would
+    /// refuse — see <see cref="CmsClaimTypes.Permission"/> for why that is a display convenience and
+    /// never the check itself.
+    /// </remarks>
+    public static IReadOnlyList<string> PermissionsFor(IEnumerable<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+
+        var held = new HashSet<string>(roles, StringComparer.Ordinal);
+        var granted = new List<string>();
+
+        foreach (var (permission, grantedTo) in RolesByPermission)
+        {
+            for (var i = 0; i < grantedTo.Count; i++)
+            {
+                if (!held.Contains(grantedTo[i])) continue;
+
+                granted.Add(permission);
+                break;
+            }
+        }
+
+        return granted;
+    }
 }

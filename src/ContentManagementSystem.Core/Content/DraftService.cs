@@ -10,6 +10,7 @@ using ContentManagementSystem.Shared.Contracts.Api;
 using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Security;
+using ContentManagementSystem.Shared.Contracts.Workflow;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -83,12 +84,14 @@ public interface IDraftService
 /// <param name="validator">Checks a payload against the schema it was authored against.</param>
 /// <param name="references">Rewrites the draft's reference rows from its payload.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="logger">Log for saves that lost a race and for checkpoints.</param>
 public sealed class DraftService(
     ApplicationDbContext context,
     IContentSchemaValidator validator,
     IContentReferenceProjector references,
     ICmsAuthorization authorization,
+    IAclService acl,
     ILogger<DraftService> logger) : IDraftService
 {
     /// <inheritdoc />
@@ -99,6 +102,14 @@ public sealed class DraftService(
         if (!authorization.HasPermission(CmsPermissions.ContentRead))
         {
             return Forbidden<DraftState>("Reading pages is not permitted.");
+        }
+
+        // Not found rather than forbidden, matching PageService: a subtree with read denied is
+        // hidden, and a draft that answered 403 where the page itself answers 404 would give the
+        // hidden branch away.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return NotFound<DraftState>(pageId);
         }
 
         var draft = await context.Pages
@@ -125,9 +136,26 @@ public sealed class DraftService(
             return Forbidden<DraftSaveResult>("Editing pages is not permitted.");
         }
 
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return Forbidden<DraftSaveResult>($"Editing page {pageId} is not permitted.");
+        }
+
         var page = await LoadForWriteAsync(pageId, cancellationToken);
 
         if (page?.DraftVersion is null) return NotFound<DraftSaveResult>(pageId);
+
+        // A draft under review is frozen (spec section 11.1, task P7-10). The point of an approval
+        // is that what publishes is what was approved, and a draft editable between the two would
+        // make the approval a statement about content that no longer exists. The way out is a
+        // decision, not a save.
+        if (page.DraftVersion.Status is PageVersionStatus.InReview)
+        {
+            return CmsResult<DraftSaveResult>.Conflict(
+                WorkflowCodes.LockedForReview,
+                "This draft is waiting for review and cannot be edited until it is approved or " +
+                "sent back.");
+        }
 
         var draft = page.DraftVersion;
 
@@ -199,9 +227,22 @@ public sealed class DraftService(
             return Forbidden<DraftState>("Editing pages is not permitted.");
         }
 
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return Forbidden<DraftState>($"Editing page {pageId} is not permitted.");
+        }
+
         var page = await LoadForWriteAsync(pageId, cancellationToken);
 
         if (page?.DraftVersion is null) return NotFound<DraftState>(pageId);
+
+        if (page.DraftVersion.Status is PageVersionStatus.InReview)
+        {
+            return CmsResult<DraftState>.Conflict(
+                WorkflowCodes.LockedForReview,
+                "This draft is waiting for review, so there is nothing to discard until it is " +
+                "approved or sent back.");
+        }
 
         if (page.PublishedVersion is null)
         {
@@ -250,6 +291,11 @@ public sealed class DraftService(
         if (!authorization.HasPermission(CmsPermissions.ContentEdit))
         {
             return Forbidden<DraftState>("Editing pages is not permitted.");
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return Forbidden<DraftState>($"Editing page {pageId} is not permitted.");
         }
 
         if (string.IsNullOrWhiteSpace(label))

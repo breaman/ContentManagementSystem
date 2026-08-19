@@ -2,16 +2,20 @@ using System.Diagnostics;
 
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
+using ContentManagementSystem.Core.Auditing;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Dashboard;
 using ContentManagementSystem.Core.Fields;
 using ContentManagementSystem.Core.Media;
 using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Media.Stores;
+using ContentManagementSystem.Core.Notifications;
 using ContentManagementSystem.Core.Routing;
+using ContentManagementSystem.Core.Scheduling;
 using ContentManagementSystem.Core.Security;
 using ContentManagementSystem.Core.Structure;
 using ContentManagementSystem.Core.Telemetry;
+using ContentManagementSystem.Core.Workflow;
 using ContentManagementSystem.Data.Common;
 using ContentManagementSystem.Data.Interceptors;
 using ContentManagementSystem.Data.Interfaces;
@@ -23,6 +27,7 @@ using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
 using ContentManagementSystem.Server.Delivery.Preview;
 using ContentManagementSystem.Server.HealthChecks;
+using ContentManagementSystem.Server.HostedServices;
 using ContentManagementSystem.Server.Media;
 using ContentManagementSystem.Server.Components;
 using ContentManagementSystem.Server.Components.Account;
@@ -135,6 +140,10 @@ try
     builder.Services.AddCmsFieldTypes();
     builder.Services.AddCmsStructure();
     builder.Services.AddCmsAuthorization();
+    // Section-level access rules (tasks P7-04, P7-05). Registered beside the global permission
+    // policies because the two are asked together: a role grant says what an editor may do, and
+    // this says where.
+    builder.Services.AddCmsAccessControl();
     // The payload engine (task P1-30, completed in P2-10). This is what P1-30 was waiting for: the
     // catalog it registers is DatabaseContentSchemaCatalog, which reads captured revision snapshots
     // and caches them for the life of the process. Registering an empty catalog earlier, to make
@@ -148,6 +157,17 @@ try
     // references, the audit log, and the not-found log without owning any of them, which is why it
     // is registered beside the page services rather than by them.
     builder.Services.AddCmsDashboard();
+    // Review, comments, notifications, mail, and scheduling (tasks P7-09 to P7-19). One call,
+    // because these depend on each other: workflow raises notifications, notifications need a
+    // transport, and a scheduled publish notifies its owner about what it did.
+    builder.Services.AddCmsWorkflow();
+    // The read-only audit viewer (task P7-20). Registered separately because it depends on nothing
+    // the workflow does — it reads rows the save interceptor writes.
+    builder.Services.AddCmsAuditing();
+    builder.Services.Configure<CmsEmailOptions>(
+        builder.Configuration.GetSection(CmsEmailOptions.SectionName));
+    builder.Services.Configure<PublishSchedulerOptions>(
+        builder.Configuration.GetSection(PublishSchedulerOptions.SectionName));
     // URLs, redirects, and route resolution (tasks P3-04 and P3-05). Registered beside the page
     // services rather than with delivery, because it is the write path that depends on it: creating,
     // renaming, publishing, and recycling a page all rebuild routes inside their own transactions.
@@ -216,7 +236,13 @@ try
         // unwritable store means no upload succeeds and no cold rendition can be generated.
         .AddCheck<CmsMediaStoreHealthCheck>(
             CmsMediaStoreHealthCheck.Name,
-            tags: ["ready", "cms", "media"]);
+            tags: ["ready", "cms", "media"])
+        // The cms-scheduler check of task P7-17. Unhealthy when publishing is more than five
+        // minutes behind, or when the poll loop has stopped altogether — the second of which
+        // otherwise has no symptom until somebody notices a page that never went live.
+        .AddCheck<CmsSchedulerHealthCheck>(
+            CmsSchedulerHealthCheck.Name,
+            tags: ["ready", "cms", "scheduler"]);
 
     // The management API is cookie-authenticated, so every write carries an antiforgery token in a
     // header. Naming the header here is what lets the JSON endpoints validate one at all — the
@@ -236,13 +262,23 @@ try
     builder.Services.AddSingleton<IFieldEditorCatalog>(new FieldEditorCatalog());
     builder.Services.AddHostedService<CmsEditorStartupService>();
 
-    builder.Services.AddSingleton<IEmailSender<User>, IdentityNoOpEmailSender>();
+    // Identity's account mail goes through the same transport as workflow notifications (task
+    // P7-18). The no-op sender it replaces discarded password resets silently.
+    builder.Services.AddSingleton<IEmailSender<User>, IdentityCmsEmailSender>();
     builder.Services.AddScoped<IUserService, HttpUserService>();
 
     // A bulk job outlives the request that started it, and everything it runs authorizes the caller
     // and stamps their identity on an audit row (task P6-29). This replaces Core's identity-free
     // default with one that captures the signed-in editor, so item forty is still theirs.
     builder.Services.AddScoped<IBulkOperationScopeFactory, HttpBulkOperationScopeFactory>();
+
+    // The same problem one step further removed: a scheduled job has only the user id it was written
+    // with, so its caller is rebuilt from the identity tables rather than captured (task P7-13).
+    builder.Services.AddSingleton<IJobIdentityScopeFactory, HttpJobIdentityScopeFactory>();
+
+    // Claims what is due every thirty seconds. Claiming is one atomic UPDATE … OUTPUT, so running
+    // this on every instance is correct rather than merely tolerated (risk R16).
+    builder.Services.AddHostedService<PublishSchedulerService>();
 
     // Backs the structure admin screens while they pre-render, calling the services directly rather
     // than looping back through the HTTP API (task P1-29). Scoped alongside them, the gate keeps the
@@ -254,6 +290,7 @@ try
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();
     builder.Services.AddScoped<IMediaClient, ServerMediaClient>();
     builder.Services.AddScoped<IMarkupPreviewClient, ServerMarkupPreviewClient>();
+    builder.Services.AddScoped<IWorkflowClient, ServerWorkflowClient>();
     builder.Services.AddScoped<ICurrentUserClient, ServerCurrentUserClient>();
     builder.Services.AddScoped<IDashboardClient, ServerDashboardClient>();
     builder.Services.AddScoped<IToastService, ToastService>();

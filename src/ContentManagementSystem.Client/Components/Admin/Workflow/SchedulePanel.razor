@@ -1,0 +1,51 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Workflow
+
+@if (State is not null)
+{
+    <section class="cms-schedule" aria-labelledby="cms-schedule-heading">
+
+        <h2 class="h6" id="cms-schedule-heading">Schedule</h2>
+
+        <p class="text-body-secondary">
+            Times are @State.TimeZoneId. The exact moment is shown beneath each box, because
+            &ldquo;09:00&rdquo; happens twice on the morning the clocks go back.
+        </p>
+
+        @if (State.FailureReason is { Length: > 0 } failure)
+        {
+            <p class="alert alert-danger" role="alert">
+                The last scheduled run was refused and will not be retried: @failure
+            </p>
+        }
+
+        <div class="cms-schedule__field">
+            <label class="form-label" for="cms-schedule-publish">Publish at</label>
+            <input class="form-control" type="datetime-local" id="cms-schedule-publish"
+                   value="@_publishLocal" @onchange="OnPublishChanged" />
+            <p class="form-text" id="cms-schedule-publish-help">@PublishHelp</p>
+        </div>
+
+        <div class="cms-schedule__field">
+            <label class="form-label" for="cms-schedule-unpublish">Stop serving at</label>
+            <input class="form-control" type="datetime-local" id="cms-schedule-unpublish"
+                   value="@_unpublishLocal" @onchange="OnUnpublishChanged" />
+            <p class="form-text" id="cms-schedule-unpublish-help">@UnpublishHelp</p>
+        </div>
+
+        @if (Error is { Length: > 0 } error)
+        {
+            <p class="alert alert-warning" role="alert">@error</p>
+        }
+
+        <div class="cms-schedule__buttons">
+            <button type="button" class="btn btn-primary" disabled="@IsBusy" @onclick="SaveAsync">
+                Save schedule
+            </button>
+            <button type="button" class="btn btn-outline-secondary"
+                    disabled="@(IsBusy || !HasSchedule)" @onclick="ClearAsync">
+                Clear
+            </button>
+        </div>
+
+    </section>
+}

@@ -48,6 +48,11 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
                 [$"ConnectionStrings:{Constants.DatabaseConnectionString}"] = connectionString,
                 // The OTLP exporter would otherwise try to reach a collector that is not running.
                 ["OTEL_EXPORTER_OTLP_ENDPOINT"] = null,
+                // The publish scheduler polls every thirty seconds and publishes what it finds. In
+                // a suite where several hosts share one container that is a background writer no
+                // test asked for; the scheduler's own behaviour is driven directly through
+                // ScheduledJobRunner instead, which is where the decisions are.
+                ["Cms:Scheduler:Enabled"] = "false",
             });
         });
 

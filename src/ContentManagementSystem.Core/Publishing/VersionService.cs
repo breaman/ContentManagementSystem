@@ -74,12 +74,14 @@ public interface IVersionService
 /// <param name="context">The application database context.</param>
 /// <param name="references">Rewrites the draft's reference rows after a restore.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="clock">Source of the current time, so the retention window is testable.</param>
 /// <param name="logger">Log for restores and for what the retention sweep removed.</param>
 public sealed class VersionService(
     ApplicationDbContext context,
     IContentReferenceProjector references,
     ICmsAuthorization authorization,
+    IAclService acl,
     TimeProvider clock,
     ILogger<VersionService> logger) : IVersionService
 {
@@ -99,6 +101,13 @@ public sealed class VersionService(
             return CmsResult<IReadOnlyList<PageVersionSummary>>.Forbidden(
                 "Reading pages is not permitted.",
                 PageCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<IReadOnlyList<PageVersionSummary>>.NotFound(
+                $"No page has id {pageId}.",
+                PageCodes.NotFound);
         }
 
         // IgnoreQueryFilters, because the recycle bin lists the history of a deleted page and the
@@ -143,6 +152,11 @@ public sealed class VersionService(
                 PageCodes.Forbidden);
         }
 
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<PageVersionDetail>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
+        }
+
         var page = await context.Pages
             .AsNoTracking()
             .IgnoreQueryFilters()
@@ -185,6 +199,13 @@ public sealed class VersionService(
         if (!authorization.HasPermission(CmsPermissions.ContentEdit))
         {
             return CmsResult<DraftState>.Forbidden("Editing pages is not permitted.", PageCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return CmsResult<DraftState>.Forbidden(
+                $"Editing page {pageId} is not permitted.",
+                PageCodes.Forbidden);
         }
 
         var page = await context.Pages

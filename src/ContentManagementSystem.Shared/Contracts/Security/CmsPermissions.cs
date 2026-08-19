@@ -23,6 +23,24 @@ public static class CmsPermissions
     /// <summary>Publish, unpublish, and schedule.</summary>
     public const string ContentPublish = "Content.Publish";
 
+    /// <summary>Submit a draft for review.</summary>
+    /// <remarks>
+    /// Held by the roles that write content, and — following the section 21.1 matrix — not by
+    /// <c>Approver</c>, whose editing is confined to the items assigned to them.
+    /// </remarks>
+    public const string ContentSubmit = "Content.Submit";
+
+    /// <summary>
+    /// Approve or reject a submission.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not the same permission as <see cref="ContentPublish"/>, though the two overlap.
+    /// Section 21.1 gives <c>Editor</c> publish but not approve, which is the whole point of a
+    /// two-step workflow: the person who may push the button is not automatically the person who may
+    /// say it is ready.
+    /// </remarks>
+    public const string ContentApprove = "Content.Approve";
+
     /// <summary>Soft-delete content and restore it.</summary>
     public const string ContentDelete = "Content.Delete";
 
@@ -40,4 +58,12 @@ public static class CmsPermissions
 
     /// <summary>Manage users, roles, and ACLs.</summary>
     public const string UsersManage = "Users.Manage";
+
+    /// <summary>Read the audit log.</summary>
+    /// <remarks>
+    /// Separate from <see cref="UsersManage"/> because section 21.1 gives it to <c>Developer</c> as
+    /// well: diagnosing "what happened to this page" is development work, and requiring the ability
+    /// to grant yourself roles in order to do it would be the wrong trade.
+    /// </remarks>
+    public const string AuditView = "Audit.View";
 }

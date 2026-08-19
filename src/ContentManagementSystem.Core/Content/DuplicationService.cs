@@ -52,6 +52,7 @@ public interface IDuplicationService
 /// <param name="remapper">Rewrites intra-subtree references in a copied payload.</param>
 /// <param name="referenceProjector">Rewrites each copy's reference rows from its payload.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="logger">Log for what was copied and how much of it.</param>
 public sealed class DuplicationService(
     ApplicationDbContext context,
@@ -60,6 +61,7 @@ public sealed class DuplicationService(
     IContentPayloadRemapper remapper,
     IContentReferenceProjector referenceProjector,
     ICmsAuthorization authorization,
+    IAclService acl,
     ILogger<DuplicationService> logger) : IDuplicationService
 {
     /// <summary>Suffix appended to a copied page's title.</summary>
@@ -87,6 +89,14 @@ public sealed class DuplicationService(
             return CmsResult<PageDetail>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
 
+        // Reading the source is a separate question from writing the copy, and both are asked. A
+        // duplicate is otherwise a way to lift content out of a branch you may only read into one
+        // you may write.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<PageDetail>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
+        }
+
         var targetParentId = parentId ?? source.ParentId;
         var targetParent = targetParentId is null
             ? null
@@ -100,6 +110,19 @@ public sealed class DuplicationService(
                 PageCodes.ParentNotFound,
                 $"No page has id {targetParentId}, or it is in the recycle bin.",
                 nameof(parentId));
+        }
+
+        var allowedAtDestination = targetParent is not null
+            ? await acl.IsAllowedAsync(CmsPermissions.ContentEdit, targetParent.Id, cancellationToken)
+            : await acl.IsAllowedAtRootAsync(CmsPermissions.ContentEdit, cancellationToken);
+
+        if (!allowedAtDestination)
+        {
+            return CmsResult<PageDetail>.Forbidden(
+                targetParent is null
+                    ? "Adding pages at the root of the site is not permitted."
+                    : $"Adding pages under page {targetParent.Id} is not permitted.",
+                PageCodes.Forbidden);
         }
 
         // A deep copy under one of the pages being copied would copy the copies. The tree makes that

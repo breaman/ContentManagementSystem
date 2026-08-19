@@ -15,6 +15,7 @@ using ContentManagementSystem.Shared.Contracts.Content;
 using ContentManagementSystem.Shared.Contracts.Fields;
 using ContentManagementSystem.Shared.Contracts.Routing;
 using ContentManagementSystem.Shared.Contracts.Security;
+using ContentManagementSystem.Shared.Contracts.Workflow;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -87,8 +88,10 @@ public interface IPublishingService
 /// <param name="indexer">Walks a payload to check the entities it points at still exist.</param>
 /// <param name="schemas">Supplies the property configuration the allowed-templates check reads.</param>
 /// <param name="media">Checks the pictures this content places — existence, alt text, and the picker settings.</param>
+/// <param name="redirects">Writes the fall-back redirect a retirement may leave behind.</param>
 /// <param name="urls">Materializes the public route a publish creates and withdraws it on unpublish.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
 /// <param name="clock">Source of the current time.</param>
 /// <param name="metrics">Counter and histogram of publish attempts (spec section 24.1).</param>
@@ -101,7 +104,9 @@ public sealed class PublishingService(
     IContentSchemaCatalog schemas,
     IMediaContentValidator media,
     IUrlService urls,
+    IRedirectService redirects,
     ICmsAuthorization authorization,
+    IAclService acl,
     IUserService users,
     TimeProvider clock,
     CmsMetrics metrics,
@@ -121,7 +126,8 @@ public sealed class PublishingService(
 
         var page = await LoadAsync(pageId, tracked: false, cancellationToken);
 
-        if (page?.DraftVersion is null)
+        if (page?.DraftVersion is null
+            || !await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
         {
             return CmsResult<PublishValidation>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
@@ -214,7 +220,35 @@ public sealed class PublishingService(
             return CmsResult<PublishResult>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
 
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentPublish, pageId, cancellationToken))
+        {
+            return CmsResult<PublishResult>.Forbidden(
+                $"Publishing page {pageId} is not permitted.",
+                PageCodes.Forbidden);
+        }
+
         var draft = page.DraftVersion;
+
+        // The workflow gate, and the only place publishing consults the site's mode. TwoStep means
+        // three distinct acts, so a version nobody has approved is refused here however senior the
+        // caller is — a publish permission that could skip the approval would make the mode a
+        // suggestion (spec section 11.9, criterion P7 #3).
+        var mode = await context.SiteSettings
+            .AsNoTracking()
+            .Where(settings => settings.Id == SiteSettings.SingletonId)
+            .Select(settings => settings.WorkflowMode)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (mode is WorkflowMode.TwoStep && draft.Status is not PageVersionStatus.Approved)
+        {
+            return CmsResult<PublishResult>.Invalid(
+                WorkflowCodes.ApprovalRequired,
+                draft.Status is PageVersionStatus.InReview
+                    ? "This draft is waiting for review. It can be published once it is approved."
+                    : "This site asks for content to be approved before it is published. Submit the " +
+                      "draft for review first.");
+        }
+
         var checks = await CheckAsync(page, draft, cancellationToken);
 
         if (checks.HasErrors)
@@ -266,6 +300,13 @@ public sealed class PublishingService(
 
         if (page is null) return CmsResult<int>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
 
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentPublish, pageId, cancellationToken))
+        {
+            return CmsResult<int>.Forbidden(
+                $"Unpublishing page {pageId} is not permitted.",
+                PageCodes.Forbidden);
+        }
+
         if (page.PublishedVersion is null)
         {
             return CmsResult<int>.Invalid(
@@ -278,11 +319,15 @@ public sealed class PublishingService(
         page.PublishedVersionId = null;
         page.PublishedVersion = null;
 
-        // The published routes of this page and every descendant go with it, in the same save. No
-        // redirect is left behind: an unpublished page has not moved anywhere, and the URL becoming
-        // a 404 is what puts it in the NotFoundLog report where somebody decides what should
-        // actually happen to it (spec section 10.6).
+        // The published routes of this page and every descendant go with it, in the same save.
+        // Whether a redirect is left behind is a site decision (task P7-15): by default nothing is,
+        // and the URL becoming a 404 is what puts it in the NotFoundLog report where somebody
+        // decides what should actually happen to it (spec section 10.6). A site that would rather
+        // keep the traffic sets RedirectToParentOnUnpublish, and the retired URLs are sent to the
+        // parent instead.
         var withdrawn = await urls.WithdrawAsync(pageId, cancellationToken);
+
+        await RedirectToParentIfConfiguredAsync(page, withdrawn, cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -293,6 +338,42 @@ public sealed class PublishingService(
             withdrawn.Count);
 
         return CmsResult<int>.Success(retired.VersionNumber);
+    }
+
+    /// <summary>
+    /// Sends a retired page's URLs to its parent, when the site is configured to (task P7-15).
+    /// </summary>
+    /// <param name="page">The page being retired, with its parent key loaded.</param>
+    /// <param name="withdrawn">The URLs that have just stopped being served.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <remarks>
+    /// Written in the same change set as the withdrawal rather than afterwards, so a site never
+    /// exists in a state where the URL is retired and the redirect that was meant to cover it is
+    /// not. Nothing is saved here; the caller commits both together.
+    /// <para>
+    /// A page at the root has no parent to fall back to and is left as a 404 — sending the site root
+    /// somebody's retired press release would be worse than the 404.
+    /// </para>
+    /// </remarks>
+    private async Task RedirectToParentIfConfiguredAsync(
+        Page page,
+        IReadOnlyList<string> withdrawn,
+        CancellationToken cancellationToken)
+    {
+        if (withdrawn.Count == 0 || page.ParentId is not { } parentId) return;
+
+        var configured = await context.SiteSettings
+            .AsNoTracking()
+            .Where(settings => settings.Id == SiteSettings.SingletonId)
+            .Select(settings => settings.RedirectToParentOnUnpublish)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (!configured) return;
+
+        foreach (var url in withdrawn)
+        {
+            await redirects.RecordAutomaticAsync(url, parentId, cancellationToken);
+        }
     }
 
     /// <summary>
@@ -346,6 +427,12 @@ public sealed class PublishingService(
             }
 
             page.PublishedVersionId = published.Id;
+
+            // The draft becomes editable again. Under a workflow it arrived here as Approved, and
+            // leaving it that way would let the next edit inherit an approval nobody gave it; with
+            // no workflow this is already its status and the assignment does nothing.
+            draft.Status = PageVersionStatus.Draft;
+
             await context.SaveChangesAsync(cancellationToken);
 
             // Step 2b — materialize the public route. The page now has a published version, so the

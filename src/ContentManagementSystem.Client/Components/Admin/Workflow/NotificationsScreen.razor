@@ -1,0 +1,81 @@
+@page "/admin/notifications"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize]
+@namespace ContentManagementSystem.Client.Components.Admin.Workflow
+
+<PageTitle>Notifications</PageTitle>
+
+<h1>Notifications</h1>
+
+@if (Inbox is null)
+{
+    <p role="status">Loading…</p>
+}
+else
+{
+    <div class="cms-inbox__toolbar">
+        <p role="status">
+            @if (Inbox.UnreadCount == 0)
+            {
+                <text>Nothing unread.</text>
+            }
+            else
+            {
+                <text>@Inbox.UnreadCount unread.</text>
+            }
+        </p>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm"
+                disabled="@(IsBusy || Inbox.UnreadCount == 0)" @onclick="MarkAllAsync">
+            Mark all read
+        </button>
+    </div>
+
+    @if (Inbox.Items.Count == 0)
+    {
+        <p>You have no notifications.</p>
+    }
+    else
+    {
+        <ul class="cms-inbox__list">
+            @foreach (var item in Inbox.Items)
+            {
+                <li class="cms-inbox__item @(item.ReadOn is null ? "cms-inbox__item--unread" : null)">
+                    <article>
+                        <h2 class="h6">
+                            @if (item.Link is { Length: > 0 } link)
+                            {
+                                <a href="@link" @onclick="() => MarkAsync(item.Id)"
+                                   @onclick:preventDefault="false">@item.Subject</a>
+                            }
+                            else
+                            {
+                                @item.Subject
+                            }
+                            @if (item.ReadOn is null)
+                            {
+                                <span class="visually-hidden">(unread)</span>
+                            }
+                        </h2>
+
+                        @* Text, not markup: the body quotes a page title and an editor's note. *@
+                        <p class="cms-inbox__body">@item.Body</p>
+
+                        <footer>
+                            <time datetime="@item.CreatedOn.ToString("O")">
+                                @item.CreatedOn.ToLocalTime().ToString("d MMM yyyy HH:mm")
+                            </time>
+                            @if (item.ReadOn is null)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-2"
+                                        disabled="@IsBusy" @onclick="() => MarkAsync(item.Id)">
+                                    Mark read
+                                </button>
+                            }
+                        </footer>
+                    </article>
+                </li>
+            }
+        </ul>
+    }
+}

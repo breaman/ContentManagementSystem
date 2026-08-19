@@ -18,6 +18,24 @@ namespace ContentManagementSystem.Server.Authorization;
 public sealed class HttpCmsAuthorization(IHttpContextAccessor accessor) : ICmsAuthorization
 {
     /// <inheritdoc />
+    public IReadOnlyCollection<string> Roles
+    {
+        get
+        {
+            if (accessor.HttpContext?.User is not { Identity.IsAuthenticated: true } user) return [];
+
+            // Read from the identity's own configured role claim type rather than a constant, since
+            // Identity is free to be configured with a different one and a hard-coded type would
+            // then silently return no roles — an ACL resolver that finds no rules permits
+            // everything, so this is a failure that would open access rather than close it.
+            var roleClaimType = (user.Identity as System.Security.Claims.ClaimsIdentity)?.RoleClaimType
+                ?? System.Security.Claims.ClaimTypes.Role;
+
+            return [.. user.FindAll(roleClaimType).Select(claim => claim.Value)];
+        }
+    }
+
+    /// <inheritdoc />
     public bool HasPermission(string permission)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(permission);

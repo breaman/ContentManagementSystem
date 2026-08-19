@@ -1,5 +1,7 @@
 using System.Diagnostics.Metrics;
 
+using ContentManagementSystem.Core.Scheduling;
+
 namespace ContentManagementSystem.Core.Telemetry;
 
 /// <summary>
@@ -36,6 +38,9 @@ public sealed class CmsMetrics
     /// <summary>Name of the histogram of rendition encode durations (task P5-32).</summary>
     public const string RenditionDurationName = "cms.media.rendition.duration";
 
+    /// <summary>Name of the gauge of scheduled-publish lag (task P7-17, spec section 24.1).</summary>
+    public const string SchedulerLagName = "cms.scheduler.lag";
+
     /// <summary>Tag naming the output format a rendition was encoded in.</summary>
     public const string FormatTag = "format";
 
@@ -57,9 +62,13 @@ public sealed class CmsMetrics
 
     /// <summary>Creates the instruments on the CMS meter.</summary>
     /// <param name="meterFactory">Factory supplying the container-scoped meter.</param>
-    public CmsMetrics(IMeterFactory meterFactory)
+    /// <param name="scheduler">
+    /// What the scheduled-publish poller last saw, which the lag gauge observes.
+    /// </param>
+    public CmsMetrics(IMeterFactory meterFactory, SchedulerState scheduler)
     {
         ArgumentNullException.ThrowIfNull(meterFactory);
+        ArgumentNullException.ThrowIfNull(scheduler);
 
         var meter = meterFactory.Create(CmsTelemetry.MeterName);
 
@@ -92,6 +101,16 @@ public sealed class CmsMetrics
             RenditionDurationName,
             unit: "ms",
             description: "Wall-clock time one rendition encode took, tagged by output format.");
+
+        // Observable rather than recorded: lag is a level, not an event, and the question it answers
+        // — "is anything overdue right now" — has an answer whether or not the poller has done
+        // anything worth reporting. It reads a value the poller last wrote rather than the database,
+        // so a metrics scrape costs nothing and reports the poller's own view (task P7-17).
+        meter.CreateObservableGauge(
+            SchedulerLagName,
+            () => scheduler.LagSeconds,
+            unit: "s",
+            description: "How overdue the oldest waiting scheduled job was at the last poll.");
     }
 
     /// <summary>

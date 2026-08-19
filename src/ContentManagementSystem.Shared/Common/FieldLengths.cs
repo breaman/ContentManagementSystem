@@ -178,4 +178,29 @@ public static class FieldLengths
 
     /// <summary>Short image format token, such as <c>webp</c>.</summary>
     public const int ImageFormat = 10;
+
+    /// <summary>A <c>CmsPermissions</c> constant stored as data, as on an access rule.</summary>
+    /// <remarks>
+    /// Shares its number with <see cref="ContentKey"/> and is deliberately its own constant: a
+    /// permission name is a security identifier that appears in an ACL row, not a content-model key,
+    /// and the two must be free to move apart without a silent widening of the other.
+    /// </remarks>
+    public const int PermissionName = 100;
+
+    /// <summary>Body of a review comment, and of an in-app notification.</summary>
+    /// <remarks>
+    /// Bounded rather than <c>nvarchar(max)</c> because both are shown in lists: a comment that can
+    /// be a megabyte long is a comment that can make a review screen unusable for everyone else.
+    /// </remarks>
+    public const int CommentBody = 4000;
+
+    /// <summary>Note attached to a workflow submission or to the decision that settled it.</summary>
+    public const int WorkflowNote = 2000;
+
+    /// <summary>Identifier of the server instance holding a scheduled job's claim.</summary>
+    /// <remarks>
+    /// Machine name plus process id, recorded so a job that was claimed and never finished names the
+    /// instance that stopped. Never parsed — it is for a human reading a stuck row.
+    /// </remarks>
+    public const int SchedulerInstance = 200;
 }

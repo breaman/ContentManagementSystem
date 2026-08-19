@@ -56,11 +56,13 @@ public interface IDashboardService
 /// <inheritdoc cref="IDashboardService" />
 /// <param name="context">The application database context.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may read (task P7-06, spec section 21.2).</param>
 /// <param name="users">Who the caller is, which is what makes "my work" theirs.</param>
 /// <param name="clock">Source of the current time.</param>
 public sealed class DashboardService(
     ApplicationDbContext context,
     ICmsAuthorization authorization,
+    IAclService acl,
     IUserService users,
     TimeProvider clock) : IDashboardService
 {
@@ -110,17 +112,86 @@ public sealed class DashboardService(
             await BuildAsync(tile, Clamp(limit), cancellationToken));
     }
 
-    /// <summary>Builds one tile.</summary>
-    private Task<DashboardTileContent> BuildAsync(
+    /// <summary>Builds one tile, with anything the caller may not read taken back out of it.</summary>
+    private async Task<DashboardTileContent> BuildAsync(
         DashboardTile tile,
         int limit,
-        CancellationToken cancellationToken) => tile switch
+        CancellationToken cancellationToken)
     {
-        DashboardTile.MyWork => MyWorkAsync(limit, cancellationToken),
-        DashboardTile.Scheduled => ScheduledAsync(limit, cancellationToken),
-        DashboardTile.NeedsAttention => NeedsAttentionAsync(limit, cancellationToken),
-        _ => RecentActivityAsync(limit, cancellationToken),
-    };
+        var content = await (tile switch
+        {
+            DashboardTile.MyWork => MyWorkAsync(limit, cancellationToken),
+            DashboardTile.Scheduled => ScheduledAsync(limit, cancellationToken),
+            DashboardTile.NeedsAttention => NeedsAttentionAsync(limit, cancellationToken),
+            _ => RecentActivityAsync(limit, cancellationToken),
+        });
+
+        return await RedactAsync(content, cancellationToken);
+    }
+
+    /// <summary>
+    /// Removes the rows naming pages the caller may not read (task P7-06, criterion P7 #6).
+    /// </summary>
+    /// <param name="content">The tile as its query built it.</param>
+    /// <param name="cancellationToken">Token observed while resolving page positions.</param>
+    /// <returns>The tile with hidden pages gone and the counts adjusted to match.</returns>
+    /// <remarks>
+    /// Applied once, after every tile, rather than woven into the eight queries behind them. A
+    /// dashboard is the one screen that reads across the whole site, so it is the most likely place
+    /// for a hidden branch to reappear as a title in a list — and a filter that has to be remembered
+    /// in eight places is a filter that will be forgotten in one.
+    /// <para>
+    /// <c>TotalCount</c> is reduced by what was removed rather than left alone, because a group
+    /// saying "showing 5 of 40" while holding three rows would be the hidden branch leaking as a
+    /// number instead of as a title.
+    /// </para>
+    /// </remarks>
+    private async Task<DashboardTileContent> RedactAsync(
+        DashboardTileContent content,
+        CancellationToken cancellationToken)
+    {
+        var readable = await acl.GetFilterAsync(CmsPermissions.ContentRead, cancellationToken);
+
+        if (readable.IsUnrestricted) return content;
+
+        var pageIds = content.Groups
+            .SelectMany(group => group.Items)
+            .Where(item => item.Kind == DashboardItemKind.Page && item.Id is not null)
+            .Select(item => item.Id!.Value)
+            .Distinct()
+            .ToList();
+
+        if (pageIds.Count == 0) return content;
+
+        var paths = await context.Pages
+            .AsNoTracking()
+            .IgnoreQueryFilters()
+            .Where(page => pageIds.Contains(page.Id))
+            .Select(page => new { page.Id, page.Path })
+            .ToDictionaryAsync(row => row.Id, row => row.Path, cancellationToken);
+
+        var groups = new List<DashboardGroup>(content.Groups.Count);
+
+        foreach (var group in content.Groups)
+        {
+            var kept = group.Items
+                .Where(item => item.Kind != DashboardItemKind.Page
+                    || item.Id is not { } id
+                    || !paths.TryGetValue(id, out var path)
+                    || readable.Allows(id, path))
+                .ToList();
+
+            groups.Add(kept.Count == group.Items.Count
+                ? group
+                : group with
+                {
+                    Items = kept,
+                    TotalCount = Math.Max(0, group.TotalCount - (group.Items.Count - kept.Count)),
+                });
+        }
+
+        return content with { Groups = groups };
+    }
 
     /// <summary>
     /// What the signed-in editor has in progress (task P6-24).

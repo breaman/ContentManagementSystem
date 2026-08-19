@@ -88,12 +88,14 @@ public interface IEditLockService
 /// <inheritdoc cref="IEditLockService" />
 /// <param name="context">The application database context.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="users">Identity of the caller, which is who a lock belongs to.</param>
 /// <param name="clock">Source of the current time, so expiry is testable without waiting.</param>
 /// <param name="logger">Log for take-overs, which are worth being able to explain afterwards.</param>
 public sealed class EditLockService(
     ApplicationDbContext context,
     ICmsAuthorization authorization,
+    IAclService acl,
     IUserService users,
     TimeProvider clock,
     ILogger<EditLockService> logger) : IEditLockService
@@ -108,6 +110,15 @@ public sealed class EditLockService(
         {
             return CmsResult<EditLockState>.Forbidden(
                 "Editing pages is not permitted.",
+                PageCodes.Forbidden);
+        }
+
+        // Asked before the page is looked up, so that taking a lock cannot be used to probe for
+        // pages in a branch the caller may not touch.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return CmsResult<EditLockState>.Forbidden(
+                $"Editing page {pageId} is not permitted.",
                 PageCodes.Forbidden);
         }
 
@@ -165,6 +176,13 @@ public sealed class EditLockService(
             return CmsResult<EditLockState?>.Forbidden("Reading pages is not permitted.", PageCodes.Forbidden);
         }
 
+        // A page the caller may not read has no lock as far as they are concerned — the same answer
+        // it gives for a page nobody holds, which is what keeps the hidden branch hidden.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            return CmsResult<EditLockState?>.Success(null);
+        }
+
         var lockRow = await context.EditLocks
             .AsNoTracking()
             .Include(candidate => candidate.User)
@@ -186,6 +204,13 @@ public sealed class EditLockService(
         if (!authorization.HasPermission(CmsPermissions.ContentEdit))
         {
             return CmsResult<bool>.Forbidden("Editing pages is not permitted.", PageCodes.Forbidden);
+        }
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentEdit, pageId, cancellationToken))
+        {
+            return CmsResult<bool>.Forbidden(
+                $"Editing page {pageId} is not permitted.",
+                PageCodes.Forbidden);
         }
 
         var me = users.UserId;

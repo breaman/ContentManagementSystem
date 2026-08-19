@@ -1,0 +1,110 @@
+@namespace ContentManagementSystem.Client.Components.Admin.Workflow
+
+<section class="cms-comments" aria-labelledby="@HeadingId">
+
+    <h2 class="h6" id="@HeadingId">@Heading</h2>
+
+    @if (Threads.Count == 0)
+    {
+        <p class="text-body-secondary">No comments yet.</p>
+    }
+    else
+    {
+        <ul class="cms-comments__list">
+            @foreach (var thread in Threads)
+            {
+                <li class="cms-comments__thread @(thread.ResolvedOn is null ? null : "cms-comments__thread--resolved")">
+
+                    <article>
+                        <header class="cms-comments__meta">
+                            <strong>@(thread.AuthorName ?? $"user {thread.AuthorUserId}")</strong>
+                            @if (thread.CreatedOn is { } when)
+                            {
+                                <time datetime="@when.ToString("O")">
+                                    @when.ToLocalTime().ToString("d MMM yyyy HH:mm")
+                                </time>
+                            }
+                            @if (thread.ZoneKey is { Length: > 0 } zone && ZoneKey is null)
+                            {
+                                <span class="badge text-bg-light">@zone</span>
+                            }
+                            @if (thread.ResolvedOn is not null)
+                            {
+                                <span class="badge text-bg-success">Dealt with</span>
+                            }
+                        </header>
+
+                        @* Rendered as text, never as markup. A comment body is whatever somebody
+                           typed, and the one thing it must never become is HTML. *@
+                        <p class="cms-comments__body">@thread.Body</p>
+
+                        <div class="cms-comments__actions">
+                            <button type="button" class="btn btn-link btn-sm p-0"
+                                    @onclick="() => StartReply(thread.Id)">
+                                Reply
+                            </button>
+                            <button type="button" class="btn btn-link btn-sm p-0"
+                                    disabled="@IsBusy"
+                                    @onclick="() => ResolveAsync(thread)">
+                                @(thread.ResolvedOn is null ? "Mark dealt with" : "Reopen")
+                            </button>
+                        </div>
+                    </article>
+
+                    @if (thread.Replies.Count > 0)
+                    {
+                        <ul class="cms-comments__replies">
+                            @foreach (var reply in thread.Replies)
+                            {
+                                <li>
+                                    <header class="cms-comments__meta">
+                                        <strong>@(reply.AuthorName ?? $"user {reply.AuthorUserId}")</strong>
+                                        @if (reply.CreatedOn is { } replied)
+                                        {
+                                            <time datetime="@replied.ToString("O")">
+                                                @replied.ToLocalTime().ToString("d MMM yyyy HH:mm")
+                                            </time>
+                                        }
+                                    </header>
+                                    <p class="cms-comments__body">@reply.Body</p>
+                                </li>
+                            }
+                        </ul>
+                    }
+
+                    @if (_replyingTo == thread.Id)
+                    {
+                        <div class="cms-comments__compose">
+                            <label class="visually-hidden" for="@($"{HeadingId}-reply")">
+                                Reply to @(thread.AuthorName ?? "this comment")
+                            </label>
+                            <textarea class="form-control" id="@($"{HeadingId}-reply")" rows="2"
+                                      @bind="_reply" @bind:event="oninput"></textarea>
+                            <button type="button" class="btn btn-secondary btn-sm mt-1"
+                                    disabled="@(IsBusy || string.IsNullOrWhiteSpace(_reply))"
+                                    @onclick="() => SendReplyAsync(thread.Id)">
+                                Post reply
+                            </button>
+                        </div>
+                    }
+
+                </li>
+            }
+        </ul>
+    }
+
+    <div class="cms-comments__compose">
+        <label class="form-label" for="@($"{HeadingId}-new")">Add a comment</label>
+        <textarea class="form-control" id="@($"{HeadingId}-new")" rows="2"
+                  @bind="_draft" @bind:event="oninput"></textarea>
+        <p class="form-text">
+            Name somebody with <code>@@</code> and their username to send them a notification.
+        </p>
+        <button type="button" class="btn btn-secondary btn-sm"
+                disabled="@(IsBusy || string.IsNullOrWhiteSpace(_draft))"
+                @onclick="AddAsync">
+            Post comment
+        </button>
+    </div>
+
+</section>

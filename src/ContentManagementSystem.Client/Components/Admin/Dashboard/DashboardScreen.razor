@@ -19,8 +19,15 @@
         <li class="nav-item"><NavLink class="nav-link" href="/admin/media">Media</NavLink></li>
         <li class="nav-item"><NavLink class="nav-link" href="/admin/reusable">Reusable</NavLink></li>
         <li class="nav-item"><NavLink class="nav-link" href="/admin/structure/templates">Structure</NavLink></li>
+        <AuthorizeView Roles="@CmsRoles.ContentApprovers" Context="approver">
+            <li class="nav-item"><NavLink class="nav-link" href="/admin/workflow">Review</NavLink></li>
+        </AuthorizeView>
+        <li class="nav-item"><NavLink class="nav-link" href="/admin/notifications">Notifications</NavLink></li>
         <AuthorizeView Roles="@CmsRoles.ContentDeleters" Context="deleter">
             <li class="nav-item"><NavLink class="nav-link" href="/admin/recycle-bin">Recycle bin</NavLink></li>
+        </AuthorizeView>
+        <AuthorizeView Roles="@CmsRoles.AuditViewers" Context="auditor">
+            <li class="nav-item"><NavLink class="nav-link" href="/admin/audit">Audit</NavLink></li>
         </AuthorizeView>
     </ul>
 </nav>

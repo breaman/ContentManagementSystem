@@ -113,6 +113,17 @@ public class ApiContractTests(SqlServerFixture fixture)
         // The permanent delete is the one irreversible operation in the system, so it sits with user
         // management rather than with content deletion (task P2-17).
         RolesFor(CmsPermissions.UsersManage).Should().BeEquivalentTo([CmsRoles.Administrator]);
+
+        // Phase 7's three additions. The gap between publish and approve is the whole of a two-step
+        // workflow: an Editor may push the button, and somebody else has to say the content is
+        // ready — so Editor holds one and not the other. Approver is the mirror image, and holds
+        // neither Content.Submit nor Content.Delete.
+        RolesFor(CmsPermissions.ContentApprove).Should().BeEquivalentTo(
+            [CmsRoles.Administrator, CmsRoles.Developer, CmsRoles.Approver]);
+        RolesFor(CmsPermissions.ContentSubmit).Should().Contain(CmsRoles.Author)
+            .And.NotContain(CmsRoles.Approver);
+        RolesFor(CmsPermissions.AuditView).Should().BeEquivalentTo(
+            [CmsRoles.Administrator, CmsRoles.Developer]);
     }
 
     [Test]
@@ -126,6 +137,9 @@ public class ApiContractTests(SqlServerFixture fixture)
         Roles(CmsRoles.ContentEditors).Should().BeEquivalentTo(RolesFor(CmsPermissions.ContentEdit));
         Roles(CmsRoles.ContentPublishers).Should().BeEquivalentTo(RolesFor(CmsPermissions.ContentPublish));
         Roles(CmsRoles.StructureEditors).Should().BeEquivalentTo(RolesFor(CmsPermissions.StructureEdit));
+        Roles(CmsRoles.ContentApprovers).Should().BeEquivalentTo(RolesFor(CmsPermissions.ContentApprove));
+        Roles(CmsRoles.ContentSubmitters).Should().BeEquivalentTo(RolesFor(CmsPermissions.ContentSubmit));
+        Roles(CmsRoles.AuditViewers).Should().BeEquivalentTo(RolesFor(CmsPermissions.AuditView));
     }
 
     [Test]
@@ -155,10 +169,17 @@ public class ApiContractTests(SqlServerFixture fixture)
         // gate for it — a media manager with no content rights still has a name and an id, and the
         // answer discloses nothing the caller did not arrive holding. The floor the group applies,
         // an authenticated user, is the whole requirement.
+        //
+        // The two notification routes joined them in P7-19 for the same reason: every query behind
+        // them is scoped to the caller inside the service, so the only inbox anybody can reach is
+        // their own. A permission here would be a second, weaker statement of that — and would have
+        // to be one every role holds, which is not a permission.
         unprotected.Should().BeEquivalentTo(
         [
             $"{CmsApiEndpoints.BasePath}/antiforgery-token",
             $"{CmsApiEndpoints.BasePath}/me",
+            $"{CmsApiEndpoints.BasePath}/notifications/",
+            $"{CmsApiEndpoints.BasePath}/notifications/read",
         ]);
     }
 

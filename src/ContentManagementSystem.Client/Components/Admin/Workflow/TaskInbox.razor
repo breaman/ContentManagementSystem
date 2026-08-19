@@ -1,0 +1,79 @@
+@page "/admin/workflow"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.ContentApprovers)]
+@namespace ContentManagementSystem.Client.Components.Admin.Workflow
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Waiting for review</PageTitle>
+
+<h1>Waiting for review</h1>
+
+<div class="form-check">
+    <input class="form-check-input" type="checkbox" id="cms-inbox-mine"
+           checked="@_assignedToMe" @onchange="ToggleAsync" />
+    <label class="form-check-label" for="cms-inbox-mine">
+        Only what was addressed to me by name
+    </label>
+</div>
+
+@if (Tasks is null)
+{
+    <p role="status">Loading…</p>
+}
+else if (Tasks.Count == 0)
+{
+    <p>Nothing is waiting for you.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table">
+            <caption class="visually-hidden">Review requests waiting on you, oldest first</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Page</th>
+                    <th scope="col">Version</th>
+                    <th scope="col">Submitted by</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col">Wanted by</th>
+                    <th scope="col">Addressed to</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var task in Tasks)
+                {
+                    <tr>
+                        <th scope="row">
+                            <a href="@($"/admin/pages/{task.PageId}")">@task.PageTitle</a>
+                        </th>
+                        <td>@task.VersionNumber</td>
+                        <td>@(task.SubmittedByName ?? $"user {task.SubmittedByUserId}")</td>
+                        <td>
+                            @if (task.SubmittedOn is { } when)
+                            {
+                                <time datetime="@when.ToString("O")">
+                                    @when.ToLocalTime().ToString("d MMM yyyy HH:mm")
+                                </time>
+                            }
+                        </td>
+                        <td>
+                            @if (task.DueDate is { } due)
+                            {
+                                @due.ToString("d MMM yyyy")
+                                @if (due < DateOnly.FromDateTime(DateTime.Today))
+                                {
+                                    <span class="badge text-bg-danger ms-1">Overdue</span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                        <td>@(task.AssignedToName ?? "anyone who can approve")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

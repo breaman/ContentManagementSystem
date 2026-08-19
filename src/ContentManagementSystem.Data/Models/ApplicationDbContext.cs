@@ -98,6 +98,21 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>Derived encodings of media items. Regenerable; excluded from the audit log.</summary>
     public DbSet<MediaRendition> MediaRenditions => Set<MediaRendition>();
 
+    /// <summary>Rules narrowing a global permission to a branch of the content tree.</summary>
+    public DbSet<PageAcl> PageAcls => Set<PageAcl>();
+
+    /// <summary>Requests for a page version to be reviewed, and how each was settled.</summary>
+    public DbSet<WorkflowTask> WorkflowTasks => Set<WorkflowTask>();
+
+    /// <summary>Threaded review remarks, optionally anchored to the zone they are about.</summary>
+    public DbSet<Comment> Comments => Set<Comment>();
+
+    /// <summary>Standing instructions to publish or retire a page at a stated moment.</summary>
+    public DbSet<ScheduledJob> ScheduledJobs => Set<ScheduledJob>();
+
+    /// <summary>The in-app inbox. Written by services; excluded from the audit log.</summary>
+    public DbSet<Notification> Notifications => Set<Notification>();
+
     /// <inheritdoc />
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace ContentManagementSystem.Core.Security;
 
 /// <summary>
-/// Registration helpers for HTML sanitization.
+/// Registration helpers for HTML sanitization and section-level access rules.
 /// </summary>
 public static class SecurityServiceCollectionExtensions
 {
@@ -45,6 +45,25 @@ public static class SecurityServiceCollectionExtensions
         // at construction into three prepared sanitizers, so a policy that could change after
         // startup would be a policy that silently does not apply.
         services.TryAddSingleton<IContentSanitizer>(_ => new SanitizationService(options));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers <see cref="AclService"/> as the deployment's <see cref="IAclService"/>.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <returns>The service collection, for chaining.</returns>
+    /// <remarks>
+    /// Scoped, and that is load-bearing rather than conventional: the resolver caches the rules it
+    /// read for the length of one request (task P7-05) and must not carry them into the next, where
+    /// an administrator may have just revoked them.
+    /// </remarks>
+    public static IServiceCollection AddCmsAccessControl(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddScoped<IAclService, AclService>();
 
         return services;
     }

@@ -311,6 +311,63 @@ namespace ContentManagementSystem.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Comment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("PageId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PageVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ParentCommentId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ResolvedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ResolvedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("ZoneKey")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageVersionId");
+
+                    b.HasIndex("ParentCommentId");
+
+                    b.HasIndex("ResolvedByUserId");
+
+                    b.HasIndex("PageId", "Id");
+
+                    b.ToTable("Comments");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Composition", b =>
                 {
                     b.Property<int>("Id")
@@ -763,6 +820,52 @@ namespace ContentManagementSystem.Data.Migrations
                     b.ToTable("NotFoundLogs");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Notification", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Link")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("PageId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ReadOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageId");
+
+                    b.HasIndex("UserId", "ReadOn", "Id");
+
+                    b.ToTable("Notifications");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Page", b =>
                 {
                     b.Property<int>("Id")
@@ -869,6 +972,57 @@ namespace ContentManagementSystem.Data.Migrations
                         .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("Pages");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.PageAcl", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<bool>("IsAllow")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsInherited")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("PageId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Permission")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<int>("PrincipalId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PrincipalType")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PageId", "PrincipalType", "PrincipalId", "Permission")
+                        .IsUnique()
+                        .HasDatabaseName("UX_PageAcls_PageId_Principal_Permission");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("PageId", "PrincipalType", "PrincipalId", "Permission"), new[] { "IsAllow", "IsInherited" });
+
+                    b.ToTable("PageAcls");
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.PageRoute", b =>
@@ -1316,6 +1470,75 @@ namespace ContentManagementSystem.Data.Migrations
                     b.ToTable("ReusableContentVersions");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ScheduledJob", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ClaimedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("ClaimedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<DateTimeOffset?>("CompletedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Kind")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("OwnerUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PageId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("PageVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("RunOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("State")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OwnerUserId");
+
+                    b.HasIndex("PageVersionId");
+
+                    b.HasIndex("PageId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ScheduledJobs_PageId_Kind_Outstanding")
+                        .HasFilter("[State] IN (0, 1)");
+
+                    b.HasIndex("State", "RunOn")
+                        .HasDatabaseName("IX_ScheduledJobs_State_RunOn");
+
+                    b.ToTable("ScheduledJobs");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteSettings", b =>
                 {
                     b.Property<int>("Id")
@@ -1352,6 +1575,9 @@ namespace ContentManagementSystem.Data.Migrations
 
                     b.Property<int?>("NotFoundPageId")
                         .HasColumnType("int");
+
+                    b.Property<bool>("RedirectToParentOnUnpublish")
+                        .HasColumnType("bit");
 
                     b.Property<string>("RobotsTxt")
                         .HasColumnType("nvarchar(max)");
@@ -1390,6 +1616,7 @@ namespace ContentManagementSystem.Data.Migrations
                             CreatedBy = 0,
                             Culture = "en-US",
                             ModifiedBy = 0,
+                            RedirectToParentOnUnpublish = false,
                             SiteName = "Content Management System",
                             TimeZoneId = "UTC",
                             VersionRetentionDays = 0,
@@ -1497,6 +1724,71 @@ namespace ContentManagementSystem.Data.Migrations
                     b.ToTable("TemplateRevisions");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.WorkflowTask", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssignedToUserId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int?>("DecidedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("DecidedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int>("PageId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("PageVersionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("State")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SubmissionNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DecidedByUserId");
+
+                    b.HasIndex("PageVersionId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_WorkflowTasks_PageVersionId_Pending")
+                        .HasFilter("[State] = 0");
+
+                    b.HasIndex("AssignedToUserId", "State");
+
+                    b.HasIndex("PageId", "State");
+
+                    b.ToTable("WorkflowTasks");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Zone", b =>
                 {
                     b.Property<int>("Id")
@@ -1591,6 +1883,57 @@ namespace ContentManagementSystem.Data.Migrations
                         .HasFilter("[NormalizedName] IS NOT NULL");
 
                     b.ToTable("AspNetRoles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0001",
+                            Name = "Administrator",
+                            NormalizedName = "ADMINISTRATOR"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0002",
+                            Name = "Developer",
+                            NormalizedName = "DEVELOPER"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0003",
+                            Name = "Editor",
+                            NormalizedName = "EDITOR"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0004",
+                            Name = "Author",
+                            NormalizedName = "AUTHOR"
+                        },
+                        new
+                        {
+                            Id = 5,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0005",
+                            Name = "Approver",
+                            NormalizedName = "APPROVER"
+                        },
+                        new
+                        {
+                            Id = 6,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0006",
+                            Name = "MediaManager",
+                            NormalizedName = "MEDIAMANAGER"
+                        },
+                        new
+                        {
+                            Id = 7,
+                            ConcurrencyStamp = "9a1f0b64-0f21-4b3c-9a0e-6c1f5f0a0007",
+                            Name = "Viewer",
+                            NormalizedName = "VIEWER"
+                        });
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.User", b =>
@@ -1837,6 +2180,38 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("BlockType");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Comment", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", "Page")
+                        .WithMany()
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.PageVersion", "PageVersion")
+                        .WithMany()
+                        .HasForeignKey("PageVersionId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Comment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.User", "ResolvedBy")
+                        .WithMany()
+                        .HasForeignKey("ResolvedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Page");
+
+                    b.Navigation("PageVersion");
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("ResolvedBy");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.CompositionProperty", b =>
                 {
                     b.HasOne("ContentManagementSystem.Data.Models.Cms.Composition", "Composition")
@@ -1898,6 +2273,24 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("MediaItem");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Notification", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", "Page")
+                        .WithMany()
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Page");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Page", b =>
                 {
                     b.HasOne("ContentManagementSystem.Data.Models.Cms.PageVersion", "DraftVersion")
@@ -1935,6 +2328,17 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("PublishedVersion");
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.PageAcl", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", "Page")
+                        .WithMany()
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Page");
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.PageRoute", b =>
@@ -2030,6 +2434,32 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("ReusableContent");
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ScheduledJob", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", "Page")
+                        .WithMany()
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.PageVersion", "PageVersion")
+                        .WithMany()
+                        .HasForeignKey("PageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Owner");
+
+                    b.Navigation("Page");
+
+                    b.Navigation("PageVersion");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteSettings", b =>
                 {
                     b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", null)
@@ -2052,6 +2482,39 @@ namespace ContentManagementSystem.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Template");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.WorkflowTask", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.User", "AssignedTo")
+                        .WithMany()
+                        .HasForeignKey("AssignedToUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.User", "DecidedBy")
+                        .WithMany()
+                        .HasForeignKey("DecidedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.Page", "Page")
+                        .WithMany()
+                        .HasForeignKey("PageId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.PageVersion", "PageVersion")
+                        .WithMany()
+                        .HasForeignKey("PageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("AssignedTo");
+
+                    b.Navigation("DecidedBy");
+
+                    b.Navigation("Page");
+
+                    b.Navigation("PageVersion");
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Zone", b =>
@@ -2175,6 +2638,11 @@ namespace ContentManagementSystem.Data.Migrations
                     b.Navigation("Properties");
 
                     b.Navigation("Revisions");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Comment", b =>
+                {
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Composition", b =>

@@ -87,11 +87,13 @@ public interface IRecycleBinService
 /// <param name="context">The application database context.</param>
 /// <param name="urls">Withdraws the public routes a delete retires, and refreshes them on restore.</param>
 /// <param name="authorization">What the caller of the current request may do.</param>
+/// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="logger">Log for every delete, restore, and purge.</param>
 public sealed class RecycleBinService(
     ApplicationDbContext context,
     IUrlService urls,
     ICmsAuthorization authorization,
+    IAclService acl,
     ILogger<RecycleBinService> logger) : IRecycleBinService
 {
     /// <inheritdoc />
@@ -111,6 +113,16 @@ public sealed class RecycleBinService(
             .Where(page => page.IsDeleted)
             .Include(page => page.DraftVersion)
             .ToListAsync(cancellationToken);
+
+        // The bin is a view of the tree, so it inherits the tree's access rules. An editor confined
+        // to /products sees what they deleted and nothing else — otherwise the bin would be the one
+        // screen in the backoffice that lists the whole site.
+        var deletable = await acl.GetFilterAsync(CmsPermissions.ContentDelete, cancellationToken);
+
+        if (!deletable.IsUnrestricted)
+        {
+            deleted = [.. deleted.Where(page => deletable.Allows(page.Id, page.Path))];
+        }
 
         var entries = new List<RecycleBinEntry>(deleted.Count);
 
@@ -158,7 +170,7 @@ public sealed class RecycleBinService(
             .Include(candidate => candidate.DraftVersion)
             .FirstOrDefaultAsync(candidate => candidate.Id == pageId, cancellationToken);
 
-        if (page is null)
+        if (page is null || !await acl.IsAllowedAsync(CmsPermissions.ContentDelete, pageId, cancellationToken))
         {
             return CmsResult<SubtreeImpact>.NotFound($"No page has id {pageId}.", PageCodes.NotFound);
         }
@@ -197,6 +209,14 @@ public sealed class RecycleBinService(
             cancellationToken);
 
         if (page is null) return NotFound(pageId);
+
+        // Only the root of the delete is checked, and that is deliberate: a delete takes the whole
+        // subtree with it, and a rule can only narrow access further down, never widen it. A caller
+        // allowed to delete this page is therefore allowed to delete everything beneath it.
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentDelete, pageId, cancellationToken))
+        {
+            return Forbidden($"Deleting page {pageId} is not permitted.");
+        }
 
         var subtree = await LoadSubtreeAsync(page, includeDeleted: false, cancellationToken);
         var unpublished = 0;
@@ -258,6 +278,11 @@ public sealed class RecycleBinService(
             .FirstOrDefaultAsync(candidate => candidate.Id == pageId, cancellationToken);
 
         if (page is null) return NotFound(pageId);
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentDelete, pageId, cancellationToken))
+        {
+            return Forbidden($"Restoring page {pageId} is not permitted.");
+        }
 
         if (!page.IsDeleted)
         {

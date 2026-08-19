@@ -2,6 +2,7 @@ using System.Net;
 
 using ContentManagementSystem.Core.Preview;
 using ContentManagementSystem.Rendering;
+using ContentManagementSystem.Shared.Contracts.Security;
 
 namespace ContentManagementSystem.Server.Delivery.Preview;
 
@@ -65,20 +66,42 @@ public static class PreviewEndpoint
     /// <param name="http">The request.</param>
     /// <param name="pageId">Page being previewed.</param>
     /// <param name="preview">Reads any version of a page.</param>
+    /// <param name="acl">Whether this editor may read this branch of the tree.</param>
     /// <param name="renderer">Renders the chrome document.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <param name="version">The exact version to show, or absent for the page's draft.</param>
     /// <param name="device">Which width to constrain the frame to.</param>
+    /// <remarks>
+    /// The access rules are applied here rather than inside <see cref="IPreviewContentService"/>
+    /// because that service serves two callers with different claims to the content: an editor, who
+    /// is authorized by their permissions and by the rules on the branch, and the holder of a shared
+    /// link, who is authorized by the token and has no permissions at all. A check inside the
+    /// service would have to be true for both, and the only such check is no check
+    /// (task P7-06, spec section 21.2).
+    /// </remarks>
     public static async Task EditorChromeAsync(
         HttpContext http,
         int pageId,
         IPreviewContentService preview,
+        IAclService acl,
         CmsPreviewRenderer renderer,
         CancellationToken cancellationToken,
         int? version = null,
         string? device = null)
     {
         ApplyPreviewHeaders(http);
+
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            await WriteNoticeAsync(
+                http,
+                HttpStatusCode.NotFound,
+                "Nothing to preview",
+                "That page or version does not exist. It may have been deleted since the link was made.",
+                cancellationToken);
+
+            return;
+        }
 
         if (await preview.DescribeAsync(pageId, version, cancellationToken) is not { } described)
         {
@@ -111,17 +134,40 @@ public static class PreviewEndpoint
     /// <param name="http">The request.</param>
     /// <param name="pageId">Page being previewed.</param>
     /// <param name="preview">Reads any version of a page.</param>
+    /// <param name="acl">Whether this editor may read this branch of the tree.</param>
     /// <param name="renderer">Renders the page through the delivery pipeline.</param>
     /// <param name="cancellationToken">Token observed while querying.</param>
     /// <param name="version">The exact version to show, or absent for the page's draft.</param>
-    public static Task EditorContentAsync(
+    /// <remarks>
+    /// Checked here as well as on the chrome around it, and not only there: this route is a URL of
+    /// its own, and an editor who guessed a page id would otherwise be served the content of a
+    /// branch they may not read simply by skipping the frame (task P7-06).
+    /// </remarks>
+    public static async Task EditorContentAsync(
         HttpContext http,
         int pageId,
         IPreviewContentService preview,
+        IAclService acl,
         CmsPageRenderer renderer,
         CancellationToken cancellationToken,
-        int? version = null) =>
-        WriteContentAsync(http, pageId, version, preview, renderer, cancellationToken);
+        int? version = null)
+    {
+        if (!await acl.IsAllowedAsync(CmsPermissions.ContentRead, pageId, cancellationToken))
+        {
+            ApplyPreviewHeaders(http);
+
+            await WriteNoticeAsync(
+                http,
+                HttpStatusCode.NotFound,
+                "Nothing to preview",
+                "That page or version does not exist. It may have been deleted since the link was made.",
+                cancellationToken);
+
+            return;
+        }
+
+        await WriteContentAsync(http, pageId, version, preview, renderer, cancellationToken);
+    }
 
     /// <summary>
     /// Serves the toolbar and device frame for a shared link, to a caller with no account.

@@ -1,0 +1,119 @@
+@page "/admin/audit"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.AuditViewers)]
+@namespace ContentManagementSystem.Client.Components.Admin.Audit
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Audit log</PageTitle>
+
+<h1>Audit log</h1>
+
+<p class="text-body-secondary">
+    Every change to every row, newest first. Start from the entity — “Page” and its id answers
+    “who unpublished the homepage and when” in one filter.
+</p>
+
+<form class="cms-audit__filters row g-2" @onsubmit="SearchAsync" @onsubmit:preventDefault="true">
+
+    <div class="col-sm-3">
+        <label class="form-label" for="cms-audit-entity">Entity</label>
+        <select class="form-select" id="cms-audit-entity" @bind="_entity">
+            <option value="">Everything</option>
+            @foreach (var entity in Entities)
+            {
+                <option value="@entity">@entity</option>
+            }
+        </select>
+    </div>
+
+    <div class="col-sm-2">
+        <label class="form-label" for="cms-audit-entity-id">Id</label>
+        <input class="form-control" id="cms-audit-entity-id" @bind="_entityId" />
+    </div>
+
+    <div class="col-sm-2">
+        <label class="form-label" for="cms-audit-user">User id</label>
+        <input class="form-control" id="cms-audit-user" type="number" @bind="_userId" />
+    </div>
+
+    <div class="col-sm-2">
+        <label class="form-label" for="cms-audit-from">From</label>
+        <input class="form-control" id="cms-audit-from" type="date" @bind="_from" />
+    </div>
+
+    <div class="col-sm-2">
+        <label class="form-label" for="cms-audit-to">To</label>
+        <input class="form-control" id="cms-audit-to" type="date" @bind="_to" />
+    </div>
+
+    <div class="col-sm-1 d-flex align-items-end">
+        <button type="submit" class="btn btn-primary" disabled="@IsBusy">Search</button>
+    </div>
+
+</form>
+
+@if (Entries is null)
+{
+    <p role="status">Loading…</p>
+}
+else if (Entries.Count == 0)
+{
+    <p>Nothing matches that.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm">
+            <caption class="visually-hidden">Audit entries, newest first</caption>
+            <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Who</th>
+                    <th scope="col">What</th>
+                    <th scope="col">Entity</th>
+                    <th scope="col">Columns</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Entries)
+                {
+                    <tr>
+                        <th scope="row">
+                            <time datetime="@entry.When.ToString("O")">
+                                @entry.When.ToLocalTime().ToString("d MMM yyyy HH:mm:ss")
+                            </time>
+                        </th>
+                        <td>@(entry.UserName ?? $"user {entry.UserId}")</td>
+                        <td>@entry.Type</td>
+                        <td>@entry.Entity @entry.EntityId</td>
+                        <td>
+                            @if (entry.ChangedColumns is { Length: > 0 } columns)
+                            {
+                                <details>
+                                    <summary>@columns</summary>
+                                    @* Rendered as text. These documents hold whatever an editor
+                                       typed, which is why they are worth keeping and why they must
+                                       never be interpolated as markup. *@
+                                    <pre class="cms-audit__values">@entry.OldValues</pre>
+                                    <pre class="cms-audit__values">@entry.NewValues</pre>
+                                </details>
+                            }
+                            else
+                            {
+                                <span class="text-body-secondary">—</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    @if (_next is { Length: > 0 })
+    {
+        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy"
+                @onclick="MoreAsync">
+            Show older
+        </button>
+    }
+}
