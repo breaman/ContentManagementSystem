@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Media.Library;
@@ -94,6 +95,7 @@ public interface IPublishingService
 /// <param name="acl">Where in the tree the caller may do it (task P7-06, spec section 21.2).</param>
 /// <param name="users">Identity of the caller, recorded on the published version.</param>
 /// <param name="clock">Source of the current time.</param>
+/// <param name="cacheInvalidation">Enqueues the cache eviction, inside the publish's transaction.</param>
 /// <param name="metrics">Counter and histogram of publish attempts (spec section 24.1).</param>
 /// <param name="logger">Log for every publish and every failure to publish.</param>
 public sealed class PublishingService(
@@ -109,6 +111,7 @@ public sealed class PublishingService(
     IAclService acl,
     IUserService users,
     TimeProvider clock,
+    ICacheInvalidationQueue cacheInvalidation,
     CmsMetrics metrics,
     ILogger<PublishingService> logger) : IPublishingService
 {
@@ -329,6 +332,10 @@ public sealed class PublishingService(
 
         await RedirectToParentIfConfiguredAsync(page, withdrawn, cancellationToken);
 
+        // Enqueued before the save that carries it, like the publish above: the page's response, the
+        // route lookup that found it, and any navigation showing it all stop being true here.
+        await cacheInvalidation.EnqueuePageAsync(pageId, cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
@@ -466,10 +473,13 @@ public sealed class PublishingService(
 
             await context.SaveChangesAsync(cancellationToken);
 
-            // Step 4 — the outbox row that drives cache invalidation belongs here (spec section 5.5).
-            // OutboxMessage arrives with the caching work in P8; until then delivery reads through
-            // no cache, so there is nothing yet to invalidate. The step is kept as its own point in
-            // the sequence so adding it is an insertion rather than a restructuring.
+            // Step 4 — the outbox row that drives cache invalidation (task P8-09, spec section
+            // 5.5). Inside the transaction, and that is the whole point: it commits with the publish
+            // or not at all, so a publish that rolls back evicts nothing and a publish that commits
+            // always has an eviction waiting for it, even if this process dies on the next line
+            // (acceptance criterion P8 #8).
+            await cacheInvalidation.EnqueuePageAsync(page.Id, cancellationToken);
+
             await context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);

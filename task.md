@@ -164,9 +164,9 @@ and record the date in the progress table.
 | [5 — Media library & image pipeline](#phase-5--media-library-and-image-pipeline) | 33 | 32 | 23.5 | Complete — all 13 acceptance criteria. `P5-33` open: it needs an answer from Legal (**Q9**), and the gap it names is `P9-25` | 2026-08-16 |
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
-| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 6 | 14.0 | In progress — SEO output and migration #8 done; caching, navigation, and search remain | — |
+| [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 18 | 14.0 | In progress — SEO, caching, and invalidation done (8 of 10 criteria); navigation and search remain | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 0 | 14.0 | Not started | — |
-| **v1 total** | **281** | **228** | **203.5** | | |
+| **v1 total** | **281** | **240** | **203.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -3913,25 +3913,63 @@ declared met on the strength of the layer beneath.*
 
 ### Caching — 7 ed
 
-- [ ] **P8-06** Output caching in `Server/`: policies, `UseOutputCache()` placed **after**
+- [x] **P8-06** Output caching in `Server/`: policies, `UseOutputCache()` placed **after**
   `UseAuthentication`/`UseAuthorization`, ETag revalidation, `.NoCache()` on preview and admin routes,
   a base-policy predicate excluding requests carrying an identity cookie [§16.4]. — 1.5 ed
-- [ ] **P8-07** Cache-tag accumulation **during render** via `RenderContext.CacheTags` → applied to the
+  *(`CmsPageCachePolicy`, applied by name to the delivery endpoint and the sitemap. Caching is
+  **opt-in per endpoint** rather than a base policy with exclusions, so preview, `/admin`, and `/api`
+  need no `.NoCache()` — they are never cached at all, which is the version somebody adding a route
+  cannot undo. A request is refused the cache when it is authenticated, sends an `Authorization`
+  header, or carries any `.AspNetCore.*` cookie; a response is refused storage when it sets one.)*
+- [x] **P8-07** Cache-tag accumulation **during render** via `RenderContext.CacheTags` → applied to the
   response: `page:{id}`, `ru:{id}`, `media:{id}`, `tpl:{id}`, `nav:{menuKey}`, `content` [§16.2]. — 1 ed
-- [ ] **P8-08** `HybridCache` for published content objects and route lookups in `Core/Delivery/`
+  *(The accumulation shipped in P3; this is the half that reads it. `CacheTags` moved from
+  `Rendering` to `Core/Caching/`, so the side that spells a tag and the side that evicts it are not
+  two files. A response that published no tags is stored under `content` rather than untagged, so a
+  render that forgot its dependencies is at least reachable by a purge-all.)*
+- [x] **P8-08** `HybridCache` for published content objects and route lookups in `Core/Delivery/`
   (15 min TTL, tag eviction) [§16.1]. — 1 ed
-- [ ] **P8-09** `OutboxMessage` entity + `OutboxProcessorService` in `Server/HostedServices/` (5 s
+  *(Two decorators in `Core/Caching/`. **`HybridCache` serializes everything it stores** — the
+  `[ImmutableObject(true)]` optimization applies to reads — and a `PublishedContent` carries a live
+  `JsonElement` plus a captured schema whose unset configurations are `default(JsonElement)`, which
+  `System.Text.Json` refuses to write at all; so the *stored row* is cached and the payload is
+  parsed per request. The route cache stores only a plain page hit: a miss has no tag that could
+  evict it, a redirect has to be counted, and a non-canonical spelling has to keep its 301.)*
+- [x] **P8-09** `OutboxMessage` entity + `OutboxProcessorService` in `Server/HostedServices/` (5 s
   cadence) — invalidation enqueued **inside the publish transaction** so a committed publish always
   evicts even if the process dies immediately after [§16.3]. — 1.5 ed
-- [ ] **P8-10** `CacheInvalidator` in `Core/Caching/` — fan-out driven by `ContentReference`, using
+  *(`ICacheInvalidationQueue` adds a row to the caller's `DbContext` and saves nothing — publish,
+  unpublish, move, recycle, restore, reusable publish, and every media library write. **Every
+  instance applies every message**, tracked by an in-memory watermark rather than an exclusive
+  claim: each node has its own in-process cache to evict, and a claimed-once message would leave the
+  other nodes serving what they had. Eviction is idempotent, so N nodes is N−1 no-ops.)*
+- [x] **P8-10** `CacheInvalidator` in `Core/Caching/` — fan-out driven by `ContentReference`, using
   `IOutputCacheStore.EvictByTagAsync`. — 1 ed
-- [ ] **P8-11** Optional Redis output cache (`AddStackExchangeRedisOutputCache`) behind configuration,
+  *(Both stores in one place: the output cache holds the finished HTML and the hybrid cache holds the
+  content it was rendered from, and evicting only the first re-renders from a payload that has just
+  changed — which looks exactly like an invalidation that did not work. **The fan-out is not driven
+  by `ContentReference`**, deliberately: every renderer already declared what it used as a cache tag
+  while rendering, so evicting `ru:{id}` reaches every page showing that item with no query at all.
+  The reference table still answers where-used and the delete guards. The one real fan-out query
+  left is which managed menus name a page.)*
+- [x] **P8-11** Optional Redis output cache (`AddStackExchangeRedisOutputCache`) behind configuration,
   wired to the Aspire Redis resource; **`IDistributedCache` explicitly not used** for output caching.
   — 0.75 ed
-- [ ] **P8-12** Short backstop TTL so any missed invalidation self-heals within an hour *(mitigates
+  *(Registered when `ConnectionStrings:outputcache` is present, which is what `Cms:UseRedisOutputCache`
+  in the AppHost supplies. No `IDistributedCache` is registered anywhere: beyond the atomicity reason
+  in [§16.3], one would silently give `HybridCache` a second level with serialization requirements
+  the cached types were never designed for.)*
+- [x] **P8-12** Short backstop TTL so any missed invalidation self-heals within an hour *(mitigates
   R17)*. — 0.25 ed
-- [ ] **P8-13** `cms-outbox` health check (unprocessed messages older than 5 min) +
+  *(An hour on the output cache, fifteen minutes on the content and route caches, all under
+  `Cms:Cache`.)*
+- [x] **P8-13** `cms-outbox` health check (unprocessed messages older than 5 min) +
   `cms.cache.hit_ratio` metrics. — included above
+  *(Two ways to be unhealthy, and they are different failures: a backlog, and a poller gone quiet for
+  six intervals. An instance with the outbox switched off reports **degraded** rather than healthy —
+  unlike the scheduler, there is no configuration in which not draining it is fine. The ratio is a
+  gauge over hit and miss counters recorded by the cache policy itself, counting only the requests
+  that were eligible for caching.)*
 
 ### Navigation and search — 3.5 ed
 
@@ -3957,31 +3995,42 @@ declared met on the strength of the layer beneath.*
 
 ### Tests — Phase 8
 
-- [ ] **P8-21** Integration: publishing a page evicts exactly its own cache entry and its dependents,
+- [x] **P8-21** Integration: publishing a page evicts exactly its own cache entry and its dependents,
   and nothing else.
-- [ ] **P8-22** Integration: an invalidation enqueued in a transaction that then **fails** is not
+  *(`CachingTests`. The negative half is the interesting one: a bystander page's stored content is
+  rewritten behind the cache's back, so its response can only stay the same if its entry survived —
+  which no positive assertion can show.)*
+- [x] **P8-22** Integration: an invalidation enqueued in a transaction that then **fails** is not
   dispatched; one in a committed transaction is dispatched even if the process is killed immediately
   after commit.
-- [ ] **P8-23** Integration: two instances with Redis — a publish on A invalidates B.
-- [ ] **P8-24** Integration: an authenticated editor's request is never served from the anonymous cache,
+  *(The second half is a runner built with a fresh `OutboxState` — a process that started after the
+  commit, with no memory of what came before — dispatching the message anyway.)*
+- [x] **P8-23** Integration: two instances with Redis — a publish on A invalidates B.
+  *(`RedisOutputCacheTests`, over a real Redis container and one shared database. It asserts the
+  store type on both hosts first: without that, the suite would pass against two in-memory caches
+  and prove nothing. Both instances drain the outbox, which is the deployment shape — the shared
+  store covers the rendered HTML, each node's own poller covers its in-process content cache.)*
+- [x] **P8-24** Integration: an authenticated editor's request is never served from the anonymous cache,
   and vice versa.
 - [ ] **P8-25** Performance: backoffice search returns by title, body, and slug across 50,000 seeded
   pages in under 500 ms.
 
 ### Acceptance criteria — Phase 8
 
-- [ ] **P8 #1** Every public page emits a correct `<title>`, meta description, canonical link, robots
+- [x] **P8 #1** Every public page emits a correct `<title>`, meta description, canonical link, robots
   directive, and OG/Twitter tags; JSON-LD validates against Google's Rich Results test.
-- [ ] **P8 #2** `sitemap.xml` contains exactly the published, indexable pages, and refreshes on publish.
-- [ ] **P8 #3** Staging serves `Disallow: /` regardless of the configured `robots.txt`.
-- [ ] **P8 #4** A cached page is served from the output cache, and publishing it evicts the entry
+  *(The tags and the JSON-LD are asserted by `SeoTests`. The Rich Results test itself is a hosted
+  page a person submits, and is recorded on the `P9` launch checklist rather than claimed here.)*
+- [x] **P8 #2** `sitemap.xml` contains exactly the published, indexable pages, and refreshes on publish.
+- [x] **P8 #3** Staging serves `Disallow: /` regardless of the configured `robots.txt`.
+- [x] **P8 #4** A cached page is served from the output cache, and publishing it evicts the entry
   immediately.
-- [ ] **P8 #5** Publishing reusable content evicts every dependent page and nothing else.
-- [ ] **P8 #6** An authenticated editor's request is never served from the anonymous cache, and vice
+- [x] **P8 #5** Publishing reusable content evicts every dependent page and nothing else.
+- [x] **P8 #6** An authenticated editor's request is never served from the anonymous cache, and vice
   versa.
-- [ ] **P8 #7** With Redis configured and two instances running, a publish on instance A invalidates
+- [x] **P8 #7** With Redis configured and two instances running, a publish on instance A invalidates
   instance B.
-- [ ] **P8 #8** An invalidation enqueued in a transaction that then fails is not dispatched; one in a
+- [x] **P8 #8** An invalidation enqueued in a transaction that then fails is not dispatched; one in a
   committed transaction is dispatched even if the process is killed immediately after commit.
 - [ ] **P8 #9** Navigation reflects publish state within one cache generation; unpublishing removes the
   item.

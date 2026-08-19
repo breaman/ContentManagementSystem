@@ -4,6 +4,7 @@ using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
 using ContentManagementSystem.Core.Auditing;
 using ContentManagementSystem.Core.Content;
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Dashboard;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Fields;
@@ -24,6 +25,7 @@ using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Server.Api.Cms;
 using ContentManagementSystem.Server.Authorization;
+using ContentManagementSystem.Server.Caching;
 using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
 using ContentManagementSystem.Server.Delivery.Preview;
@@ -182,6 +184,23 @@ try
     // page or in SiteSettings; what is left here is what only the deployment can know.
     builder.Services.Configure<SeoOptions>(
         builder.Configuration.GetSection(SeoOptions.SectionName));
+
+    // The published-content and route caches, the invalidation queue, and the outbox runner
+    // (tasks P8-08 to P8-10). Registered after delivery and routing, because two of these are
+    // decorators over registrations those calls made.
+    builder.Services.AddCmsCaching();
+    builder.Services.Configure<DeliveryCacheOptions>(
+        builder.Configuration.GetSection(DeliveryCacheOptions.SectionName));
+    builder.Services.Configure<OutboxOptions>(
+        builder.Configuration.GetSection(OutboxOptions.SectionName));
+
+    // The output cache itself, and Redis behind it when a deployment has one (tasks P8-06, P8-11).
+    // UseOutputCache is placed after UseAuthentication below, which is what lets the policy see the
+    // principal and refuse to cache an authenticated response (spec section 16.4).
+    builder.Services.AddCmsOutputCache(builder.Configuration);
+
+    // Dispatches what publishing enqueued, on every instance rather than on one (task P8-09).
+    builder.Services.AddHostedService<OutboxProcessorService>();
     // Preview (tasks P3-16 to P3-19). It renders through the delivery pipeline registered above and
     // differs only in which version it loads, which is what makes preview fidelity structural
     // (spec section 12.1). Also registers the rate limiter the shared-link routes require.
@@ -249,7 +268,13 @@ try
         // otherwise has no symptom until somebody notices a page that never went live.
         .AddCheck<CmsSchedulerHealthCheck>(
             CmsSchedulerHealthCheck.Name,
-            tags: ["ready", "cms", "scheduler"]);
+            tags: ["ready", "cms", "scheduler"])
+        // The cms-outbox check of task P8-13. The failure it exists for has no other symptom: when
+        // invalidation stops draining, every request still succeeds and every page still renders,
+        // with content that was replaced hours ago.
+        .AddCheck<CmsOutboxHealthCheck>(
+            CmsOutboxHealthCheck.Name,
+            tags: ["ready", "cms", "cache"]);
 
     // The management API is cookie-authenticated, so every write carries an antiforgery token in a
     // header. Naming the header here is what lets the JSON endpoints validate one at all — the
@@ -372,6 +397,11 @@ try
     // preview routes opt in; everything else is unlimited, because a limiter in front of the whole
     // site is a denial-of-service tool pointed at its own visitors.
     app.UseRateLimiter();
+
+    // After authentication and authorization, and that ordering is the correctness rule of spec
+    // section 16.4 rather than a preference: the page policy refuses to cache a request carrying an
+    // identity, and it can only see one because those two middlewares have already run.
+    app.UseOutputCache();
 
     app.MapStaticAssets();
 

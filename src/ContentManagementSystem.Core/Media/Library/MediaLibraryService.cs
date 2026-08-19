@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Media.Stores;
 using ContentManagementSystem.Data.Interfaces;
@@ -29,6 +30,7 @@ public sealed class MediaLibraryService(
     ICmsAuthorization authorization,
     IUserService users,
     TimeProvider clock,
+    ICacheInvalidationQueue cacheInvalidation,
     ILogger<MediaLibraryService> logger) : IMediaLibraryService
 {
     /// <inheritdoc />
@@ -323,6 +325,10 @@ public sealed class MediaLibraryService(
         item.DeletedOn = clock.GetUtcNow();
         item.DeletedBy = users.UserId;
 
+        // A recycled item resolves to nothing and renders as the spec section 15.3 placeholder, so
+        // every page showing it has changed.
+        cacheInvalidation.EnqueueMedia(id);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation("Media item {MediaItemId} was moved to the recycle bin.", id);
@@ -501,6 +507,13 @@ public sealed class MediaLibraryService(
     /// <summary>Saves a tracked item, mapping a lost concurrency race to a conflict.</summary>
     private async Task<CmsResult<MediaDetail>> SaveAsync(MediaItem item, CancellationToken cancellationToken)
     {
+        // Every library-scope write goes through here — metadata, edits, a revert, a restore — and
+        // every one of them changes what a page showing this item renders: the alt text in the
+        // markup, or the URL of every rendition when the edits generation moves. One enqueue here
+        // rather than four at the call sites is what keeps a later fifth writer from forgetting
+        // (task P8-09, spec section 16.2).
+        cacheInvalidation.EnqueueMedia(item.Id);
+
         try
         {
             await context.SaveChangesAsync(cancellationToken);

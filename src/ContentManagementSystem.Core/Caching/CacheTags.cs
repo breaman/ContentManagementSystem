@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace ContentManagementSystem.Rendering;
+namespace ContentManagementSystem.Core.Caching;
 
 /// <summary>
 /// Constructs the output-cache tag names of spec section 16.2.
@@ -9,7 +9,12 @@ namespace ContentManagementSystem.Rendering;
 /// Tags are strings the eviction side has to spell identically, months and several phases apart:
 /// the render adds <c>media:812</c> and a publish evicts by whatever the media service happens to
 /// format. One place that builds them is what keeps those two in agreement, and it is why nothing
-/// else in the rendering pipeline concatenates a tag by hand.
+/// else concatenates a tag by hand.
+/// <para>
+/// In Core rather than in Rendering, even though rendering is where tags are collected, because the
+/// half that evicts them lives here — and two copies of this file, one per side, is precisely the
+/// disagreement it exists to prevent.
+/// </para>
 /// </remarks>
 public static class CacheTags
 {
@@ -35,6 +40,17 @@ public static class CacheTags
     /// <param name="templateId">The template id.</param>
     /// <returns>The tag.</returns>
     public static string Template(int templateId) => Format("tpl", templateId);
+
+    /// <summary>
+    /// Menu key the tree-generated navigation is tagged under (spec section 10.7).
+    /// </summary>
+    /// <remarks>
+    /// Structural navigation has no menu row and therefore no key of its own, but it is still a
+    /// dependency a page takes and still has to be evicted when the tree changes. Naming it here
+    /// rather than at the two call sites keeps it out of the space a managed menu's key could
+    /// collide with — a menu called <c>tree</c> is a menu somebody would create.
+    /// </remarks>
+    public const string StructuralMenuKey = "*tree";
 
     /// <summary>Tags every page rendering a navigation menu.</summary>
     /// <param name="menuKey">The menu key.</param>

@@ -33,6 +33,24 @@ public sealed class PublishedContentService(
     /// <inheritdoc />
     public async Task<PublishedContent?> GetAsync(
         int pageId,
+        CancellationToken cancellationToken = default) =>
+        await GetRowAsync(pageId, cancellationToken) is { } row ? Materialize(row) : null;
+
+    /// <summary>
+    /// Reads the stored row for a page's published version, without parsing anything.
+    /// </summary>
+    /// <param name="pageId">The page.</param>
+    /// <param name="cancellationToken">Token observed while querying.</param>
+    /// <returns>The row, or null when the page has no published version.</returns>
+    /// <remarks>
+    /// Split out from <see cref="GetAsync"/> so the cache in front of this can store something a
+    /// serializer can write: the row is scalars and one JSON string, while a
+    /// <see cref="PublishedContent"/> carries a live <c>JsonElement</c> and a captured schema, and
+    /// <c>HybridCache</c> serializes everything it stores whatever the type claims about its own
+    /// immutability (task P8-08).
+    /// </remarks>
+    public async Task<PublishedContentRow?> GetRowAsync(
+        int pageId,
         CancellationToken cancellationToken = default)
     {
         if (pageId <= 0) return null;
@@ -43,7 +61,7 @@ public sealed class PublishedContentService(
         var row = await context.Pages
             .AsNoTracking()
             .Where(page => page.Id == pageId && page.PublishedVersionId != null)
-            .Select(page => new PublishedRow(
+            .Select(page => new PublishedContentRow(
                 page.Id,
                 page.PublicId,
                 page.PublishedVersion!.Id,
@@ -74,7 +92,17 @@ public sealed class PublishedContentService(
                     .FirstOrDefault()))
             .FirstOrDefaultAsync(cancellationToken);
 
-        if (row is null) return null;
+        return row;
+    }
+
+    /// <summary>
+    /// Turns a stored row into the delivery result, parsing the payload and resolving its schema.
+    /// </summary>
+    /// <param name="row">The row, from this service or from the cache in front of it.</param>
+    /// <returns>The content, or null when the stored payload cannot be read at all.</returns>
+    public PublishedContent? Materialize(PublishedContentRow row)
+    {
+        ArgumentNullException.ThrowIfNull(row);
 
         ContentPayload payload;
 
@@ -130,8 +158,12 @@ public sealed class PublishedContentService(
     /// columns; EF translates either identically. It stops one column short of
     /// <see cref="PublishedContent"/> — the content arrives as text and becomes a payload afterwards,
     /// because parsing is not something a query provider can be asked to do.
+    /// <para>
+    /// Public, and the reason is the cache: this is the form that can be serialized and stored, and
+    /// <see cref="Materialize"/> is what turns it back into something renderable (task P8-08).
+    /// </para>
     /// </remarks>
-    private sealed record PublishedRow(
+    public sealed record PublishedContentRow(
         int PageId,
         Guid PublicId,
         int VersionId,

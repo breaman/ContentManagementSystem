@@ -1,6 +1,7 @@
 using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Telemetry;
+using ContentManagementSystem.Server.Caching;
 using ContentManagementSystem.Server.Delivery.Seo;
 
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -57,10 +58,9 @@ public static class DeliveryEndpointRouteBuilderExtensions
     /// once broken (risk R6). The <c>P3-15</c> tests assert the outcome rather than the ordering, so
     /// a future reshuffle fails on the behaviour that matters.
     /// <para>
-    /// <c>CacheOutput</c> is deliberately not applied yet. Output caching is Phase 8, and a response
-    /// cached before there is anything to evict it would make every publish look broken. The tags
-    /// the policy will need are already collected and published on <c>HttpContext.Items</c> by the
-    /// endpoint.
+    /// <c>CacheOutput</c> applies the CMS page policy (task P8-06): anonymous requests only, tagged
+    /// with what the render actually depended on, and expiring within the hour even if no
+    /// invalidation ever arrives.
     /// </para>
     /// </remarks>
     public static IEndpointRouteBuilder MapCmsDelivery(this IEndpointRouteBuilder endpoints)
@@ -69,6 +69,7 @@ public static class DeliveryEndpointRouteBuilderExtensions
 
         endpoints.MapGet("/{**slug}", DeliveryEndpoint.HandleAsync)
             .AllowAnonymous()
+            .CacheOutput(CachingServiceCollectionExtensions.PagePolicyName)
             .WithName(DeliveryRouteName);
 
         return endpoints;

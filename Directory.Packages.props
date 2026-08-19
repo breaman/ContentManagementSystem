@@ -60,11 +60,24 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.10" />
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <!--
+      The optional shared output cache of spec section 16.3, used only when a deployment configures
+      Redis. AddStackExchangeRedisOutputCache is the output-cache registration specifically:
+      IDistributedCache is explicitly not used for output caching, since it lacks the atomic
+      operations tag eviction needs.
+      -->
+    <PackageVersion Include="Microsoft.AspNetCore.OutputCaching.StackExchangeRedis" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
+    <!--
+      HybridCache backs the published-content and route caches of spec section 16.1. It is used for
+      its in-process layer and its stampede protection; no IDistributedCache is registered, because
+      spec section 16.3 puts the shared cache at the output-cache layer instead.
+      -->
+    <PackageVersion Include="Microsoft.Extensions.Caching.Hybrid" Version="10.9.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.8.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.8.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.17.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.17.0" />
@@ -103,6 +116,11 @@
       -->
     <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.13.0" />
+    <!--
+      Redis, for the one test that has to prove a publish on one instance invalidates another
+      (task P8-23). Same Testcontainers line as the SQL Server fixture, so the two share a version.
+      -->
+    <PackageVersion Include="Testcontainers.Redis" Version="4.13.0" />
     <!--
       The test framework. TUnit is a Microsoft.Testing.Platform framework rather than a VSTest one,
       so the runner lives in the test executable itself: there is no Microsoft.NET.Test.Sdk and no

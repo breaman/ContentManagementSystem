@@ -41,6 +41,12 @@ public sealed class CmsMetrics
     /// <summary>Name of the gauge of scheduled-publish lag (task P7-17, spec section 24.1).</summary>
     public const string SchedulerLagName = "cms.scheduler.lag";
 
+    /// <summary>Name of the counter of output-cache lookups, tagged by outcome (task P8-13).</summary>
+    public const string CacheLookupName = "cms.cache.lookup";
+
+    /// <summary>Name of the gauge of the output-cache hit ratio (task P8-13).</summary>
+    public const string CacheHitRatioName = "cms.cache.hit_ratio";
+
     /// <summary>Tag naming the output format a rendition was encoded in.</summary>
     public const string FormatTag = "format";
 
@@ -59,6 +65,10 @@ public sealed class CmsMetrics
     private readonly Counter<long> _routeResolutionMiss;
     private readonly Counter<long> _renditionGenerated;
     private readonly Histogram<double> _renditionDuration;
+    private readonly Counter<long> _cacheLookup;
+
+    private long _cacheHits;
+    private long _cacheMisses;
 
     /// <summary>Creates the instruments on the CMS meter.</summary>
     /// <param name="meterFactory">Factory supplying the container-scoped meter.</param>
@@ -101,6 +111,27 @@ public sealed class CmsMetrics
             RenditionDurationName,
             unit: "ms",
             description: "Wall-clock time one rendition encode took, tagged by output format.");
+
+        _cacheLookup = meter.CreateCounter<long>(
+            CacheLookupName,
+            unit: "{lookup}",
+            description: "Output-cache lookups on cacheable requests, tagged by whether they hit.");
+
+        // The ratio itself, because that is the number an operator actually watches and deriving it
+        // from two counters is a query every dashboard would otherwise have to repeat. It is
+        // cumulative over the process rather than windowed: a rate is what the counters are for, and
+        // this answers "is the cache working at all", which is a question about the whole run.
+        meter.CreateObservableGauge(
+            CacheHitRatioName,
+            () =>
+            {
+                var hits = Interlocked.Read(ref _cacheHits);
+                var total = hits + Interlocked.Read(ref _cacheMisses);
+
+                return total == 0 ? 0d : (double)hits / total;
+            },
+            unit: "1",
+            description: "Share of cacheable page requests served from the output cache.");
 
         // Observable rather than recorded: lag is a level, not an event, and the question it answers
         // — "is anything overdue right now" — has an answer whether or not the poller has done
@@ -165,6 +196,28 @@ public sealed class CmsMetrics
     /// counter answers the different question of whether the rate has changed.
     /// </remarks>
     public void RecordRouteMiss() => _routeResolutionMiss.Add(1);
+
+    /// <summary>Records a page response served from the output cache (task P8-13).</summary>
+    public void RecordCacheHit()
+    {
+        Interlocked.Increment(ref _cacheHits);
+        _cacheLookup.Add(1, new KeyValuePair<string, object?>(CacheHitTag, true));
+    }
+
+    /// <summary>
+    /// Records a cacheable page response that had to be rendered and was then stored.
+    /// </summary>
+    /// <remarks>
+    /// Counted where the response is stored rather than where it is rendered, so the two counters
+    /// describe the same population: requests that were eligible for the cache. A request excluded
+    /// from caching — an editor's, a POST — is neither a hit nor a miss, and counting it as a miss
+    /// would make the ratio a measure of how many editors are logged in.
+    /// </remarks>
+    public void RecordCacheMiss()
+    {
+        Interlocked.Increment(ref _cacheMisses);
+        _cacheLookup.Add(1, new KeyValuePair<string, object?>(CacheHitTag, false));
+    }
 
     /// <summary>
     /// Records one rendition encode (task P5-32, spec section 24.1).

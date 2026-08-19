@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Shared.Content;
@@ -57,8 +58,8 @@ public sealed class RenderContext
         // Seeded here rather than by the delivery endpoint: these two are the tags every page
         // response carries by definition, and a tag that has to be remembered is a tag that will
         // eventually be forgotten on one code path and leave a stale page live.
-        CacheTags.Add(Rendering.CacheTags.Page(page.Id));
-        CacheTags.Add(Rendering.CacheTags.Template(page.TemplateId));
+        CacheTags.Add(Core.Caching.CacheTags.Page(page.Id));
+        CacheTags.Add(Core.Caching.CacheTags.Template(page.TemplateId));
     }
 
     /// <summary>

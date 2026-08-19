@@ -36,6 +36,18 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
     /// </remarks>
     public Action<IServiceCollection, string>? ConfigureServices { get; init; }
 
+    /// <summary>
+    /// Extra configuration values, applied over the defaults below.
+    /// </summary>
+    /// <remarks>
+    /// Applied through <c>UseSetting</c> rather than <c>ConfigureAppConfiguration</c>, and the
+    /// difference matters: the configuration sources added below are only visible once the host is
+    /// being built, which is <em>after</em> <c>Program</c> has read configuration to decide what to
+    /// register. A test that has to change one of those decisions — which output cache store is
+    /// registered, say — must set the value where the application builder can see it.
+    /// </remarks>
+    public IReadOnlyDictionary<string, string?>? Settings { get; init; }
+
     /// <inheritdoc />
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -55,6 +67,11 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
                 ["Cms:Scheduler:Enabled"] = "false",
             });
         });
+
+        foreach (var setting in Settings ?? new Dictionary<string, string?>())
+        {
+            builder.UseSetting(setting.Key, setting.Value);
+        }
 
         builder.ConfigureTestServices(services =>
         {

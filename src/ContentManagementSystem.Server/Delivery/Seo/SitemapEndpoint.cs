@@ -2,10 +2,10 @@ using System.Globalization;
 using System.Text;
 using System.Xml;
 
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
-using ContentManagementSystem.Rendering;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;

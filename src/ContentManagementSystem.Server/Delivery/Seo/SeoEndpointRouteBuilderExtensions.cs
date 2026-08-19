@@ -1,3 +1,5 @@
+using ContentManagementSystem.Server.Caching;
+
 namespace ContentManagementSystem.Server.Delivery.Seo;
 
 /// <summary>
@@ -18,14 +20,21 @@ public static class SeoEndpointRouteBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(endpoints);
 
+        // Cached under the same policy as a page, and tagged `content`: any publish changes what
+        // belongs in a sitemap, and there is no narrower dependency to take (spec section 18.3).
         endpoints.MapGet("/sitemap.xml", SitemapEndpoint.IndexAsync)
             .AllowAnonymous()
+            .CacheOutput(CachingServiceCollectionExtensions.PagePolicyName)
             .WithName(SitemapEndpoint.RouteName);
 
         endpoints.MapGet("/sitemap-{page:int:min(1)}.xml", SitemapEndpoint.PageAsync)
             .AllowAnonymous()
+            .CacheOutput(CachingServiceCollectionExtensions.PagePolicyName)
             .WithName(SitemapEndpoint.PageRouteName);
 
+        // Not cached, unlike the sitemap. The body depends on the environment as well as on the
+        // settings row, and a copy of the production body cached in front of staging would undo the
+        // one rule here that must not be reachable by editing anything (spec section 18.4).
         endpoints.MapGet("/robots.txt", RobotsEndpoint.HandleAsync)
             .AllowAnonymous()
             .WithName(RobotsEndpoint.RouteName);

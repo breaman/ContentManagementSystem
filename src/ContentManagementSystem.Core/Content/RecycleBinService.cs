@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Data.Models;
 using ContentManagementSystem.Data.Models.Cms;
@@ -94,6 +95,7 @@ public sealed class RecycleBinService(
     IUrlService urls,
     ICmsAuthorization authorization,
     IAclService acl,
+    ICacheInvalidationQueue cacheInvalidation,
     ILogger<RecycleBinService> logger) : IRecycleBinService
 {
     /// <inheritdoc />
@@ -243,6 +245,12 @@ public sealed class RecycleBinService(
         // rebuild a page's explicit URL from nothing.
         var withdrawn = await urls.WithdrawAsync(pageId, cancellationToken);
 
+        // Every page in the subtree was just taken off the public site, so every cached response and
+        // route lookup for it is now wrong (task P8-09).
+        await cacheInvalidation.EnqueuePagesAsync(
+            subtree.Select(node => node.Id),
+            cancellationToken);
+
         await context.SaveChangesAsync(cancellationToken);
 
         logger.LogInformation(
@@ -344,6 +352,10 @@ public sealed class RecycleBinService(
         // somebody else's page. No published route is written: every restored page came back as a
         // draft two blocks above.
         await urls.SyncAsync(pageId, cancellationToken);
+
+        // Restored as drafts, so nothing comes back on the public site — but the tree changed shape
+        // and the pages' cached 404s and route misses have to go.
+        await cacheInvalidation.EnqueuePagesAsync(restored, cancellationToken);
 
         await context.SaveChangesAsync(cancellationToken);
 

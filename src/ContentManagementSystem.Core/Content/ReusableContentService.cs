@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Media.Library;
 using ContentManagementSystem.Core.Publishing;
@@ -41,6 +42,7 @@ public sealed class ReusableContentService(
     ICmsAuthorization authorization,
     IUserService users,
     TimeProvider clock,
+    ICacheInvalidationQueue cacheInvalidation,
     ILogger<ReusableContentService> logger) : IReusableContentService
 {
     /// <summary>
@@ -581,6 +583,7 @@ public sealed class ReusableContentService(
         item.PublishedVersion = null;
 
         WriteAudit(UnpublishAuditType, item.Id, retired.VersionNumber, blastRadius);
+        cacheInvalidation.EnqueueReusable(item.Id);
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -774,11 +777,16 @@ public sealed class ReusableContentService(
 
             await context.SaveChangesAsync(cancellationToken);
 
-            // Step 4 — the audit entry carrying the impact list (task P4-12, spec section 9.3), and
-            // the outbox row that will drive cache invalidation when P8 adds it. Both belong inside
-            // the transaction: an impact list committed beside a publish that rolled back describes
-            // a change that never happened.
+            // Step 4 — the audit entry carrying the impact list (task P4-12, spec section 9.3) and
+            // the outbox row that drives cache invalidation (task P8-09). Both belong inside the
+            // transaction: an impact list committed beside a publish that rolled back describes a
+            // change that never happened, and an eviction enqueued outside one would fire for it.
+            //
+            // One tag, however many pages render this item. Each of them added `ru:{id}` while it
+            // rendered, so the fan-out is already recorded on their cache entries and nothing here
+            // has to walk the reference table to find them (spec section 16.2).
             WriteAudit(PublishAuditType, item.Id, published.VersionNumber, blastRadius);
+            cacheInvalidation.EnqueueReusable(item.Id);
             await context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);

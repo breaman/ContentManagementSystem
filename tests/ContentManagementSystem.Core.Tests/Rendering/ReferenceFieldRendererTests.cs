@@ -1,3 +1,4 @@
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Rendering;
 
 using Microsoft.Extensions.Logging;

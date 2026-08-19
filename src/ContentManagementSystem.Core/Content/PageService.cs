@@ -1,5 +1,6 @@
 using System.Text.Json;
 
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Publishing;
 using ContentManagementSystem.Core.Routing;
 using ContentManagementSystem.Data.Models;
@@ -43,6 +44,7 @@ public sealed class PageService(
     ICmsAuthorization authorization,
     IAclService acl,
     TimeProvider clock,
+    ICacheInvalidationQueue cacheInvalidation,
     ILogger<PageService> logger) : IPageService
 {
     /// <summary>Escape character used with <c>LIKE</c>, so a search term's wildcards are literal.</summary>
@@ -715,6 +717,16 @@ public sealed class PageService(
 
                 return CmsResult<PageMoveResult>.Invalid(sync.Diagnostics);
             }
+
+            await context.SaveChangesAsync(cancellationToken);
+
+            // Every page whose URL moved loses its cached response and its cached route, and the
+            // tree navigation changes shape for everybody (task P8-09). Enqueued inside the
+            // transaction, so a preview's rollback takes the eviction with it — the preview changed
+            // nothing, and evicting for it would be a self-inflicted stampede on a busy site.
+            await cacheInvalidation.EnqueuePagesAsync(
+                sync.Changes.Select(change => change.PageId),
+                cancellationToken);
 
             await context.SaveChangesAsync(cancellationToken);
 

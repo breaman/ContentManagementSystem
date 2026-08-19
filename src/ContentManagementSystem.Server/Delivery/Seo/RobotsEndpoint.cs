@@ -1,8 +1,8 @@
 using System.Text;
 
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Data.Models;
-using ContentManagementSystem.Rendering;
 
 using Microsoft.EntityFrameworkCore;
 

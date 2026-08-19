@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core;
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Fields;
@@ -510,6 +511,9 @@ public class PageServiceTests(SqlServerFixture fixture)
             // with no ACLs configured runs.
             new AclService(context, authorization, new StubUserService(), NullLogger<AclService>.Instance),
             TimeProvider.System,
+            // The real queue over the same context: a move writes an outbox row, and a suite that
+            // stubbed it would not notice a move that stopped enqueuing one.
+            new CacheInvalidationQueue(context, TimeProvider.System),
             NullLogger<PageService>.Instance);
     }
 

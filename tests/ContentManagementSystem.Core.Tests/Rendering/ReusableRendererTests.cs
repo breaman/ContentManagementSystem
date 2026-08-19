@@ -1,4 +1,5 @@
 using ContentManagementSystem.Core.Delivery;
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Shared.Content;
 

@@ -1,5 +1,6 @@
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Core.Tests.Content;
+using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Rendering;
 using ContentManagementSystem.Shared.Contracts.Fields;
 

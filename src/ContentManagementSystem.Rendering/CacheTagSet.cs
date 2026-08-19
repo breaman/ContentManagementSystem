@@ -1,3 +1,5 @@
+using ContentManagementSystem.Core.Caching;
+
 namespace ContentManagementSystem.Rendering;
 
 /// <summary>

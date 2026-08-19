@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using ContentManagementSystem.Core.Content.Schema;
 using ContentManagementSystem.Shared.Content;
 
@@ -25,6 +27,12 @@ namespace ContentManagementSystem.Core.Delivery;
 /// arbitrary: a version <em>is</em> its metadata and its payload together, and the two are read in
 /// one query and cached as one entry.
 /// </para>
+/// <para>
+/// <c>[ImmutableObject(true)]</c> on a sealed type is what lets <c>HybridCache</c> hand the same
+/// instance to every caller instead of serializing one per read (task P8-08). It is a claim about
+/// this type that the type has to keep: nothing here may gain a settable member or a mutable
+/// collection, or two concurrent requests would be sharing one object that one of them can edit.
+/// </para>
 /// </remarks>
 /// <param name="PageId">Page id, used in render diagnostics and in the <c>page:{id}</c> cache tag.</param>
 /// <param name="PublicId">Stable external identifier, safe to put in markup.</param>
@@ -46,6 +54,7 @@ namespace ContentManagementSystem.Core.Delivery;
 /// discriminators are enough to read every value, and only the field configuration is lost
 /// (spec section 8.5).
 /// </param>
+[ImmutableObject(true)]
 public sealed record PublishedContent(
     int PageId,
     Guid PublicId,
