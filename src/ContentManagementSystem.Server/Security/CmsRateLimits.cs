@@ -98,11 +98,35 @@ public static class CmsRateLimits
     /// Registers every policy in spec section 20.6's table.
     /// </summary>
     /// <param name="services">The service collection.</param>
+    /// <param name="configuration">
+    /// Configuration the two public per-address budgets are read from. Omit it and the spec's
+    /// figures apply.
+    /// </param>
     /// <returns>The service collection, for chaining.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="services"/> is null.</exception>
-    public static IServiceCollection AddCmsRateLimiting(this IServiceCollection services)
+    /// <remarks>
+    /// <strong>Only the two public budgets are configurable, and only upwards of nothing.</strong>
+    /// They exist because a load test cannot be run against them: NFR-9 asks for five thousand
+    /// requests a second and the public budget is ten, so a run from a handful of generators spends
+    /// its time measuring the rejection path (task P9-13). Raising them is a deployment's decision
+    /// about its own environment, and the defaults are section 20.6's numbers, so an environment
+    /// that configures nothing is limited exactly as the spec says.
+    /// <para>
+    /// The credential and API budgets are deliberately <em>not</em> configurable. They are the ones
+    /// protecting passwords and writes, and no load test needs them moved.
+    /// </para>
+    /// </remarks>
+    public static IServiceCollection AddCmsRateLimiting(
+        this IServiceCollection services,
+        IConfiguration? configuration = null)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        var limits = new CmsRateLimitOptions();
+
+        configuration?.GetSection(CmsRateLimitOptions.SectionName).Bind(limits);
+
+        limits.Validate();
 
         services.AddRateLimiter(options =>
         {
@@ -137,10 +161,10 @@ public static class CmsRateLimits
                 RateLimitPartition.GetFixedWindowLimiter(Caller(http), _ => Minute(UploadsPerMinute)));
 
             options.AddPolicy(MediaDelivery, http =>
-                RateLimitPartition.GetFixedWindowLimiter(Address(http), _ => Minute(MediaResponsesPerMinute)));
+                RateLimitPartition.GetFixedWindowLimiter(Address(http), _ => Minute(limits.MediaResponsesPerMinute)));
 
             options.AddPolicy(PublicPages, http =>
-                RateLimitPartition.GetFixedWindowLimiter(Address(http), _ => Minute(PublicPagesPerMinute)));
+                RateLimitPartition.GetFixedWindowLimiter(Address(http), _ => Minute(limits.PublicPagesPerMinute)));
         });
 
         return services;

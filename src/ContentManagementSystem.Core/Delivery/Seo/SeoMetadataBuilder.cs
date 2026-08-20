@@ -281,36 +281,79 @@ public sealed class SeoMetadataBuilder(
     /// The page's published ancestors, root first.
     /// </summary>
     /// <remarks>
-    /// Read from the materialized path in one query rather than by following <c>ParentId</c> a row
-    /// at a time — the column exists for exactly this (spec section 10.1). Unpublished ancestors are
-    /// left out rather than emitted without a link: a breadcrumb naming a page the visitor cannot
-    /// reach is worse than a shorter trail, and a crawler is entitled to follow every item.
+    /// Read from the materialized path rather than by following <c>ParentId</c> a row at a time —
+    /// the column exists for exactly this (spec section 10.1). Unpublished ancestors are left out
+    /// rather than emitted without a link: a breadcrumb naming a page the visitor cannot reach is
+    /// worse than a shorter trail, and a crawler is entitled to follow every item.
+    /// <para>
+    /// <strong>The ancestor paths are cut in memory and looked up by equality</strong>, which is the
+    /// whole point of the two round trips. Asking the database for "every page whose path is a
+    /// prefix of this one" reads as <c>candidate.Path</c> appearing on the wrong side of a
+    /// <c>StartsWith</c>, and SQL Server cannot seek an index for that — it compares every row. On
+    /// the fifty-thousand-page dataset that one query was <strong>40 ms of a 60 ms render</strong>
+    /// and grew with the site (task P9-14). A path contains its ancestors' paths as prefixes, so
+    /// cutting them here turns the same question into an index seek on a handful of exact values.
+    /// </para>
     /// </remarks>
     private async Task<IReadOnlyList<Ancestor>> TrailAsync(
         PublishedContent content,
         CancellationToken cancellationToken)
     {
-        var ancestors = await context.Pages
+        var path = await context.Pages
             .AsNoTracking()
             .Where(page => page.Id == content.PageId)
-            .SelectMany(
-                page => context.Pages.Where(candidate =>
-                    candidate.Id != page.Id &&
-                    candidate.PublishedVersionId != null &&
-                    page.Path.StartsWith(candidate.Path)),
-                (page, candidate) => new Ancestor(
-                    candidate.Depth,
-                    candidate.PublishedVersion!.Title,
-                    context.PageRoutes
-                        .Where(route => route.PageId == candidate.Id && route.IsPublished)
-                        .OrderByDescending(route => route.IsPrimary)
-                        .Select(route => route.Url)
-                        .FirstOrDefault()))
+            .Select(page => page.Path)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (AncestorPaths(path) is not { Count: > 0 } paths) return [];
+
+        var ancestors = await context.Pages
+            .AsNoTracking()
+            .Where(candidate =>
+                paths.Contains(candidate.Path) &&
+                candidate.PublishedVersionId != null)
+            .Select(candidate => new Ancestor(
+                candidate.Depth,
+                candidate.PublishedVersion!.Title,
+                context.PageRoutes
+                    .Where(route => route.PageId == candidate.Id && route.IsPublished)
+                    .OrderByDescending(route => route.IsPrimary)
+                    .Select(route => route.Url)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return [.. ancestors
             .Where(ancestor => ancestor.Url is { Length: > 0 })
             .OrderBy(ancestor => ancestor.Depth)];
+    }
+
+    /// <summary>
+    /// The paths of every page above this one, from a materialized path.
+    /// </summary>
+    /// <param name="path">A page's path, of the form <c>/1/8/44/</c>.</param>
+    /// <returns>
+    /// <c>["/1/", "/1/8/"]</c> for <c>/1/8/44/</c> — the page's own path is not among them.
+    /// </returns>
+    /// <example>
+    /// <code>
+    /// AncestorPaths("/1/8/44/")  // ["/1/", "/1/8/"]
+    /// AncestorPaths("/1/")       // []          — the root has no ancestors
+    /// </code>
+    /// </example>
+    private static List<string> AncestorPaths(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return [];
+
+        var paths = new List<string>();
+
+        // Every '/' except the last one ends an ancestor's path, because a path is its parent's path
+        // with one more id on the end.
+        for (var index = path.IndexOf('/', 1); index >= 0 && index < path.Length - 1; index = path.IndexOf('/', index + 1))
+        {
+            paths.Add(path[..(index + 1)]);
+        }
+
+        return paths;
     }
 
     /// <summary>

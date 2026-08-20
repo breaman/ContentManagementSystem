@@ -14,6 +14,9 @@ components ([ADR 0002](docs/adr/0002-static-ssr-public-interactive-wasm-backoffi
 | [`docs/adr/`](docs/adr/) | Decisions, including what they cost |
 | [`docs/operations.md`](docs/operations.md) | Deploying it, watching it, being woken by it |
 | [`docs/guides/`](docs/guides/) | Editor, template-authoring, and administrator guides |
+| [`docs/load-testing.md`](docs/load-testing.md) | The dataset the NFR-9 load tests run against, and what it does not represent |
+| [`loadtests/`](loadtests/) | k6 scripts for NFR-1, NFR-2, and NFR-9 |
+| [`lighthouse/`](lighthouse/) | Core Web Vitals and the mobile performance score, NFR-3 and NFR-4 |
 
 ---
 

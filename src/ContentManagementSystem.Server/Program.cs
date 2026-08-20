@@ -8,6 +8,7 @@ using ContentManagementSystem.Core.Caching;
 using ContentManagementSystem.Core.Dashboard;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Fields;
+using ContentManagementSystem.Core.LoadTesting;
 using ContentManagementSystem.Core.Media;
 using ContentManagementSystem.Core.Media.Delivery;
 using ContentManagementSystem.Core.Media.Stores;
@@ -254,6 +255,11 @@ try
             Path.Combine(builder.Environment.ContentRootPath, new MediaStorageOptions().FileSystemRoot));
     }
 
+    // The load-test dataset seeder (task P9-12). Reachable only from `cms seed`, never from an
+    // endpoint — see AddCmsLoadTestSeeding. Registered after the media services because it writes
+    // its image pool through the same store the upload pipeline uses.
+    builder.Services.AddCmsLoadTestSeeding();
+
     // The CMS's own meter and activity source (task P2-29, spec section 24.1). Registering the
     // instruments is not enough on its own: an unlisted meter records measurements that no exporter
     // ever collects, which looks identical to code that was never instrumented.
@@ -377,7 +383,7 @@ try
     // The six limits of spec section 20.6 (task P9-03), as named policies the endpoint groups below
     // opt into. Not a global limiter: one of those counts the WebAssembly runtime's asset requests
     // and the health probe against the same budget as the traffic it exists to shape.
-    builder.Services.AddCmsRateLimiting();
+    builder.Services.AddCmsRateLimiting(builder.Configuration);
 
     // HSTS, configured rather than left at the framework's 30-day default (task P9-02). A year with
     // subdomains included is what the preload list asks for; submission to that list is deliberately

@@ -161,6 +161,66 @@ public class RateLimitTests(SqlServerFixture fixture)
         }
     }
 
+    [Test]
+    public async Task AConfiguredPublicBudgetIsTheOneTheLimiterEnforces()
+    {
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
+
+        // Configurable at all because a load test cannot run against the default: NFR-9 asks for
+        // five thousand requests a second and the public budget is ten (task P9-13). Five here so
+        // the test can reach the ceiling in five requests rather than six hundred.
+        await using var bench = await PageWorkbench.CreateAsync(
+            fixture,
+            cancellationToken: cancellationToken,
+            settings: new Dictionary<string, string?>
+            {
+                [$"{CmsRateLimitOptions.SectionName}:{nameof(CmsRateLimitOptions.PublicPagesPerMinute)}"] = "5",
+            });
+
+        var template = await bench.UseTemplateAsync(
+            "configured-budget",
+            cancellationToken,
+            new Zone { Key = "kicker", Name = "Kicker", FieldTypeKey = FieldTypeKeys.PlainText });
+
+        var page = await bench.AddPageAsync(template, "Throttled", cancellationToken);
+
+        await bench.Resolve<IPublishingService>().PublishAsync(page.Summary.Id, cancellationToken: cancellationToken);
+
+        bench.Context.ChangeTracker.Clear();
+
+        using var client = bench.CreateClient();
+
+        for (var request = 1; request <= 5; request++)
+        {
+            using var response = await client.GetAsync("/throttled", cancellationToken);
+
+            response.StatusCode.Should().NotBe(
+                HttpStatusCode.TooManyRequests,
+                $"request {request} is inside the configured budget of five");
+        }
+
+        using var refused = await client.GetAsync("/throttled", cancellationToken);
+
+        refused.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Test]
+    [Arguments(0)]
+    [Arguments(-1)]
+    public async Task ABudgetThatWouldRefuseEveryRequestIsRejectedAtStartup(int configured)
+    {
+        var options = new CmsRateLimitOptions { PublicPagesPerMinute = configured };
+
+        // Zero is not "no limit", it is "refuse everything", and a negative one throws from inside
+        // the limiter on the first request rather than when the deployment starts.
+        var act = options.Validate;
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage($"*{nameof(CmsRateLimitOptions.PublicPagesPerMinute)}*");
+
+        await Task.CompletedTask;
+    }
+
     /// <summary>
     /// Endpoints whose metadata names a policy, as "VERB /route".
     /// </summary>

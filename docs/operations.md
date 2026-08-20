@@ -66,6 +66,8 @@ the options class, and every default is the safe reading.
 | `Cms:Identity:RefuseWhenBreachServiceUnavailable` | `false` | Accepts on an unreachable service, and logs. Failing closed stops every password reset during the incident that prompted them. |
 | `Cms:MediaSigning:Key` | *(none)* | **Required outside Development.** Base64, at least 32 bytes. The instance refuses to start without it. |
 | `Cms:MediaSigning:PreviousKey` / `:PreviousKeyExpiresOn` | *(none)* | Rotation. Setting the first without the second refuses to start: a rotation that never completes has not removed the old key from anything. |
+| `Cms:RateLimits:PublicPagesPerMinute` | `600` | Public pages one address may fetch per minute ([§20.6](../spec.md#206-rate-limiting)). **Raise it only on a load-test environment** — a load generator is one address, and the default is ten requests a second (`P9-13`, [load testing](load-testing.md)). Zero or negative refuses to start; there is no way to spell "no limit". |
+| `Cms:RateLimits:MediaResponsesPerMinute` | `300` | The same, for renditions and originals. |
 
 ### Content and delivery
 

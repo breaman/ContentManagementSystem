@@ -141,7 +141,8 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
     public static async Task<CmsApplicationFactory> CreateAsync(
         SqlServerFixture fixture,
         CancellationToken cancellationToken = default,
-        Action<IServiceCollection, string>? configureServices = null)
+        Action<IServiceCollection, string>? configureServices = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
     {
         var databaseName = $"cms_srv_{Guid.NewGuid():N}";
 
@@ -152,6 +153,7 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
         return new CmsApplicationFactory(fixture.ConnectionStringFor(databaseName))
         {
             ConfigureServices = configureServices,
+            Settings = settings,
         };
     }
 }

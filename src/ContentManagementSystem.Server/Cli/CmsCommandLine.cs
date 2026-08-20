@@ -60,10 +60,14 @@ public static class CmsCommandLine
         ArgumentNullException.ThrowIfNull(app);
         ArgumentNullException.ThrowIfNull(args);
 
-        if (args.Length < 3 || !string.Equals(args[1], "schema", StringComparison.OrdinalIgnoreCase))
+        if (args.Length < 3) return Usage();
+
+        if (string.Equals(args[1], CmsSeedCommand.Verb, StringComparison.OrdinalIgnoreCase))
         {
-            return Usage();
+            return await CmsSeedCommand.RunAsync(app, args, cancellationToken);
         }
+
+        if (!string.Equals(args[1], "schema", StringComparison.OrdinalIgnoreCase)) return Usage();
 
         using var scope = app.Services.CreateScope();
 
@@ -170,12 +174,15 @@ public static class CmsCommandLine
     private static int Usage()
     {
         Console.Error.WriteLine("usage: cms schema export|diff|apply [directory]");
+        Console.Error.WriteLine("       cms seed load|purge [options]");
         Console.Error.WriteLine();
         Console.Error.WriteLine("  export  write the database's templates, block types, and");
         Console.Error.WriteLine("          compositions out as JSON files");
         Console.Error.WriteLine("  diff    report what the files would change; exit code 2 if");
         Console.Error.WriteLine("          anything would, for use as a CI drift check");
         Console.Error.WriteLine("  apply   apply the files, additively and non-destructively");
+        Console.Error.WriteLine();
+        CmsSeedCommand.PrintUsage();
 
         return Failed;
     }

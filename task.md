@@ -215,8 +215,8 @@ and record the date in the progress table.
 | [6 — Authoring experience](#phase-6--authoring-experience) | 41 | 36 | 34.5 | Built out — every feature task done; **12 of 14 criteria met**. Open: `P6-32`…`P6-34` (browser journeys, which need a hosted-app harness), `P6-37` (a pass a person performs), and `P6-17`'s tags and share image, which wait on `P8-20`/`P8-02` | — |
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 26 | 14.0 | All 26 tasks done; **9 of 10 criteria met**. `P8 #10`'s 500 ms budget is asserted but has only run on an engine without full-text (arm64 Azure SQL Edge), so it waits on the same CI agent `P0 #3` does | — |
-| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 17 | 14.0 | In progress — **security, accessibility, and operations are done** (`P9-01`…`P9-07`, `P9-09`…`P9-11`, `P9-19`…`P9-22`, `P9-24`, `P9-25`). Open: the performance section (`P9-12`…`P9-17`), `P9-08` and `P9-18`, which need a person and an environment, and `P9-23`, which is deferred to after launch by its own terms | — |
-| **v1 total** | **281** | **265** | **203.5** | | |
+| [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 21 | 17.0 | In progress — **security, accessibility, operations, and now performance** are done (`P9-01`…`P9-07`, `P9-09`…`P9-12`, `P9-14`, `P9-15`, `P9-17`, `P9-19`…`P9-22`, `P9-24`, `P9-25`). Open, and each on a thing rather than a change: `P9-13` on NFR-9's 5,000 rps, `P9-16` on eight hours, `P9-08` on a person, `P9-18` on an environment to restore into, and `P9-23`, which is deferred to after launch by its own terms | — |
+| **v1 total** | **281** | **269** | **206.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
 **P8 parallel from P3 exit**.
@@ -4369,16 +4369,109 @@ Entry: all prior phases exit.
 
 ### Performance — 3 ed
 
-- [ ] **P9-12** Seed a 50,000-page / 100,000-media dataset for load testing. — 0.5 ed
-- [ ] **P9-13** k6 load tests against NFR-1 (cached TTFB < 200 ms p95), NFR-2 (uncached < 800 ms p95),
+- [x] **P9-12** Seed a 50,000-page / 100,000-media dataset for load testing. — 0.5 ed
+  *`cms seed load` builds it in **53.7 seconds**: 50,000 pages, 94,503 versions, 94,503 routes,
+  100,000 media items, 149,507 search documents, and a manifest of URLs for `P9-13` to read. The
+  whole thing is documented in [`docs/load-testing.md`](./docs/load-testing.md), including the
+  section on what it deliberately does **not** represent.*
+  *Two decisions carry the task. **The rows go in with `SqlBulkCopy`, not through the content
+  services** — fifty thousand `CreatePageRequest`s is a quarter of a million round trips, each in
+  its own transaction with its own URL rebuild, which would take hours and would measure the writer.
+  The cost is that the seeder holds its own opinion of what a published page is (a draft version, a
+  published version, two routes, a search document), and `LoadTestSeederTests` is what keeps that
+  opinion honest: it seeds the same site in miniature and then asks the running application for the
+  pages over HTTP. **And the hundred thousand media rows sit on twenty-four real images**, so every
+  row serves real bytes and generates real renditions while the store stays small — which means the
+  rows carry synthetic hashes and nothing about deduplication can be measured on this data. The
+  shape is a wide, shallow tree with unevenly filled branches, one branch running to depth ten for
+  the ACL cost of `R15`, and one shared footer referenced late-bound by every landing page, which is
+  the invalidation fan-out of `R8` at a scale nothing has exercised it at yet.*
+- [~] **P9-13** k6 load tests against NFR-1 (cached TTFB < 200 ms p95), NFR-2 (uncached < 800 ms p95),
   NFR-7 (publish < 2 s), NFR-9 (scale). — 1 ed
-- [ ] **P9-14** Profile and fix the top three findings. — 0.5 ed
-- [ ] **P9-15** Lighthouse CI on representative templates; Core Web Vitals remediation to NFR-3 (≥ 90
+  *Written, run end to end, and **open on the one figure that needs an environment**. Three k6
+  scripts in [`loadtests/`](./loadtests/) read the `P9-12` manifest and carry the requirements as
+  thresholds, so a breach exits non-zero; they run from the official image, so k6 is not a
+  dependency of this repository. `NFR-7` is not among them — publishing needs an authenticated
+  editor rather than a traffic generator — and is `PublishBenchmarkTests`, which seeds five thousand
+  pages, publishes twenty of them with the outbox dispatched **inside** the clock (a publish enqueues
+  its eviction, so timing `PublishAsync` alone would time half of what NFR-7 names), and does the
+  same for the shared footer whose fan-out reaches every landing page — the first measurement of
+  `R8`'s trigger at a scale that could plausibly breach it.*
+  *The run on a laptop, against the full fifty-thousand-page dataset and **after `P9-14`'s fixes**:
+  cached TTFB **p95 0.76 ms** at 300 rps, uncached **p95 44.4 ms** over 2,000 distinct pages at 791
+  rps, and `scale.js` holding **2,434 rps** of the 3,000 asked for with nothing dropped and no
+  failure on a page or a redirect. **NFR-9's 5,000 rps is not demonstrated** — k6, SQL Server, and
+  the application were sharing four cores — and that is what keeps this task and `P9 #3` open.
+  Numbers and method are in [`docs/load-testing.md`](./docs/load-testing.md).*
+  *A second trap, recorded because it is the easiest number here to fake by accident: **the second
+  run of the uncached script reports 1.25 ms**, because the first run cached every URL it asked for.
+  A cold run means restarting the application.*
+  *One finding worth its own line: **the rate limiter refuses the load test.** Public pages are
+  capped at 600 a minute per address ([§20.6]) and a load generator is one address, so the first run
+  answered `429` to nine requests in ten. The two public per-address budgets are now configurable
+  (`Cms:RateLimits:*`), defaulting to the spec's figures, and the scripts carry a
+  `rate_limited: ['count==0']` threshold so a run against the defaults says so rather than reporting
+  excellent latencies for the tenth request. Nothing protecting a password or a write was made
+  configurable.*
+- [x] **P9-14** Profile and fix the top three findings. — 0.5 ed
+  *Profiled by logging every database command an uncached render issues against the full dataset,
+  with plans warm. **An article's render went from 60.8 ms of SQL to 7.1 ms, and uncached TTFB p95
+  from 516.8 ms to 44.4 ms** — 65% of NFR-2's budget down to 5%, and the two fixes are the two
+  costs that grew with the number of pages rather than staying flat.*
+  ***The breadcrumb read every page in the site (42.8 ms).*** `SeoMetadataBuilder.TrailAsync` asked
+  for "every page whose path is a prefix of this one", which puts the indexed column on the wrong
+  side of the prefix test — SQL Server compares every row. A materialized path *contains* its
+  ancestors' paths, so cutting them in memory and looking them up by equality turns the same
+  question into two seeks. `SeoTests` gained a four-level trail with an unpublished ancestor in the
+  middle, which is what exercises both branches of the new code.*
+  ***The structural menu read every page in the site (7.8 ms).*** The same shape of problem in
+  `NavigationService.GetStructuralAsync`, where nothing indexed `Depth`: a scan of fifty thousand
+  rows to return thirteen. Migration 10 adds `IX_Pages_Navigation`, filtered to the rows a menu can
+  contain and keyed on the ordering columns so the sort comes for free. 7.8 ms → 0.7 ms.*
+  ***The third finding was measured and deliberately not fixed.*** Media is resolved one item at a
+  time — four queries on an article with a poster and a three-picture gallery. After the first two
+  fixes each is a sub-millisecond key seek, so batching them would save about 1.5 ms of a 7 ms
+  render while reaching into the render pipeline, where every component resolves its own value. It
+  is recorded in [`docs/load-testing.md`](./docs/load-testing.md) as the next candidate, with the
+  case that would change the answer: a page with a large gallery, where the count grows with what an
+  editor put on it.*
+- [x] **P9-15** Lighthouse CI on representative templates; Core Web Vitals remediation to NFR-3 (≥ 90
   mobile) and NFR-4. — 1 ed
-- [ ] **P9-16** 8-hour editor soak test for JS interop memory growth *(R14 — fail if browser memory grows
+  *[`lighthouse/`](./lighthouse/) — an LHCI config whose assertions are the requirements and a runner
+  that fetches the CLI with `npx` and finds a Chrome, preferring an installed one and falling back to
+  the browser Playwright already downloaded for the E2E suite. Three runs per URL, one page of each
+  template. **Nothing needed remediating:** performance **0.97**, LCP **2,254 ms**, CLS **0**, TBT
+  **0 ms**, accessibility **1.00**, on all three.*
+  *Two decisions worth knowing. **INP is asserted as total blocking time**, because there is no
+  interaction in a lab run — TBT is the published proxy, and the measurement NFR-4 actually names is
+  field data. And **the SEO category is not asserted**: outside Production the site serves
+  `Disallow: /` on purpose so staging is never indexed, which Lighthouse reads as "blocked from
+  indexing" and which held the category at 0.69 on every run. Four concrete audits are asserted
+  instead — title, description, crawlable anchors, status code — and the rest is `SeoTests`.*
+- [~] **P9-16** 8-hour editor soak test for JS interop memory growth *(R14 — fail if browser memory grows
   more than 50% over 2 hours)*. — included above
-- [ ] **P9-17** Chaos test for NFR-11: cached public content continues serving during a backoffice
+  *The harness exists and runs; **the eight hours have not been spent**, which is the whole of what
+  is left. `EditorSoakTests` mounts and disposes both editors in batches, forcing a collection before
+  each sample and comparing the heap against a post-warm-up baseline — the warm-up matters, because
+  the first cycles allocate what is allocated once and measuring from zero would fail a run that
+  leaked nothing. It runs for **sixty seconds by default**, so a gross regression fails on every
+  build; the run the task names is `CMS_SOAK_MINUTES=480`. Chromium is launched with `--expose-gc`
+  and `--enable-precise-memory-info`, without which a sample is noise of the same order as the thing
+  being measured. R14 stays open until somebody has run it long enough to answer its trigger.*
+- [x] **P9-17** Chaos test for NFR-11: cached public content continues serving during a backoffice
   outage. — included above
+  *`OutageTests` takes the database away mid-test — a connection interceptor that refuses to open,
+  rather than stopping the container, which one SQL Server serves the whole session from — and
+  asserts **both halves**: a page already in the output cache still answers `200` with its cached
+  body, **and** `/health` answers `503`. Either alone would be misleading; a site that kept serving
+  and called itself healthy would be hiding an outage. The cold page is the control: it answers
+  `500`, because a page nothing has rendered cannot be produced without the database and pretending
+  otherwise would mean serving something wrong. Nothing restarts — the cold page renders the moment
+  the database answers again.*
+  ***"Backoffice outage" is read as a database outage**, deliberately. This is one process
+  ([ADR 0002](./docs/adr/0002-static-ssr-public-interactive-wasm-backoffice.md)), so there is no
+  separate tier to stop; what NFR-11 is about is whether serving what has already been rendered
+  depends on anything the editor's half needs.*
 
 ### Operations and documentation — 3 ed
 
@@ -4488,7 +4581,16 @@ Entry: all prior phases exit.
   claimed here**; `P9-08`'s keyboard and screen-reader passes are still open and are the part no
   assertion supplies.*
 - [ ] **P9 #3** NFR-1, NFR-2, NFR-7, and NFR-9 met under load with a 50,000-page dataset.
-- [ ] **P9 #4** Lighthouse mobile performance ≥ 90 on all reference templates.
+  *The dataset exists (`P9-12`) and so do the tests (`P9-13`). **NFR-7 is met** and asserted on every
+  build. NFR-1 and NFR-2 pass on the full fifty-thousand-page dataset — **0.76 ms and 44.4 ms**
+  against budgets of 200 and 800 — but against a Debug build with the load generated on the same
+  four cores. **NFR-9 has not been demonstrated**: the run reached 2,434 requests a second of the
+  5,000 the requirement names, and the generator rather than the site is why. This criterion needs
+  an environment sized like the deployment, with the load coming from somewhere else.*
+- [x] **P9 #4** Lighthouse mobile performance ≥ 90 on all reference templates.
+  *0.97 on all three, with LCP 2,254 ms, CLS 0, and TBT 0 ms alongside it (`P9-15`). Measured on a
+  laptop against a Debug build, so the figure a deployment sees will differ — but the assertions are
+  the requirement and the run exits non-zero on a breach, so this is a gate rather than a reading.*
 - [ ] **P9 #5** A full restore from backup — database and media — produces a working site, timed against
   the RTO. *The runbook is written (`P9-18`); the drill needs an environment to restore into.*
 - [x] **P9 #6** Every health check has a monitor and an alert threshold.
@@ -4585,6 +4687,8 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 6 | `AddCmsMedia` | 5 | P5-02 | `MediaFolder`, `MediaItem`, `MediaRendition` | [x] |
 | 7 | `AddCmsWorkflow` | 7 | P7-08 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob`, `Notification` (+ the seven seeded roles and `SiteSettings.RedirectToParentOnUnpublish`) | [x] |
 | 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [x] |
+| 9 | `AddAuditRetention` | 9 | P9-25 | `SiteSettings.AuditLogRetentionDays` | [x] |
+| 10 | `AddNavigationIndex` | 9 | P9-14 | `IX_Pages_Navigation` — a filtered covering index on `(Depth, SortOrder)` for the structural menu, which every public render builds. No table or column changes | [x] |
 
 **Rules:** data backfills are separate, idempotent, resumable, and batched — never inline in a schema
 migration. Full-text catalog creation in migration 8 requires raw SQL and must handle Azure SQL vs.
@@ -4608,6 +4712,10 @@ reviewer.
 | `Data/Models/ApplicationDbContext.cs` | Suppress EF warning 10622: `PageVersion` deliberately carries no soft-delete filter, so a deleted page's history stays retrievable | 2 | P2-03 | [x] |
 | `Data/Models/ApplicationDbContext.cs` | Register CMS `DbSet`s; apply configurations from the assembly | 1 | P1-04 | [x] |
 | `Server/Program.cs` | Register CMS services, field type registry, output cache, rate limiting, security headers, background services; delivery endpoint registered **last** | 1–9 | P1-30, P3-13, P9-01…P9-04, P9-20, P9-25 | [x] |
+| `Server/Program.cs` | Register the load-test dataset seeder, after the media services because it writes its image pool through the same store the upload pipeline uses. Reachable only from `cms seed`, never from an endpoint — a tool that writes half a million rows does not belong within reach of a request | 9 | P9-12 | [x] |
+| `Server/Cli/CmsCommandLine.cs` | Dispatch a second verb group, `cms seed load\|purge`, alongside `cms schema` | 9 | P9-12 | [x] |
+| `Server/Security/CmsRateLimits.cs`, `Server/Program.cs` | Read the two public per-address budgets from configuration, defaulting to [§20.6]'s figures. The load test cannot run against a limit of ten requests a second from one address; the credential and API budgets stay fixed | 9 | P9-13 | [x] |
+| `tests/…Server.Tests/CmsApplicationFactory.cs`, `Content/PageWorkbench.cs` | Accept configuration settings, not just service overrides — anything a startup call binds is already read by the time `ConfigureTestServices` runs | 9 | P9-13 | [x] |
 | `Server/Program.cs` | Tighten the Identity password policy; decide self-registration. Twelve characters, no character-class rules, lockout for new users, and a breach screen; registration answers 404 until **Q10** says otherwise | 9 | P9-04 | [x] |
 | `Server/Components/Email/IdentityNoOpEmailSender.cs` | Replaced by `IdentityCmsEmailSender` over the CMS's own transport, and deleted. `RegisterConfirmation.razor.cs` showed the confirmation link whenever the sender was the no-op one; it now shows it only when mail is unconfigured **and** the environment is Development — the old condition would have handed every visitor a working confirmation link on a production deployment that forgot to configure SMTP | 7 | P7-18 | [x] |
 | `Data/Interceptors/AuditLogInterceptor.cs` | Exclude `ScheduledJob` and `Notification` from audit capture — both are written by services rather than by a person, and the publish a job performs is audited by the ordinary path | 7 | P7-08 | [x] |
@@ -4749,16 +4857,16 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R5 | Diff algorithm slow or noisy | Low | 2 | Diff over 2 s on a typical page | Open |
 | R6 | ~~Catch-all route shadows framework/admin paths~~ | — | 3 | **Closed 2026-08-15** — mapped last, reserved prefixes read from `Slugs.Reserved`, outcome asserted by `RouteOrderingTests` ([ADR-0020](./docs/adr/0020-catch-all-route-ordering-and-reserved-prefixes.md)) | Closed |
 | R7 | ~~`DynamicComponent` under static SSR misbehaves~~ | — | 0/3 | **Closed** — S2 returned go at the Phase 0 gate; now running in shipped code through four levels of `DynamicComponent` (`P3-13`) | Closed |
-| R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | **Measured 2026-08-16, still open for P8** — the where-used walk is ~2.8 ms for 40 pages and its query count is bounded by nesting depth (5), not by page count ([baseline](./docs/phase-4-fanout-baseline.md), `ReferenceFanOutTests`). The residual is the eviction itself, which has no implementation until P8 |
+| R8 | Invalidation fan-out slow for a reusable item on 10,000 pages | Med | 4/8 | Publish exceeds NFR-7 (2 s) | **Measured 2026-08-16, still open for P8** — the where-used walk is ~2.8 ms for 40 pages and its query count is bounded by nesting depth (5), not by page count ([baseline](./docs/phase-4-fanout-baseline.md), `ReferenceFanOutTests`). The residual is the eviction itself, which had no implementation until P8. **Timed end to end 2026-08-19** (`P9-13`): `PublishBenchmarkTests` publishes the shared footer on a five-thousand-page seeded site with the outbox dispatched inside the clock, and it stays inside NFR-7's two seconds. Kept **open** because the trigger is stated at ten thousand referencing pages — which `cms seed load` now produces (a fifth of its leaves are landing pages) and nobody has yet published against |
 | R9 | Testcontainers unreliable in CI | Med | 0 | Flake rate above 5% | Open |
 | R10 | ~~Six Labors licensing stalls Phase 5~~ | — | 5 | **Closed** — SkiaSharp selected; residual is the silent-null AVIF encode, mitigated by P5-09 | Closed |
-| R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | **Mitigated and measured 2026-08-16, still open for P9** — renditions are lazy rather than warmed (ADR 0007), a per-key semaphore collapses N cold requests for one rendition into one encode (`P5-30`), and generation is bounded by an allowlist of six widths. `RenditionBenchmarkTests` holds NFR-8 on cold encodes through the whole endpoint. None of that is the trigger: the contingency turns on **sustained CPU under a load test**, and no load test exists until P9 |
+| R11 | Rendition generation saturates CPU | High | 5 | CPU above 70% sustained during load test | **Mitigated and measured 2026-08-16, still open for P9** — renditions are lazy rather than warmed (ADR 0007), a per-key semaphore collapses N cold requests for one rendition into one encode (`P5-30`), and generation is bounded by an allowlist of six widths. `RenditionBenchmarkTests` holds NFR-8 on cold encodes through the whole endpoint. None of that is the trigger: the contingency turns on **sustained CPU under a load test**. The load tests now exist (`P9-13`) and **generate page traffic rather than image traffic**, so they do not exercise this; a run that would needs media requests in the mix and a dashboard being watched |
 | R12 | SVG sanitization bypassed | **Critical** | 5 | Any bypass found → disable SVG | **Unreached in the shipped default, still open** — `SvgUploadPolicy` defaults to `Reject` (`P5-06`), so a deployment that never opts in cannot be bypassed because it never sanitizes. The sanitizer is reachable only by an explicit `Sanitize`, and **Q7 is unanswered**, so the risk cannot be closed — it is the opt-in branch that carries it. The contingency is already the default state, which is the point |
 | R13 | Phase 6 scope expands | Med | 6 | 20% over budget at the midpoint → cut to acceptance criteria only | **Open at the end of the phase's build, and the trigger was never pulled 2026-08-16** — the fallback is verified rather than assumed: `IFieldEditorCatalog.FallbackEditor` is reached by any field type with no editor and `PlainZoneEditorTests` pins that it still round-trips a value. Every task in the phase is now done or explicitly deferred, and what came in wider than the tasks named — eighteen field editors rather than ten, four dashboard tiles over one service, a bulk operation set of five — is scope the criteria required rather than scope that expanded. **No budget figure has been taken at any point**, so the trigger has never been evaluated; the risk stays open on that alone, and closing it would be recording a measurement nobody made |
-| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**. `P6-31a` has now run — ten mount/unmount cycles of each editor in Chromium, created equal to disposed, and no surviving editor node, toolbar included — which is the instrument reading zero on a short run. `P9-16`'s two-hour soak is what the trigger actually names, and it has not |
-| R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | **Mitigated and measured 2026-08-18** — the caller's rules are read once per request and every node after that is a string prefix comparison in memory (`P7-05`), so resolution cost is independent of how many nodes are being decided. `AclPerformanceTests` loads a depth-10 tree with rules at several depths inside the budget. Kept **open** because the trigger names a wall-clock figure on a loaded system, and the only load test in the plan is `P9-16` |
+| R14 | JS interop leaks memory in long sessions | Med | 6/9 | Browser memory grows >50% over 2 hours | **Mitigated 2026-08-16, still open** — `JsEditorComponentBase` owns all three of the teardown steps S3 found (`P6-16`): the editor's own `destroy()`, Quill's sibling toolbar, and `DotNetObjectReference.Dispose()`. The JS registry counts created against disposed and reports surviving DOM nodes, which is the instrument. None of that is the trigger: it turns on **browser memory over two hours**. `P6-31a` has now run — ten mount/unmount cycles of each editor in Chromium, created equal to disposed, and no surviving editor node, toolbar included — which is the instrument reading zero on a short run. `P9-16`'s soak is what the trigger actually names. **The harness now exists** — `EditorSoakTests` cycles both editors, forces a collection, and compares the heap against a post-warm-up baseline, sixty seconds by default and `CMS_SOAK_MINUTES=480` for the run the task names — and **the hours have not been spent**, so the trigger is still unanswered |
+| R15 | ACL resolution slow on a deep tree | Med | 7 | Tree load exceeds 500 ms at depth 10 | **Mitigated and measured 2026-08-18** — the caller's rules are read once per request and every node after that is a string prefix comparison in memory (`P7-05`), so resolution cost is independent of how many nodes are being decided. `AclPerformanceTests` loads a depth-10 tree with rules at several depths inside the budget. **Measured under load 2026-08-19** (`P9-14`): the structural menu's tree query was a scan of every page and is now an index seek — 7.8 ms to 0.7 ms at fifty thousand pages — and an uncached render's whole database cost is 7.1 ms. Kept **open** because the trigger names a wall-clock figure on a system under real load, which is `P9 #3`'s environment |
 | R16 | Duplicate scheduled publishes under scale-out | Med | 7 | Any duplicate observed | **Closed 2026-08-18** — a job leaves `Pending` only through a single `UPDATE … OUTPUT`, which is atomic against every other writer: the row is claimed and its identity returned in one statement, so there is no read-then-write window to lose. `PublishSchedulerTests` runs two uncoordinated passes over the same rows and asserts exactly one claim and exactly one published version. A claim abandoned by a dying instance is reclaimed after ten minutes rather than stranding the page |
 | R17 | Cache invalidation misses a dependent page | **High** | 8 | Any stale page reported after publish | **Mitigated 2026-08-18, still open** — the fan-out is not computed at eviction time: every renderer declares what it used as a cache tag *while* rendering, so evicting `ru:{id}` reaches every page showing that item with no query and nothing to forget (`P8-07`, `P8-10`). A response that published no tags is stored under `content` rather than untagged, so even a render that forgot its dependencies is reachable by a purge-all, and a one-hour backstop TTL bounds anything that still slips (`P8-12`). `CachingTests` asserts the negative half by rewriting a bystander's stored content behind the cache's back. Kept **open** because the trigger is a *stale page reported in production*, and nothing has run in production |
-| R18 | Full-text index degrades write throughput | Med | 8 | Save latency exceeds NFR-6 | **Mitigated 2026-08-18, still open** — indexing was moved off the save entirely: a write enqueues an id in its own transaction and the outbox rebuilds the document afterwards, so extracting text from every zone is never on the path an editor waits on (`P8-18`). What that buys in latency it pays for in a window where a just-saved page is not yet findable, which the nightly reconcile repairs — and `SearchTests` asserts the reconcile fixes both a lost document and an orphaned one. Kept **open** because the trigger is a **measured** save latency against NFR-6, and the only load test in the plan is `P9-16` |
+| R18 | Full-text index degrades write throughput | Med | 8 | Save latency exceeds NFR-6 | **Mitigated 2026-08-18, still open** — indexing was moved off the save entirely: a write enqueues an id in its own transaction and the outbox rebuilds the document afterwards, so extracting text from every zone is never on the path an editor waits on (`P8-18`). What that buys in latency it pays for in a window where a just-saved page is not yet findable, which the nightly reconcile repairs — and `SearchTests` asserts the reconcile fixes both a lost document and an orphaned one. Kept **open** because the trigger is a **measured** save latency against NFR-6, and the load tests that exist (`P9-13`) generate read traffic only |
 | R19 | Requirements shift mid-build (multi-site, multilingual) | **High** | any | Either raised → stop and re-plan | **Assessed for multi-site 2026-08-18, still open** — [ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md) records what the reversal costs and what keeps it affordable, so if the requirement is raised the re-plan starts from a written estimate rather than from a survey. Neither requirement has been raised, which is why the risk stays open rather than closing |
 | R20 | Key-person dependency on Blazor/EF expertise | Med | 1–3 | Either engineer unavailable >1 week | Open |

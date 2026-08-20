@@ -180,6 +180,45 @@ public class SeoTests(SqlServerFixture fixture)
     }
 
     [Test]
+    public async Task ADeepPageNamesEveryPublishedAncestorInOrderAndSkipsTheOneThatIsNot()
+    {
+        var cancellationToken = TestContext.Current!.Execution.CancellationToken;
+        var template = await TemplateAsync(cancellationToken);
+
+        var support = await _bench.AddPageAsync(template, "Support", cancellationToken);
+
+        await SaveDraftAsync(support.Summary.Id, template.Key, "How to reach us", cancellationToken);
+        await PublishAsync(support.Summary.Id, cancellationToken);
+
+        // Never published, and it sits in the middle of the trail. Its child is still reachable —
+        // a draft parent does not unpublish what is under it — so the breadcrumb has to step over it.
+        var drafts = await _bench.AddPageAsync(template, "Drafts", cancellationToken, support.Summary.Id);
+
+        var guides = await _bench.AddPageAsync(template, "Guides", cancellationToken, drafts.Summary.Id);
+
+        await SaveDraftAsync(guides.Summary.Id, template.Key, "Every guide", cancellationToken);
+        await PublishAsync(guides.Summary.Id, cancellationToken);
+
+        var contact = await _bench.AddPageAsync(template, "Contact", cancellationToken, guides.Summary.Id);
+
+        await SaveDraftAsync(contact.Summary.Id, template.Key, "Send us a note", cancellationToken);
+        await PublishAsync(contact.Summary.Id, cancellationToken);
+
+        using var client = _bench.CreateClient();
+
+        var html = await client.GetStringAsync("/support/drafts/guides/contact", cancellationToken);
+
+        // Four levels deep, which is what exercises the path-cutting the ancestors are found by
+        // (task P9-14): one query per render seeking exact paths, rather than a comparison against
+        // every row in the table.
+        html.Should().Contain("\"@type\":\"BreadcrumbList\"")
+            .And.Contain("\"position\":1,\"name\":\"Support\",\"item\":\"http://localhost/support\"")
+            .And.Contain("\"position\":2,\"name\":\"Guides\",\"item\":\"http://localhost/support/drafts/guides\"")
+            .And.Contain("\"position\":3,\"name\":\"Contact\"")
+            .And.NotContain("\"name\":\"Drafts\"");
+    }
+
+    [Test]
     public async Task AHandAuthoredStructuredDataDocumentReplacesTheGeneratedOnes()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;

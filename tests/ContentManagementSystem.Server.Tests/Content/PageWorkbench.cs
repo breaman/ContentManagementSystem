@@ -176,12 +176,18 @@ public sealed class PageWorkbench : IAsyncDisposable
         StubAuthorization? authorization = null,
         CancellationToken cancellationToken = default,
         IInterceptor? interceptor = null,
-        Action<IServiceCollection>? configure = null)
+        Action<IServiceCollection>? configure = null,
+        IReadOnlyDictionary<string, string?>? settings = null)
     {
         var granted = authorization ?? StubAuthorization.Everything;
         var clock = new FakeTimeProvider();
 
-        var factory = await CmsApplicationFactory.CreateAsync(fixture, cancellationToken, (services, connectionString) =>
+        // Settings rather than services for anything a startup call reads out of configuration: by
+        // the time ConfigureTestServices runs, Program has already bound its options.
+        var factory = await CmsApplicationFactory.CreateAsync(
+            fixture,
+            cancellationToken,
+            (services, connectionString) =>
         {
             services.RemoveAll<ICmsAuthorization>();
             services.AddSingleton<ICmsAuthorization>(granted);
@@ -207,7 +213,8 @@ public sealed class PageWorkbench : IAsyncDisposable
             }
 
             configure?.Invoke(services);
-        });
+        },
+            settings);
 
         return new PageWorkbench(factory, granted, clock);
     }

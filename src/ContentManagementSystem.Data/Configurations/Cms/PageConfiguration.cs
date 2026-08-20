@@ -14,6 +14,9 @@ public class PageConfiguration : IEntityTypeConfiguration<Page>
     /// <summary>Name of the filtered index serving the tree, asserted by the schema tests.</summary>
     public const string LiveChildrenIndexName = "IX_Pages_ParentId_SortOrder_Live";
 
+    /// <summary>Name of the index the structural menu is built from.</summary>
+    public const string NavigationIndexName = "IX_Pages_Navigation";
+
     /// <inheritdoc />
     public void Configure(EntityTypeBuilder<Page> builder)
     {
@@ -56,6 +59,18 @@ public class PageConfiguration : IEntityTypeConfiguration<Page>
 
         // Delivery resolves a route to a page and then loads exactly this version.
         builder.HasIndex(p => p.PublishedVersionId);
+
+        // The structural menu, which every public render builds: the top levels of the tree, in
+        // order, for pages that are live and asked to appear. Without this it is a scan of every
+        // page in the site on every uncached render — 7.8 ms of a 20 ms render at fifty thousand
+        // pages, and growing with the site (task P9-14). The filter is what keeps it small: it
+        // indexes only the rows a menu can contain, and the ordering columns are the key, so the
+        // sort comes for free. ParentId and PublishedVersionId are included rather than keyed
+        // because the query returns them without ever searching on them.
+        builder.HasIndex(p => new { p.Depth, p.SortOrder })
+            .HasDatabaseName(NavigationIndexName)
+            .IncludeProperties(p => new { p.ParentId, p.PublishedVersionId })
+            .HasFilter($"[{nameof(Page.IsDeleted)}] = 0 AND [{nameof(Page.ShowInNavigation)}] = 1");
 
         builder.HasOne(p => p.Parent)
             .WithMany(p => p.Children)
