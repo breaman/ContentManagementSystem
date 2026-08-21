@@ -66,9 +66,11 @@ public class RedisOutputCacheTests(SqlServerFixture sql, RedisFixture redis)
     public async Task AnEvictionOnOneInstanceReachesTheOthersOutputCache()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        var database = $"cms_redis_{Guid.NewGuid():N}";
+        var database = await sql.CreateDatabaseOnlyAsync($"cms_redis_{Guid.NewGuid():N}", cancellationToken);
 
-        await using (await sql.CreateDatabaseAsync(database, cancellationToken)) { }
+        // Two hosts share one database, so neither owns it — the suite does, and drops it once both
+        // are gone.
+        await using var release = new DatabaseRelease(sql, database);
 
         await using var instanceA = Instance(database);
         await using var instanceB = Instance(database);
@@ -103,9 +105,11 @@ public class RedisOutputCacheTests(SqlServerFixture sql, RedisFixture redis)
     public async Task APublishOnOneInstanceIsServedByTheOther()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        var database = $"cms_redis_{Guid.NewGuid():N}";
+        var database = await sql.CreateDatabaseOnlyAsync($"cms_redis_{Guid.NewGuid():N}", cancellationToken);
 
-        await using (await sql.CreateDatabaseAsync(database, cancellationToken)) { }
+        // Two hosts share one database, so neither owns it — the suite does, and drops it once both
+        // are gone.
+        await using var release = new DatabaseRelease(sql, database);
 
         await using var instanceA = Instance(database);
         await using var instanceB = Instance(database);

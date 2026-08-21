@@ -27,7 +27,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task TwoPublishedRoutesCannotShareAUrl()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var first = await CreatePageAsync(context, "one", cancellationToken);
         var second = await CreatePageAsync(context, "two", cancellationToken);
@@ -45,7 +46,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task ADraftRouteMaySitAtAUrlAPublishedRouteAlreadyHolds()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var live = await CreatePageAsync(context, "live", cancellationToken);
         var replacement = await CreatePageAsync(context, "replacement", cancellationToken);
@@ -66,7 +68,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task DeletingAPageTakesItsRoutesAndItsPreviewTokens()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "temporary", cancellationToken);
 
@@ -106,7 +109,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task TwoRedirectsCannotShareASourceUrlEvenWhenOneIsDisabled()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.Redirects.Add(Redirect("/legacy", "/current", isEnabled: false));
         await context.SaveChangesAsync(cancellationToken);
@@ -123,7 +127,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task ARedirectPointingAtAPageBlocksThatPagesDeletion()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "target", cancellationToken);
 
@@ -157,7 +162,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task OneUrlProducesOneNotFoundRow()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var now = DateTimeOffset.UtcNow;
 
@@ -191,7 +197,8 @@ public class RoutingSchemaTests(SqlServerFixture fixture)
     public async Task TwoPreviewTokensCannotShareAHash()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "draft", cancellationToken);
         var hash = RandomNumberGenerator.GetBytes(SiteUrls.HashLength);

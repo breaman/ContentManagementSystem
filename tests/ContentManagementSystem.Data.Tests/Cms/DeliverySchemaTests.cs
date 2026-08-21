@@ -23,7 +23,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task ANavigationItemMustPointAtEitherAPageOrAUrlAndNotBoth()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "careers", cancellationToken);
         var menu = await CreateMenuAsync(context, "footer", cancellationToken);
@@ -57,7 +58,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task ANavigationItemMayPointAtEitherTargetOnItsOwn()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "privacy", cancellationToken);
         var menu = await CreateMenuAsync(context, "footer", cancellationToken);
@@ -87,7 +89,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task DeletingAMenuTakesItsItemsWithIt()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var menu = await CreateMenuAsync(context, "utility", cancellationToken);
 
@@ -111,7 +114,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task TwoTagsCannotShareASlug()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.Tags.Add(new Tag { Name = "Product", Slug = "product" });
         await context.SaveChangesAsync(cancellationToken);
@@ -128,7 +132,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task APageCannotCarryTheSameTagTwice()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "gearboxes", cancellationToken);
         var tag = new Tag { Name = "Product", Slug = "product" };
@@ -149,7 +154,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task OneThingHasOneSearchDocument()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.SearchDocuments.Add(Document(SearchEntityKind.Page, 42, "Gearboxes"));
         await context.SaveChangesAsync(cancellationToken);
@@ -174,7 +180,8 @@ public class DeliverySchemaTests(SqlServerFixture fixture)
     public async Task AnOutboxMessageIsStoredWithABigIntKeyAndNoProcessedTimestamp()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.OutboxMessages.Add(new OutboxMessage
         {

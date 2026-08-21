@@ -27,7 +27,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task APageAndItsFirstDraftAreInsertedInOneTransaction()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -48,7 +49,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task TwoVersionsOfOnePageCannotShareAVersionNumber()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -65,7 +67,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task TwoPagesCannotShareAPublicIdentifier()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var first = await CreatePageAsync(context, "home", cancellationToken);
         var second = await CreatePageAsync(context, "about", cancellationToken);
@@ -80,7 +83,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task AStrayRemoveRetiresThePageInsteadOfDestroyingItsHistory()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -111,7 +115,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task ADeletedPageIsHiddenFromOrdinaryQueriesButItsHistoryStaysReachable()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -136,7 +141,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var databaseName = $"cms_conc_{Guid.NewGuid():N}";
-        await using var context = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -163,7 +169,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task EditLocksAreNotWrittenToTheAuditLog()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
 
@@ -194,7 +201,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task ContentReferencesAreNotWrittenToTheAuditLog()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var page = await CreatePageAsync(context, "home", cancellationToken);
         var auditedBefore = await context.AuditLogs.CountAsync(cancellationToken);
@@ -219,7 +227,8 @@ public class PageSchemaTests(SqlServerFixture fixture)
     public async Task TheLiveChildrenIndexIsFilteredToUndeletedPages()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var filter = await context.Database
             .SqlQuery<string>(

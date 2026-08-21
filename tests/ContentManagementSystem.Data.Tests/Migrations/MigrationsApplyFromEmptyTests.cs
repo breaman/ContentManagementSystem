@@ -53,7 +53,8 @@ public class MigrationsApplyFromEmptyTests(SqlServerFixture fixture)
     public async Task IdentityAndAuditTablesExistAfterMigrating()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var tables = await context.Database
             .SqlQuery<string>($"SELECT name AS Value FROM sys.tables")

@@ -25,7 +25,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task AnItemAndItsFirstDraftAreInsertedInOneTransaction()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
 
@@ -46,7 +47,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task TwoVersionsOfOneItemCannotShareAVersionNumber()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
 
@@ -63,7 +65,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task TwoItemsCannotShareAKeyEvenWhenOneIsInTheRecycleBin()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var first = await CreateItemAsync(context, "site-footer", cancellationToken);
 
@@ -82,7 +85,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task TheLibraryIndexIsFilteredToUndeletedItems()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var filter = await context.Database
             .SqlQuery<string>(
@@ -104,7 +108,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task ADeletedItemIsHiddenFromOrdinaryQueriesButItsHistoryStaysReachable()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
 
@@ -134,7 +139,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
         var databaseName = $"cms_ru_conc_{Guid.NewGuid():N}";
-        await using var context = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(databaseName, cancellationToken);
+        var context = database.Context;
 
         var item = await CreateItemAsync(context, "site-footer", cancellationToken);
 
@@ -161,7 +167,8 @@ public class ReusableContentSchemaTests(SqlServerFixture fixture)
     public async Task ABlockTypeCannotBeDeletedWhileAnItemIsShapedByIt()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         await CreateItemAsync(context, "site-footer", cancellationToken);
 

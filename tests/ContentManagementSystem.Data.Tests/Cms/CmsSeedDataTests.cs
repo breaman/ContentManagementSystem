@@ -18,7 +18,8 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
     public async Task MigratingCreatesTheSingleSiteSettingsRow()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var settings = await context.SiteSettings.SingleAsync(cancellationToken);
 
@@ -32,7 +33,8 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
     public async Task ASecondSiteSettingsRowIsRefused()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         // "There is only ever one row" is enforced by a check constraint rather than convention,
         // because otherwise "the site's culture" quietly becomes a question with two answers.
@@ -52,7 +54,8 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
     public async Task MigratingCreatesTheBuiltInRawHtmlBlockType()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var blockType = await context.BlockTypes
             .Include(b => b.Properties)
@@ -75,12 +78,13 @@ public class CmsSeedDataTests(SqlServerFixture fixture)
     public async Task SeedRowsAreNotDuplicatedWhenMigrationsRunAgain()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        var databaseName = $"cms_seed_{Guid.NewGuid():N}";
+        var databaseName = await fixture.CreateDatabaseOnlyAsync(
+            $"cms_seed_{Guid.NewGuid():N}",
+            cancellationToken);
 
-        await using (var first = await fixture.CreateDatabaseAsync(databaseName, cancellationToken))
-        {
-            await first.Database.MigrateAsync(cancellationToken);
-        }
+        // The database has to outlive the context that migrated it, so the test owns it rather than
+        // a handle — and the release is declared first, so it drops after the contexts below close.
+        await using var release = new DatabaseRelease(fixture, databaseName);
 
         // The Aspire ef-migrations resource runs on every start, so a second pass over an
         // already-migrated database is the normal case, not an edge one.

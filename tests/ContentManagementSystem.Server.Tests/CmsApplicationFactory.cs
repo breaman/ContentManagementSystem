@@ -26,6 +26,17 @@ namespace ContentManagementSystem.Server.Tests;
 public sealed class CmsApplicationFactory(string connectionString) : WebApplicationFactory<Program>
 {
     /// <summary>
+    /// The fixture and database this factory is responsible for releasing, when it created one.
+    /// </summary>
+    /// <remarks>
+    /// The factory outlives the context that migrated the database — that is the whole point of it —
+    /// so nothing else is in a position to know when the database stops being needed. Left unset by
+    /// the constructor that is handed a connection string for a database somebody else owns, such as
+    /// the two hosts the Redis suite points at one database.
+    /// </remarks>
+    private (SqlServerFixture Fixture, string DatabaseName)? owned;
+
+    /// <summary>
     /// Extra registrations applied last, for suites that drive services directly.
     /// </summary>
     /// <remarks>
@@ -144,16 +155,34 @@ public sealed class CmsApplicationFactory(string connectionString) : WebApplicat
         Action<IServiceCollection, string>? configureServices = null,
         IReadOnlyDictionary<string, string?>? settings = null)
     {
-        var databaseName = $"cms_srv_{Guid.NewGuid():N}";
+        ArgumentNullException.ThrowIfNull(fixture);
 
-        await using (var context = await fixture.CreateDatabaseAsync(databaseName, cancellationToken))
-        {
-        }
+        var databaseName = await fixture.CreateDatabaseOnlyAsync(
+            $"cms_srv_{Guid.NewGuid():N}",
+            cancellationToken);
 
         return new CmsApplicationFactory(fixture.ConnectionStringFor(databaseName))
         {
             ConfigureServices = configureServices,
             Settings = settings,
+            owned = (fixture, databaseName),
         };
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The host is stopped by the base call <em>before</em> the database is dropped, which is not
+    /// optional: the application's background services hold connections, and a drop attempted while
+    /// one is mid-poll is a drop that fails and a database that survives the run.
+    /// </remarks>
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+
+        if (this.owned is not { } release) return;
+
+        this.owned = null;
+
+        await release.Fixture.DropDatabaseAsync(release.DatabaseName);
     }
 }

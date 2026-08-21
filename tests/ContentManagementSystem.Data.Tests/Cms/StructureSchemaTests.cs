@@ -23,7 +23,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task TemplateKeysAreUniqueAcrossTheSite()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.Templates.Add(CreateTemplate("marketing-landing"));
         await context.SaveChangesAsync(cancellationToken);
@@ -38,7 +39,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task ZoneKeysAreUniqueWithinATemplate()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var template = CreateTemplate("marketing-landing");
         template.Zones.Add(CreateZone("body"));
@@ -55,7 +57,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task TheSameZoneKeyMayAppearOnTwoDifferentTemplates()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var landing = CreateTemplate("marketing-landing");
         landing.Zones.Add(CreateZone("body"));
@@ -77,7 +80,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task BlockTypePropertyKeysAreUniqueWithinABlockType()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var blockType = CreateBlockType("hero-banner");
         blockType.Properties.Add(CreateBlockTypeProperty("headline"));
@@ -94,7 +98,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task BlockTypeKeysAreUniqueAcrossTheSite()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         context.BlockTypes.Add(CreateBlockType("hero-banner"));
         await context.SaveChangesAsync(cancellationToken);
@@ -109,7 +114,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task TemplateRevisionNumbersAreUniqueWithinATemplate()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var template = CreateTemplate("marketing-landing");
         context.Templates.Add(template);
@@ -130,7 +136,8 @@ public class StructureSchemaTests(SqlServerFixture fixture)
     public async Task DeletingATemplateWithZonesIsRefusedByTheDatabase()
     {
         var cancellationToken = TestContext.Current!.Execution.CancellationToken;
-        await using var context = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        await using var database = await fixture.CreateDatabaseAsync(cancellationToken: cancellationToken);
+        var context = database.Context;
 
         var template = CreateTemplate("marketing-landing");
         template.Zones.Add(CreateZone("body"));
