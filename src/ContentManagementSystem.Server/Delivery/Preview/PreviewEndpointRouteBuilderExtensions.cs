@@ -1,6 +1,7 @@
 using System.Threading.RateLimiting;
 
 using ContentManagementSystem.Core.Preview;
+using ContentManagementSystem.Server.Delivery.Appearance;
 using ContentManagementSystem.Server.Security;
 using ContentManagementSystem.Shared.Contracts.Security;
 
@@ -126,6 +127,16 @@ public static class PreviewEndpointRouteBuilderExtensions
 
         preview.MapGet($"/{{pageId:int}}{PreviewChrome.ContentSegment}", PreviewEndpoint.EditorContentAsync)
             .RequireAuthorization(CmsPermissions.ContentRead);
+
+        // The site stylesheet a preview frame wears (task P10-06): the *draft* for somebody holding
+        // Appearance.Edit, and the published copy for everybody else. Anonymous rather than gated,
+        // because a shared preview link is opened by an approver with no account and a frame that
+        // was refused its stylesheet shows them a page that looks nothing like the one they are
+        // approving. The permission decision is inside the handler, where it can fall back; the
+        // group's NoStore metadata above keeps either answer out of every shared cache.
+        preview.MapGet(SiteStylesheetEndpoint.PreviewPath, SiteStylesheetEndpoint.PreviewAsync)
+            .AllowAnonymous()
+            .WithName(SiteStylesheetEndpoint.PreviewRouteName);
 
         return endpoints;
     }

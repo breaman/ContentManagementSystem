@@ -17,6 +17,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <CmsSeoHead Metadata="Seo" Context="Context" />
     <link rel="stylesheet" href="/css/site.css" />
+    @* The administrator's stylesheet, second and therefore winning at equal specificity — which is
+       the whole mechanism (spec section 30.1, D27). Omitted entirely when nothing is published, so a
+       deployment that never uses the feature pays nothing for it, and absent from App.razor, so
+       nothing written here can reach the screens the CMS is administered from. *@
+    @if (CustomStylesheetHref is { Length: > 0 } customStylesheet)
+    {
+        <link rel="stylesheet" href="@customStylesheet" />
+    }
 </head>
 <body>
 @* The site's primary navigation belongs to the shell rather than to a template: it is the same on

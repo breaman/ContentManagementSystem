@@ -65,6 +65,11 @@ internal static class BackofficeScreens
         services.AddScoped<IWorkflowClient, FakeWorkflowClient>();
         services.AddScoped<IToastService, SilentToastService>();
 
+        // The site stylesheet editor (task P10-11). Registered here rather than in its own harness
+        // because the screen is an ordinary backoffice screen — a text editor, a diagnostics list,
+        // and a revision table — and the gate that judges the others should judge it too.
+        services.AddScoped<ISiteStylesheetClient, FakeSiteStylesheetClient>();
+
         // Two hosting services a real pre-render supplies and a bare collection does not: the
         // uploader's <InputFile> resolves IJSRuntime on construction, and the media item screen
         // navigates away after a permanent delete. Neither runs during a static render.

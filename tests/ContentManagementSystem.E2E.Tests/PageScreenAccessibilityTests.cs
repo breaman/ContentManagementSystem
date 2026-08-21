@@ -1,5 +1,6 @@
 using System.Security.Claims;
 
+using ContentManagementSystem.Client.Components.Admin.Appearance;
 using ContentManagementSystem.Client.Components.Admin.Dashboard;
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Components.Admin.Media;
@@ -106,6 +107,11 @@ public class PageScreenAccessibilityTests
             "Past its review date"
         ),
         ("recycle bin", typeof(RecycleBinScreen), [], "Autumn campaign"),
+
+        // The stylesheet editor (task P10-11). It has a revision table whose rows are told apart
+        // only by a date, and two buttons per row that do different things to the public site — the
+        // shape a gate has most to say about.
+        ("site stylesheet", typeof(StylesheetEditor), [], FakeSiteStylesheetClient.RevisionNote),
     ];
 
     [Test]

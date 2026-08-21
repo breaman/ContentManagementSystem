@@ -44,8 +44,15 @@ internal static class PublicPages
     /// </summary>
     /// <param name="title">The page title, which becomes the document's <c>h1</c> and its title.</param>
     /// <param name="zones">The zone payloads, as they are stored.</param>
+    /// <param name="customStylesheetHref">
+    /// Where the administrator-authored stylesheet lives, or null when nothing is published — which
+    /// is what a deployment that has never used the feature renders (task P10-07).
+    /// </param>
     /// <returns>The document.</returns>
-    public static async Task<string> RenderAsync(string title, string zones)
+    public static async Task<string> RenderAsync(
+        string title,
+        string zones,
+        string? customStylesheetHref = null)
     {
         var services = new ServiceCollection();
 
@@ -77,6 +84,7 @@ internal static class PublicPages
             {
                 [nameof(CmsDeliveryDocument.Context)] = RenderContext.For(content, CmsRenderMode.Live),
                 [nameof(CmsDeliveryDocument.Seo)] = Seo(title),
+                [nameof(CmsDeliveryDocument.CustomStylesheetHref)] = customStylesheetHref,
             }));
     }
 

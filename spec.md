@@ -39,6 +39,7 @@
 27. [Environment promotion and content migration](#27-environment-promotion-and-content-migration)
 28. [Accessibility](#28-accessibility)
 29. [Decisions, open questions, and deferred scope](#29-decisions-open-questions-and-deferred-scope)
+30. [Site stylesheet](#30-site-stylesheet)
 
 ---
 
@@ -202,6 +203,7 @@ invisible to anonymous users; page versioning; image upload with resize and rota
 | 28 | **Rate limiting and brute-force protection on the backoffice** | The admin surface is the highest-value target on the site. | v1 |
 | 29 | **Editorial metadata** — owner, review-by date, internal notes, tags | Content rot is the default state of every CMS without scheduled review. | v1 |
 | 30 | **Broken-link and orphaned-media reporting** | Housekeeping that prevents slow decay. | v2 |
+| 31 | **Editor-managed site styling** — a site-wide stylesheet an administrator writes, versions, and publishes from inside the CMS | Every visual change otherwise costs a developer, a build, and a deployment. A CMS whose content is editable in minutes but whose spacing, colour, and typography take a release is a CMS an organisation routes around — the styling ends up as inline `style` attributes in the content, where it is unmaintainable, unreviewable, and impossible to change in one place. | v1 |
 
 ### 4.3 Ambiguities in the source requirements, and the decisions taken
 
@@ -1394,6 +1396,15 @@ partial failure leaves the successful items applied and reports the rest.
   cross-linked confusion.
 - Media is referenced, never duplicated.
 
+### 14.13 The site stylesheet editor
+
+An administrator edits the public site's custom CSS from `/admin/appearance/stylesheet`, in the same
+source editor the HTML and Markdown zones use, with a CSS language mode, a diagnostics list, and a
+preview frame that renders a real page of the site against the **draft** stylesheet.
+
+It is an administrative surface rather than an authoring one, and it is described where its delivery
+and safety rules are: [§30](#30-site-stylesheet).
+
 ---
 
 ## 15. Public delivery and rendering
@@ -1444,7 +1455,9 @@ The public site must never show a stack trace or a blank page:
 
 Every public page emits: canonical `<link>`, SEO meta ([§18](#18-seo)), JSON-LD, `ETag`,
 `Last-Modified` (the publish timestamp), `Cache-Control`, and the security headers from
-[§20.5](#205-content-security-policy). Interactive islands (search box, forms in v2) opt in per
+[§20.5](#205-content-security-policy). Its `<head>` links two stylesheets in this order: the compiled
+`site.css` the deployment ships, then the administrator-authored site stylesheet
+([§30](#30-site-stylesheet)). The backoffice document links only the first. Interactive islands (search box, forms in v2) opt in per
 component with `@rendermode InteractiveWebAssembly`, keeping the rest of the page static and cacheable.
 
 ---
@@ -1461,6 +1474,7 @@ Gap #17.
 | **Published content cache** (`HybridCache`) | Deserialized `PublishedPage` objects | 15 min | Tag eviction |
 | **Route cache** | url → pageId map | 15 min | On any route change |
 | **Rendition cache** | Generated image files in `IMediaStore` | permanent | On `EditsVersion` bump (URL changes) |
+| **Site stylesheet** (`AddOutputCache`) | The rendered CSS response | 1 hour | Tag eviction on stylesheet publish |
 | **Client/CDN** | `Cache-Control` headers | pages: `max-age=0, s-maxage=300, must-revalidate`; media: `immutable` | ETag revalidation; CDN purge webhook |
 
 ### 16.2 Cache tags
@@ -1472,6 +1486,7 @@ Gap #17.
 | `media:{id}` | Every page rendering that media | Library-level media edits or metadata change |
 | `tpl:{id}` | Every page using that template | The template revision changes |
 | `nav:{menuKey}` | Pages rendering that menu | Any menu edit, or any publish/move affecting structural nav |
+| `sitecss` | The site stylesheet response | The stylesheet is published or reverted ([§30.4](#304-serving-and-caching)) |
 | `content` | Everything | Manual "purge all" |
 
 Eviction uses `IOutputCacheStore.EvictByTagAsync`.
@@ -1706,6 +1721,21 @@ vault / environment in production). The Aspire `sql-password` parameter's develo
 reach production. The signing key must be rotatable, with a grace period during which the previous key
 still validates.
 
+### 20.9 Author-supplied CSS
+
+The site stylesheet ([§30](#30-site-stylesheet)) is the one place in the system where a person writes
+code that a browser then executes as code, and it is held to the same rule as authored HTML: it is
+validated on write **and** on publish, by one validator, against a deny list that is stated rather
+than inferred ([§30.5](#305-what-is-refused-and-why)). What that list refuses — `@import`,
+`expression()`, `behavior`, `-moz-binding`, `url()` to any host but this one, and anything targeting
+a selector outside the public document — is refused because it either fetches from somewhere the CSP
+would have to be widened for, or reaches a surface the stylesheet is not allowed to reach.
+
+It never loads in the backoffice. That is a structural property rather than a rule somebody follows:
+the backoffice's document is `App.razor` and it does not link the stylesheet at all, so a stylesheet
+that hid the publish button or covered the confirmation dialog would be hiding them on a page nobody
+administers from.
+
 ---
 
 ## 21. Permissions matrix
@@ -1736,6 +1766,7 @@ still validates.
 | Manage redirects | ✔ | ✔ | ✔ | — | — | — | — |
 | Manage navigation | ✔ | ✔ | ✔ | — | — | — | — |
 | Manage site settings | ✔ | ✔ | — | — | — | — | — |
+| Edit and publish the site stylesheet | ✔ | ✔ | — | — | — | — | — |
 | Manage users / roles / ACLs | ✔ | — | — | — | — | — | — |
 | View audit log | ✔ | ✔ | — | — | — | — | — |
 | Purge cache | ✔ | ✔ | — | — | — | — | — |
@@ -1821,6 +1852,18 @@ impact) minus URLs and the tree.
 **Structure** (`Developer`/`Administrator`) — `/templates`, `/templates/{id}/zones`,
 `/block-types`, `/block-types/{id}/properties`, `/compositions`, `/field-types` (read-only registry
 introspection), `/templates/{id}/revisions`.
+
+**Appearance**
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET` | `/appearance/stylesheet` | The draft and published CSS, their hashes, and who published last |
+| `PUT` | `/appearance/stylesheet/draft` | Save the draft (`If-Match` required); returns diagnostics |
+| `POST` | `/appearance/stylesheet/validate` | Validate without saving |
+| `POST` | `/appearance/stylesheet/publish` | Snapshot the draft and serve it publicly |
+| `POST` | `/appearance/stylesheet/revert` | Publish an earlier revision, or nothing at all |
+| `GET` | `/appearance/stylesheet/revisions` | Published history |
+| `GET` | `/appearance/stylesheet/revisions/{id}` | One revision's CSS |
 
 **Site** — `/redirects` (CRUD + `POST /redirects/import` CSV), `/navigation`, `/settings`,
 `/not-found-log`, `/audit?entity=&entityId=&userId=&from=&to=`,
@@ -2024,6 +2067,16 @@ OutboxMessage
 
 NotFoundLog
   Id, Url (2000), UrlHash (binary(32) unique), Referrer (2000), HitCount, FirstSeenOn, LastSeenOn
+
+SiteStylesheet                        -- singleton, Id pinned to 1 by a check constraint
+  Id (PK), DraftCss (nvarchar(max)), PublishedCss (nvarchar(max) NULL),
+  PublishedHash (binary(32) NULL), PublishedOn, PublishedByUserId,
+  PublishedRevisionId, [fingerprint], RowVersion
+
+SiteStylesheetRevision
+  Id, Css (nvarchar(max)), Hash (binary(32)), Note (500), ByteLength,
+  CreatedOn, CreatedByUserId
+  INDEX (CreatedOn DESC)
 ```
 
 ### 23.5 Schema notes
@@ -2164,6 +2217,10 @@ These encode the requirements' core promises and must exist as automated tests:
 8. Every payload in the XSS corpus is neutralized in stored content and in rendered output.
 9. Soft-deleting a page removes it from the public site but keeps it restorable with full history.
 10. Deleting media that is still referenced is refused, with an accurate where-used list.
+11. Publishing the site stylesheet changes what an anonymous request receives, and **saving its draft
+    does not** — the same promise pages make, made about styling.
+12. A stylesheet carrying `@import`, `expression()`, or an off-origin `url()` is refused on save and
+    on publish, and the previously published stylesheet keeps being served.
 
 ---
 
@@ -2245,6 +2302,7 @@ function.
 | D10 | Shared rendering RCL between delivery and preview | Preview fidelity as a structural property |
 | D11 | SkiaSharp (MIT) behind an `IImageProcessor` abstraction; AVIF dropped from v1 | Avoids Six Labors commercial-licensing exposure; abstraction keeps AVIF recoverable ([§13.9](#139-image-library-selection)) |
 | D12 | Advisory locks never block; `rowversion` is authoritative | Blocking locks get stuck and generate support load |
+| D27 | The site stylesheet is content: drafted, validated, published, and reverted like a page — and it is **appended to** the compiled stylesheet rather than replacing it | [§30](#30-site-stylesheet), [ADR 0027](docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md) |
 
 ### 29.2 Open questions
 
@@ -2283,6 +2341,178 @@ function.
 | A/B image and content variant testing | v3 | |
 | Nested blocks beyond one level | v2 | Editor UX cost, not a storage limitation |
 | Workflow configurable per template | v2 | v1 is per-site |
+
+---
+
+## 30. Site stylesheet
+
+Gap #31. **Changing how the public site looks must not require a developer, a build, or a deployment.**
+
+### 30.1 What it is, and what it deliberately is not
+
+One site-wide CSS file, authored by an administrator inside the CMS, served from this origin, and
+linked from the public document **after** the compiled `site.css` that ships with the deployment:
+
+```html
+<link rel="stylesheet" href="/css/site.css" />          <!-- compiled from Bootstrap + styles/site.scss -->
+<link rel="stylesheet" href="/css/site-custom.css" />   <!-- the administrator's, this section -->
+```
+
+The ordering is the whole mechanism. Later rules of equal specificity win, so the administrator's
+sheet can override anything the shipped one sets without either file knowing about the other, and
+without the shipped one being editable — which keeps `styles/site.scss` a source file under review in
+a pull request rather than a thing two systems both write.
+
+What it is not:
+
+- **Not the Sass source.** The Bootstrap build stays a build. An administrator overriding
+  `$primary` would need a compiler in the request path and would be recompiling the backoffice's
+  stylesheet as a side effect ([§30.7](#307-why-not-let-them-edit-the-sass)).
+- **Not applied to the backoffice.** `App.razor` does not link it. An administrator cannot restyle,
+  hide, or overlay the screens the CMS is administered from — including the button that would
+  un-publish a stylesheet that has gone wrong.
+- **Not per-page or per-template styling.** One sheet for the site. Per-page appearance is a template
+  or a block type, which is developer work by design ([§8](#8-templates-and-zones)).
+- **Not a way to add markup or behaviour.** CSS only, and CSS with the fetching and scripting
+  constructs removed ([§30.5](#305-what-is-refused-and-why)).
+
+### 30.2 Model — a draft, a published copy, and a history
+
+The stylesheet is content, and it gets content's lifecycle (D27, [ADR 0027](docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md)):
+
+| State | Where it lives | Who sees it |
+|---|---|---|
+| **Draft** | `SiteStylesheet.DraftCss` | The editor screen, and preview ([§12](#12-preview)) |
+| **Published** | `SiteStylesheet.PublishedCss` + its `binary(32)` hash | Every anonymous visitor |
+| **Revisions** | `SiteStylesheetRevision`, one row per publish | The revision list, for comparison and revert |
+
+This is [§11.1](#111-version-model)'s promise applied to styling: an administrator can work on a
+redesign for a week while the site keeps serving what was last published, and can see the redesign on
+real pages the whole time. A revision is cut **on publish only** — a save is a save, exactly as it is
+for a page draft — and carries an optional note, because "what was this change for" is the question a
+revert is trying to answer.
+
+A single row, pinned to `Id = 1` by a check constraint, for the same reason `SiteSettings` is
+([§23.4](#234-operational-tables)): "there is only ever one" is an invariant that quietly stops being
+true and then has to be reconciled by hand.
+
+Concurrency is the system's usual one: `rowversion` on the row, `If-Match` on the save, `409` carrying
+the draft that won ([§11.8](#118-concurrency-control)). Two administrators editing one stylesheet is
+rarer than two editors on one page and no less destructive.
+
+**Nothing published is nothing linked.** With no published CSS the public document omits the second
+`<link>` entirely rather than requesting an empty file, so a deployment that never uses the feature
+pays nothing for it.
+
+### 30.3 The editor
+
+`/admin/appearance/stylesheet`, behind `Appearance.Edit` ([§21.1](#211-role--permission)):
+
+- **The source pane** is CodeMirror with the CSS language mode, from the same locally bundled editor
+  the HTML and Markdown zones use (D13), with a byte counter against the cap.
+- **Diagnostics** appear beside the source as the administrator types — debounced, and answered by
+  the server so that the editor and the save cannot disagree about what is allowed
+  ([§30.5](#305-what-is-refused-and-why)). A refusal is reported at its line and column with the
+  construct named, not as "invalid CSS".
+- **The preview pane** frames a real page of the site rendered against the **draft**. Which page is a
+  picker over the top of the content tree: a stylesheet is judged against the pages it will be seen
+  on, not against a swatch board. It shows what is **stored**, so the pane refreshes on save rather
+  than on every keystroke.
+- **Publish** is a dialog stating the byte delta and that the change reaches every visitor
+  immediately, because there is nothing to schedule and no page to republish. It takes what is
+  stored, so an unsaved edit is not publishable and the button says so.
+- **Revert** publishes an earlier revision, or publishes nothing at all — "back to the shipped design"
+  is one button, and it is the recovery path for a stylesheet that broke the site's layout. Either
+  way the draft is left alone, which is what makes reverting cheap enough to do early.
+
+Two affordances are deliberately absent. The device widths of [§12.3](#123-preview-affordances) are
+not offered here — the pane is already narrower than a page and resizes with the window, so a width
+control would be measuring the pane rather than a device — and the publish dialog reports a byte
+delta rather than a count of selectors added and removed, because a selector diff is a second parser
+to maintain in exchange for a number nobody acts on.
+
+### 30.4 Serving and caching
+
+`GET /css/site-custom.css` is an endpoint rather than a file on disk, because the bytes live in the
+database and the last thing a scaled-out deployment needs is a file every instance has to be told to
+rewrite.
+
+| Property | Value | Why |
+|---|---|---|
+| Content type | `text/css; charset=utf-8`, pinned | Never sniffed, never negotiated |
+| `ETag` | The published hash | A publish changes the URL's content, so revalidation is the mechanism |
+| `Cache-Control` | `public, max-age=0, s-maxage=300, must-revalidate` | The page policy of [§16.1](#161-layers), for the same reason: a shared cache may hold it, a browser must ask |
+| Output cache | Tagged `sitecss`, evicted on publish through the outbox | Every instance evicts, including the ones that did not serve the publish |
+| Empty published CSS | `404` | The document does not link it in that state; a request for it is a stale cache, and a `404` is the honest answer |
+| Preview | `GET /preview/site-custom.css`, `no-store` | The **draft** to a caller holding `Appearance.Edit`, the published copy to anyone else — so a *shared* preview link ([§12.2](#122-shareable-preview-links)) shows an approver the site as it looks rather than a page with no styling, without showing them a design nobody has published. It is the *framed page* that links it, not the preview toolbar around it: the chrome is backoffice furniture and is no more restylable than the editor is |
+
+The URL is stable and revalidated rather than fingerprinted with the content hash. A hash in the URL
+would be the faster answer for the stylesheet and the wrong one for the site: the URL is written into
+every page's `<head>`, so changing it would mean evicting every cached page on every stylesheet
+publish — trading one 304 per visit for a full re-render of the whole site every time somebody adjusts
+a margin.
+
+**One case does evict the site, and it is the transition rather than the content.** The document omits
+the `<link>` entirely while nothing is published, so the *first* publish — and a revert to nothing —
+changes every page's markup rather than only the bytes the link points at. A page cached before that
+moment has no link in it and would go on having none until its hour was up, so those two operations
+enqueue `content` alongside `sitecss`. Every publish after the first enqueues `sitecss` alone.
+
+### 30.5 What is refused, and why
+
+One validator, run on save, **again on publish**, and again on a revert. The repetition is [ADR
+0008](docs/adr/0008-sanitize-on-write-and-on-render.md)'s reasoning applied to CSS: a draft can reach
+the database by a path the save never ran — a restore, an environment promotion, a hand-written
+`UPDATE` — and publish is the last point before it reaches every visitor; a revision published before
+a rule existed is exactly the stylesheet that rule was added for.
+
+It parses the CSS rather than matching strings against it, so a construct hidden by comments, by CSS
+escapes, or by unusual whitespace is found in the token stream instead of being missed by a regular
+expression. That matters more here than it sounds: `@import`, `@\69 mport`, and `@\i mport` are one
+at-rule to a browser and three different strings to a pattern.
+
+| Refused | Why |
+|---|---|
+| `@import` | Fetches a stylesheet from wherever it names, at render time, from a document the CSP was written for. It is also the one construct that can grow one stylesheet into many without any of them being reviewed here. |
+| `url()` naming any host but this one | `img-src`/`font-src` in the public policy admit `'self'`, `data:`, and (for images) `https:` ([§20.5](#205-content-security-policy)). A stylesheet that could fetch from anywhere is a stylesheet that can report every visitor's arrival to a third party by requesting a background image. Media in the library is referenced by its ordinary `/media/...` URL, which is same-origin. |
+| `expression()`, `behavior`, `-moz-binding` | Script execution from a stylesheet. Historic, unsupported in current browsers, and refused anyway — the cost of refusing is zero and the cost of a surviving one is arbitrary script on every public page. |
+| `javascript:` in any value | Same. |
+| More than **256 KB** | It is a stylesheet, not a bundle. The cap is generous for hand-written CSS and small enough that the response stays a rounding error against the page it styles. Configurable as `Cms:SiteStylesheet:MaxBytes`, because "generous" is a judgement about a site nobody has seen. |
+| An unterminated comment, string, or `url()` | Not a security rule but the same failure: everything after it is a comment to the browser and a declaration to anything else reading the file, which is precisely how a validator and a renderer come to disagree about what a stylesheet says. |
+
+A refusal names the construct, the line, and the column, and refuses the **whole save**. There is no
+"strip it and carry on": silently editing somebody's CSS produces a file that does not match what
+they wrote and a bug they cannot reproduce. This is the one place the system's treatment of authored
+input differs from HTML sanitization ([§20.2](#202-html-sanitization)), and the difference is
+deliberate — an author writing prose cannot be asked to fix a `<script>` they pasted from Word, and an
+administrator writing CSS can be asked to delete an `@import` they typed.
+
+### 30.6 When it goes wrong
+
+CSS cannot throw, which is exactly the problem: a stylesheet that renders the site unreadable is
+serving `200 OK` and no monitor will notice.
+
+- **Revert is always one action**, from a screen the stylesheet cannot affect, and "publish nothing"
+  is always available — the site returns to the shipped design without a deployment.
+- **The published bytes and every revision are in the database**, so a restore ([§24.3](#243-backup-and-recovery))
+  carries the site's appearance with its content rather than leaving it behind in a file.
+- **The public accessibility gate runs against the published stylesheet**, not against the shipped one
+  alone ([§28](#28-accessibility)). Contrast is the failure this feature makes easy to introduce, and
+  it is the one an automated check can actually catch.
+- **Publishing is audited** like any other publish — who, when, the byte delta, and the note — because
+  "the site looked different on Tuesday" has to be answerable ([§24.1](#241-telemetry)).
+
+### 30.7 Why not let them edit the Sass
+
+It was considered and rejected. Compiling Sass at request time or at save time means shipping a
+compiler into the application, a compilation step that can fail with an error an administrator cannot
+act on, and — because `styles/site.scss` builds the backoffice's stylesheet as well as the public
+site's — a variable override that restyles the CMS itself, which is the surface [§30.1](#301-what-it-is-and-what-it-deliberately-is-not)
+exists to keep out of reach. Appending plain CSS gets the same outcome for the cases an administrator
+actually has (colour, spacing, typography, hiding an element) with none of it.
+
+The escape hatch for the cases it does not cover is unchanged and correct: a developer edits
+`styles/site.scss`, and it goes through review.
 
 ---
 

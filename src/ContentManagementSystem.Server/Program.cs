@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 using ContentManagementSystem.Client.Components.Admin.Fields;
 using ContentManagementSystem.Client.Services;
+using ContentManagementSystem.Core.Appearance;
 using ContentManagementSystem.Core.Auditing;
 using ContentManagementSystem.Core.Content;
 using ContentManagementSystem.Core.Caching;
@@ -31,6 +32,7 @@ using ContentManagementSystem.Server.Authorization;
 using ContentManagementSystem.Server.Caching;
 using ContentManagementSystem.Server.Cli;
 using ContentManagementSystem.Server.Delivery;
+using ContentManagementSystem.Server.Delivery.Appearance;
 using ContentManagementSystem.Server.Delivery.Preview;
 using ContentManagementSystem.Server.Delivery.Seo;
 using ContentManagementSystem.Server.HealthChecks;
@@ -204,6 +206,10 @@ try
     // beside delivery because the public site is what renders them.
     builder.Services.AddCmsNavigation();
 
+    // The administrator-authored public stylesheet (task P10-03). Registered before caching because
+    // publishing it enqueues a `sitecss` eviction through the queue that call registers.
+    builder.Services.AddCmsAppearance(builder.Configuration);
+
     builder.Services.AddCmsCaching();
     builder.Services.Configure<DeliveryCacheOptions>(
         builder.Configuration.GetSection(DeliveryCacheOptions.SectionName));
@@ -364,6 +370,7 @@ try
     builder.Services.AddScoped<PrerenderGate>();
     builder.Services.AddScoped<IStructureClient, ServerStructureClient>();
     builder.Services.AddScoped<INavigationClient, ServerNavigationClient>();
+    builder.Services.AddScoped<ISiteStylesheetClient, ServerSiteStylesheetClient>();
     builder.Services.AddScoped<ISearchClient, ServerSearchClient>();
     builder.Services.AddScoped<IPageClient, ServerPageClient>();
     builder.Services.AddScoped<IReusableClient, ServerReusableClient>();
@@ -525,6 +532,11 @@ try
     // sitemap.xml and robots.txt (tasks P8-04 and P8-05). Also before the catch-all, and also
     // reserved slugs, so neither can be shadowed by content.
     app.MapCmsSeo();
+
+    // The administrator-authored stylesheet the public document links after site.css (task P10-05).
+    // Before the catch-all, and under /css, which the static-file middleware has already had its
+    // chance at — this path is not a file the front-end build produces.
+    app.MapCmsSiteStylesheet();
 
     // Last, and it must stay last (task P3-13, spec section 15.1). This is the catch-all that serves
     // every content URL, and anything mapped after it is a route a visitor could shadow with a page

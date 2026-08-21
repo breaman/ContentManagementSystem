@@ -33,4 +33,18 @@ public partial class CmsDeliveryDocument : ComponentBase
     [Parameter]
     [EditorRequired]
     public SeoMetadata Seo { get; set; } = SeoMetadata.Empty;
+
+    /// <summary>
+    /// Where to find the administrator-authored stylesheet, or null when there is none to link
+    /// (task P10-07, spec section 30.1).
+    /// </summary>
+    /// <remarks>
+    /// Supplied by the renderer rather than resolved here, for the reason the head is: a component
+    /// that queried while rendering would make what the document says depend on when it happened to
+    /// run. The renderer also decides <em>which</em> stylesheet — the published one for a live
+    /// render, the draft for a preview — so this document has one link and no branch, and preview
+    /// cannot drift into showing what is live.
+    /// </remarks>
+    [Parameter]
+    public string? CustomStylesheetHref { get; set; }
 }

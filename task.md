@@ -159,8 +159,22 @@ version of every page forever while a policy that said otherwise sat in the code
 runs against **live rendering** as well as against the sanitizer, the accessibility gate covers the
 public document as well as the backoffice, and both come with negative controls, because an assertion
 that nothing is wrong passes just as well against a page that rendered nothing.
-**Version:** 1.0
-**Last updated:** 2026-08-19
+**Phase 10 was added on 2026-08-20** and is the only phase not present in the original plan. **All 17
+of its tasks are done and six of its seven criteria are met**; the seventh, `P10 #1`, is open on a
+person driving a browser, which is the same harness `P6-32`…`P6-34` wait on. A
+re-read of [`requirements.md`](./requirements.md) found that styling is the one editor-facing
+capability every earlier phase left entirely to developers: content, structure, media, navigation, and
+metadata are all editable in minutes, while a margin or a colour is a build and a deployment. It is
+v1 scope rather than backlog because the workaround is worse than the gap — an inline `style`
+attribute typed into a rich-text zone, on every page, invisible to review. The stylesheet is treated
+as content: drafted, previewed against real pages, published, revisable, and revertible
+([ADR 0027](./docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md)), **appended
+after** the compiled `site.css` rather than replacing it, and linked by the public and preview
+documents only — never by the backoffice, which is what stops a stylesheet from reaching the screen
+that would undo it.
+
+**Version:** 1.1
+**Last updated:** 2026-08-20
 **Sources:** [`requirements.md`](./requirements.md) · [`spec.md`](./spec.md) · [`plan.md`](./plan.md)
 
 ---
@@ -216,10 +230,12 @@ and record the date in the progress table.
 | [7 — Workflow, permissions, scheduling](#phase-7--workflow-permissions-and-scheduling) | 26 | 26 | 16.0 | Complete — all 26 tasks and all 10 acceptance criteria | 2026-08-18 |
 | [8 — SEO, caching, navigation, search](#phase-8--seo-caching-navigation-and-search) | 26 | 26 | 14.0 | All 26 tasks done; **9 of 10 criteria met**. `P8 #10`'s 500 ms budget is asserted but has only run on an engine without full-text (arm64 Azure SQL Edge), so it waits on the same CI agent `P0 #3` does | — |
 | [9 — Hardening, accessibility, launch](#phase-9--hardening-accessibility-and-launch) | 24 | 21 | 17.0 | In progress — **security, accessibility, operations, and now performance** are done (`P9-01`…`P9-07`, `P9-09`…`P9-12`, `P9-14`, `P9-15`, `P9-17`, `P9-19`…`P9-22`, `P9-24`, `P9-25`). Open, and each on a thing rather than a change: `P9-13` on NFR-9's 5,000 rps, `P9-16` on eight hours, `P9-08` on a person, `P9-18` on an environment to restore into, and `P9-23`, which is deferred to after launch by its own terms | — |
-| **v1 total** | **281** | **269** | **206.5** | | |
+| [10 — Editor-managed site styling](#phase-10--editor-managed-site-styling) | 17 | 17 | 6.0 | All 17 tasks done; **6 of 7 criteria met**. `P10 #1` is open on the browser journey alone — every mechanical half of it is asserted | — |
+| **v1 total** | **298** | **286** | **212.5** | | |
 
 Dependency order: `P0 → P1 → P2 → P3 → {P4, P5} → P6 → P9`, with **P7 parallel from P2 exit** and
-**P8 parallel from P3 exit**.
+**P8 parallel from P3 exit**. **P10 needs P3, P6, and P8** — the public document, the editor bundle,
+and tag-based invalidation — so it is last by dependency rather than by importance.
 
 ---
 
@@ -4606,6 +4622,186 @@ Entry: all prior phases exit.
 
 ---
 
+## Phase 10 — Editor-managed site styling
+
+**Objective:** an administrator changes how the public site looks, from inside the CMS, with no
+developer, no build, and no deployment — and cannot reach the backoffice with it. **6 ed** ·
+Entry: Phase 3, 6, and 8 exits (the public document, the preview frame, the CodeMirror bundle, and
+tag-based invalidation). Specified in [§30]; decided in
+[ADR 0027](./docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md).
+
+**Added 2026-08-20**, after a re-read of [`requirements.md`](./requirements.md) found styling to be the
+one editor-facing capability every earlier phase left entirely to developers. It is v1 scope, not
+backlog: the workaround for a site whose appearance takes a deployment to change is an inline `style`
+attribute typed into a rich-text zone, and that is worse than the gap.
+
+### Model, validation, and service — 2.75 ed
+
+- [x] **P10-01** `SiteStylesheet` (singleton, `Id` pinned to 1 by a check constraint) and
+  `SiteStylesheetRevision` entities, EF configurations, and migration #11 `AddSiteStylesheet`
+  [§23.4]. — 0.5 ed
+  *(The two tables reference each other — the stylesheet points at the revision it published, the
+  revisions point back at the stylesheet — which SQL Server accepts because neither side cascades.
+  The navigation property matters more than it looks: without it, pointing the stylesheet at a
+  revision that has no id yet takes two `SaveChanges`, and the second is outside the transaction that
+  enqueued the cache eviction, which is the arrangement `P8-09` exists to avoid.)*
+- [x] **P10-02** `CssValidator` in `Core/Appearance/` — parses the stylesheet and refuses `@import`,
+  `url()` naming another host, `expression()`, `behavior`, `-moz-binding`, `javascript:` values, and
+  anything over 256 KB, reporting each with its construct, line, and column [§30.5]. — 1.25 ed
+  *(It **tokenises** rather than pattern-matching, and that is the whole reason it can be trusted.
+  CSS has three ways to write one identifier — literally, `\69 mport`, `\i` — and two contexts where
+  a construct means nothing at all, a comment and a string. A regular expression sees six strings and
+  one legitimate declaration; a tokeniser sees one identifier in a known context. The escape decoder
+  has to consume the single whitespace after a hex escape, which is the rule that makes `\69 mport`
+  six characters rather than seven; getting it wrong in either direction produces a validator that
+  reads a different identifier than the browser does, which is the whole class of bypass. Control
+  characters are stripped before a scheme is read, because a browser's URL parser strips them too.)*
+- [x] **P10-03** `SiteStylesheetService`: read, save draft under `If-Match` with a `409` carrying the
+  draft that won, publish (snapshot → revision row → `sitecss` eviction enqueued **inside** the
+  transaction), revert to a revision or to nothing, and the revision list. — 1 ed
+  *(Validated on save **and again on publish**, which is `D8`'s reasoning applied to CSS: a draft can
+  reach the database by a path this service never ran — a restore, an environment promotion, a
+  hand-written `UPDATE` — and publish is the last point before it reaches every visitor. A revert
+  validates on the way back out too, since a revision published before a rule existed is exactly the
+  stylesheet that rule was added for. **A refusal refuses the whole save** rather than stripping what
+  it found: an author who pasted a `<script>` out of Word cannot be asked to go and find it, and an
+  administrator who typed an `@import` can.)*
+
+### Delivery — 0.75 ed
+
+- [x] **P10-04** Outbox message and handler evicting the `sitecss` tag on every instance, alongside the
+  page-eviction handler of `P8-11`. — included below
+  *(No new handler was needed — `CacheInvalidationQueue.Enqueue` already carries arbitrary tags, so
+  this is one constant on `CacheTags` and the existing dispatcher. **The interesting part is what
+  else gets evicted**: ordinarily `sitecss` alone, because the URL in every page's head does not
+  change when the CSS does. The **transition** does evict the site — the document omits the `<link>`
+  entirely while nothing is published, so the first publish and a revert-to-nothing change every
+  page's markup rather than only the bytes the link points at, and a page cached before that moment
+  would have no link in it for an hour.)*
+- [x] **P10-05** `GET /css/site-custom.css`: the published CSS, `text/css; charset=utf-8` pinned,
+  `ETag` = the published hash, `Cache-Control: public, max-age=0, s-maxage=300, must-revalidate`,
+  output-cached under the `sitecss` tag, `404` when nothing is published [§30.4]. — 0.5 ed
+  *(Cached under the existing page policy rather than a policy of its own — anonymous requests only,
+  tags taken from what the handler published — so a rule about caching an authenticated response has
+  one implementation. The entity tag is hex rather than Base64: a tag travels in a header where `+`
+  and `/` are legal and routinely mangled, and a tag that comes back different never matches.
+  **Deliberately not rate-limited**, and `RateLimitTests` is what said so: `CmsRateLimits.PublicPages`
+  is a *page* budget, every page load fetches this file alongside the page, and counting it would
+  halve the allowance a visitor actually has — the same reason the framework assets and `site.css`
+  are not limited.)*
+- [x] **P10-06** `GET /preview/site-custom.css`: `no-store`, in the preview endpoint group so it gets
+  the `Preview` CSP profile and the group's `NoStore` metadata. — 0.15 ed
+  *(It serves the **draft** to a caller holding `Appearance.Edit` and **the published copy to anyone
+  else**, which is the shared-preview case [§12.2]: those links are opened by approvers and clients
+  with no account, and a frame refused its stylesheet shows them a page that looks nothing like the
+  one they are approving. They are meant to see unpublished content; the unpublished *design* is a
+  different thing and stays gated. The decision is in the handler rather than on the route, because a
+  route that refuses cannot fall back.)*
+- [x] **P10-07** The `<link>` after `site.css` in `CmsDeliveryDocument`, omitted entirely when
+  nothing is published. `CmsPageRenderer` decides *which* stylesheet — published on a live render,
+  draft on a preview one — so the document has one link and no branch, and preview cannot drift into
+  showing what is live. **`App.razor` is not touched**, and that omission is the mechanism rather
+  than an oversight [§30.1]. — 0.1 ed
+  *(The renderer asks the reader for the published **entity tag** rather than the CSS, because the
+  document needs to know only whether one exists and reading an `nvarchar(max)` column to answer a
+  yes-or-no question would put the whole stylesheet on the wire once per render.)*
+
+### API, editor, and shell — 2 ed
+
+- [x] **P10-08** `Appearance.Edit` permission, granted to `Administrator` and `Developer` in
+  `CmsPermissionMap`, plus `CmsRoles.AppearanceEditors` for the screen's `Authorize` attribute
+  [§21.1]. — 0.1 ed
+- [x] **P10-09** `/api/cms/v1/appearance/stylesheet` — read, save draft, validate, publish, revert,
+  revisions [§22.1]. Writes behind `Appearance.Edit` and antiforgery. — 0.4 ed
+  *(The **reads** are behind the same permission, not `Content.Read`: the draft is unpublished work,
+  and "what is the site about to look like" is not a question the backoffice answers to everyone who
+  can sign in.)*
+- [x] **P10-10** `@codemirror/lang-css` added to the source-editor bundle, and a `css` language on
+  `cms-source-editor.js` — one more mode on the bundle `P6-08` already ships, not a second editor
+  (`D13`). — 0.25 ed
+  *(The two-way conditional became a `languageFor` switch. Splitting CSS into a fourth bundle would
+  download the editor twice for an administrator who edits a Markdown zone and then the stylesheet.)*
+- [x] **P10-11** `/admin/appearance/stylesheet`: source pane, diagnostics as the administrator types,
+  a preview frame rendering a real page against the draft, a publish dialog stating the byte delta
+  and that the change reaches every visitor immediately, and a revision list with revert
+  [§30.3]. — 1.15 ed
+  *(**The diagnostics come from the server**, debounced rather than run per keystroke, so a
+  stylesheet that shows no problems in the editor cannot be refused a moment later by a second
+  implementation that disagreed. Publish takes what is *stored*, so the button says "save first"
+  rather than publishing the previous draft and leaving somebody to work out why their change is not
+  live. The preview frame carries a nonce in its query, because an `iframe` whose `src` has not
+  changed is not re-fetched and a save would otherwise leave the pane showing the previous draft.)*
+- [x] **P10-12** Section-bar entry on the dashboard, inside an `AuthorizeView` for
+  `CmsRoles.AppearanceEditors`, beside the other role-gated sections. — 0.1 ed
+
+### Tests — Phase 10
+
+- [x] **P10-13** The refusal corpus: every construct of [§30.5], each in several spellings — inside
+  comments, behind CSS escapes, with unusual whitespace, in `@media` and `@supports` blocks — asserted
+  refused on save **and** on publish, with a negative control of ordinary CSS that must pass.
+  *(31 cases. The negative controls are half of them — custom properties, `@media`, `@supports`,
+  a relative `url()`, a `data:` URI, and the word `behavior` as a class and a string — because every
+  refusal assertion above is satisfied by a validator that refuses its own input unconditionally.)*
+- [x] **P10-14** Integration over HTTP: saving the draft leaves the anonymous response byte-identical;
+  publishing changes it on the next request; `sitecss` is evicted on an instance that did not serve
+  the publish; and the endpoint answers `404` while nothing is published.
+  *(15 tests. Also: the `<link>` comes after `site.css` and not before, a conditional request answers
+  `304`, preview serves the draft to an administrator and refuses an anonymous caller, publish
+  refuses a draft written straight into the table, a revert publishes an earlier revision without
+  touching the draft, and a lost race hands back the stylesheet that won.)*
+- [x] **P10-15** Authorization: every write refused for a caller without `Appearance.Edit`, at the
+  service layer as well as at the endpoint.
+  *(Driven with a caller holding `Content.Read` and `Settings.Edit` and not this one — which is also
+  the assertion that `Settings.Edit` does not quietly imply it.)*
+- [x] **P10-16** The rendered backoffice document contains no link to `site-custom.css` — asserted
+  against the HTML, so a future edit to `App.razor` cannot quietly grant a stylesheet the run of the
+  admin screens.
+- [x] **P10-17** The public accessibility gate re-run with a published stylesheet, **with a negative
+  control**: a deliberately low-contrast sheet must fail it, or the gate proves nothing.
+  *(`SiteStylesheetAccessibilityTests` serves both stylesheets from a routed origin rather than
+  pushing the document in with `SetContentAsync`, because a contrast measurement against a page whose
+  CSS never loaded is a measurement of the browser's defaults. The control is `#dcdcdc` on white —
+  what "make the body copy a bit lighter" turns into, not an absurd value — and axe reports
+  `color-contrast` on it. The editor screen itself joined `PageScreenAccessibilityTests` and the
+  200% zoom pass, which share one screen list.)*
+
+### Acceptance criteria — Phase 10
+
+- [ ] **P10 #1** An administrator writes CSS in the CMS, previews it against a real page, publishes,
+  and an anonymous request receives it — no build, no deployment, no developer.
+  *Every mechanical half is asserted: the API round trip, the preview route serving the draft to a
+  caller holding `Appearance.Edit`, the publish, and the anonymous response changing. **What has not
+  been done is a person doing it in a browser** — the same hosted-app harness `P6-32`…`P6-34` wait
+  on. The criterion names an administrator, so it stays open on that.*
+- [x] **P10 #2** Saving the draft does not change what an anonymous visitor receives; publishing does,
+  on the next request, on every instance. `P2 #4`'s promise, restated about styling and tested the
+  same way.
+  *Over HTTP against an anonymous client, with the outbox dispatched between, so "on every instance"
+  is the eviction path rather than the one the publish happened to run on.*
+- [x] **P10 #3** A refused construct is refused on save and on publish, named with its line and
+  column, and the previously published stylesheet keeps being served.
+  *The publish half is the one worth having: it is driven by writing an `@import` straight into the
+  table, which is the only way a draft the save refused can exist.*
+- [x] **P10 #4** The backoffice document links no administrator-authored stylesheet, asserted against
+  the rendered HTML.
+  *Against `/admin` fetched as an `Administrator` with a stylesheet published, so the assertion is
+  about what the server sent rather than about what `App.razor` says today.*
+- [x] **P10 #5** A caller without `Appearance.Edit` is refused at the API, not merely hidden from in
+  the UI. *And in the service, which is the check that still runs when something else calls it.*
+- [x] **P10 #6** Revert publishes an earlier revision, and publishing nothing restores the shipped
+  design.
+  *Both asserted through the delivered response, and both leave the draft alone — which is what makes
+  reverting cost nothing and therefore something an administrator will actually do early.*
+- [x] **P10 #7** The public axe pass is green with a published stylesheet applied and red with a
+  deliberately low-contrast one.
+
+**Exit gate:** an administrator with no repository access restyles the public site and reverts it;
+the axe gate and the caching tests are green in CI. — [ ] met on ____
+*The gates are green. The first clause is a person and an environment, like `P6 #1` and `P9 #7`, and
+it has not been run.*
+
+---
+
 ## Launch checklist
 
 From [`plan.md` §22](./plan.md#22-launch-and-rollout). Not counted in the phase totals.
@@ -4689,6 +4885,7 @@ verified in CI to apply cleanly against a database restored from the previous on
 | 8 | `AddCmsDelivery` | 8 | P8-14 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` | [x] |
 | 9 | `AddAuditRetention` | 9 | P9-25 | `SiteSettings.AuditLogRetentionDays` | [x] |
 | 10 | `AddNavigationIndex` | 9 | P9-14 | `IX_Pages_Navigation` — a filtered covering index on `(Depth, SortOrder)` for the structural menu, which every public render builds. No table or column changes | [x] |
+| 11 | `AddSiteStylesheet` | 10 | P10-01 | `SiteStylesheet` (singleton, `Id` pinned to 1 by a check constraint), `SiteStylesheetRevision` | [x] |
 
 **Rules:** data backfills are separate, idempotent, resumable, and batched — never inline in a schema
 migration. Full-text catalog creation in migration 8 requires raw SQL and must handle Azure SQL vs.
@@ -4740,6 +4937,15 @@ reviewer.
 | `Client/…/PageList.razor`, `PageVersions.razor`, `PagePreviewLinks.razor`, `ReusableLibrary.razor` | Wrap each wide table in `table-responsive`. All four overflowed a 640-pixel viewport, which is what 200% zoom reports on a 1280-pixel display — found by the zoom pass rather than by looking | 6 | P6-38 | [x] |
 | `Client/…/Dashboard/DashboardGroupList.razor` | Groups are `div`s under headings rather than labelled `section`s, and the heading level is a parameter. Four labelled sections in one card are four landmarks announced by the same name; a fixed level makes one of the two screens skip one — both found by the axe gate | 6 | P6-36 | [x] |
 | `README.md` | Document CMS setup, template authoring, schema sync CLI. Rewritten from the template leftovers it still was — bootstrap, `dotnet ef`, `aspire run` — and now opens with a map of the other documents | 9 | P9-22 | [x] |
+| `Server/Delivery/CmsDeliveryDocument.razor` | Link the administrator's stylesheet after `site.css`, and omit the link entirely when nothing is published | 10 | P10-07 | [x] |
+| `Server/Delivery/CmsPageRenderer.cs` | Decide which stylesheet the document links — published on a live render, **draft** on a preview one — so a redesign is judged on real pages before it is live and one component cannot get the two modes the wrong way round | 10 | P10-07 | [x] |
+| `Server/Components/App.razor` | **Deliberately unchanged.** The backoffice links no administrator-authored CSS, which is what keeps a stylesheet away from the screen that reverts it — asserted by `P10-16` rather than left as a convention | 10 | P10-07 | [x] |
+| `Shared/Contracts/Security/CmsPermissions.cs`, `Server/Authorization/CmsPermissionMap.cs`, `Shared/Contracts/Security/CmsRoles.cs` | Add `Appearance.Edit` (`Administrator`, `Developer`) and the `AppearanceEditors` role set. Kept out of `Settings.Edit` because publishing CSS reaches every anonymous visitor immediately, with no draft state on the public side and no approval step | 10 | P10-08 | [x] |
+| `Server/package.json`, `scripts/cms-source-editor.js` | Add `@codemirror/lang-css` and a `css` mode — one more language on the bundle `P6-08` ships, not a second editor | 10 | P10-10 | [x] |
+| `Server/Api/Cms/CmsApiEndpoints.cs` | Map the appearance endpoint group | 10 | P10-09 | [x] |
+| `Client/…/Dashboard/DashboardScreen.razor` | Section-bar entry for Appearance, behind the role that can use it | 10 | P10-12 | [x] |
+| `tests/…Server.Tests/Content/PageWorkbench.cs` | `StubAuthorization.Everything` gains `Appearance.Edit`. The delivery suite arranges a published stylesheet through the real service, and the service checks the permission itself | 10 | P10-14 | [x] |
+| `tests/…E2E.Tests/SiteStyles.cs`, `PublicPages.cs`, `BackofficeScreens.cs`, `PageScreenAccessibilityTests.cs` | Serve and render the administrator's stylesheet, and put the editor screen under the axe and 200%-zoom gates the other screens already sit under | 10 | P10-17 | [x] |
 | `ContentManagementSystem.slnx` | Add Core, Rendering, and four test projects | 0 | P0-07…P0-11 | [ ] |
 
 ---
@@ -4782,11 +4988,12 @@ the checklist for verifying the delivered system against the original ask.
 | R-11 | "image management functionality … upload images" | [§13.3] | P5-01…P5-08 | P5 #1–#5 | [x] 2026-08-16 — `P5 #1`–`#5` all met; `P5-08` (chunked upload) is a comfort feature over a working upload, not a gate |
 | R-12 | "resize and rotate those images" | [§13.4], [§13.5] | P5-09…P5-13 | P5 #6, #7 | [x] 2026-08-16 — both met, and non-destructively: the stored original is byte-for-byte identical across an edit, a library rotate reaches every page showing the image without republishing one, and a usage crop reaches only its own placement |
 | R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | P5-19, P5-20 | P5 #10 | [x] 2026-08-16 — a placement stores an id and its own edits, nothing about the file, which is what makes `R-12`'s library rotate propagate |
-| R-14 | "do plenty of research and add elements that are clearly missing" | [§4.2] — 30 gaps | see below | per gap | [ ] |
+| R-14 | "do plenty of research and add elements that are clearly missing" | [§4.2] — 31 gaps | see below | per gap | [ ] |
+| R-15 | "Administrators should be able to change the look and feel of the public site without a developer … a site-wide CSS file they can create and edit from an editor inside the system … public facing pages only" | [§30] | P10-01…P10-12 | P10 #1–#4 | [x] 2026-08-20 — the stylesheet is content: drafted, previewed against real pages, published, revertible, and **appended after** the compiled `site.css` rather than replacing it. `P10 #1` is open on a person driving a browser; `#2`–`#4` are met, including the one the requirement is really about — the public pages get it and the admin screens do not |
 
 ### Gap coverage (R-14)
 
-The 30 gaps from [§4.2], mapped to the tasks that close them.
+The 31 gaps from [§4.2], mapped to the tasks that close them.
 
 | Gap | Item | Tasks | Done |
 |---|---|---|:--:|
@@ -4820,6 +5027,7 @@ The 30 gaps from [§4.2], mapped to the tasks that close them.
 | #28 | Rate limiting & brute-force protection | P9-03, P9-04 | [x] 2026-08-19 — the six limits of [§20.6] as named policies on endpoint groups, two of which decide per request whether they apply; plus lockout for new users, a twelve-character minimum, a breach screen, and mandatory 2FA for the three roles that can change what the public site says |
 | #29 | Editorial metadata | P6-17, P8-20 | [x] 2026-08-18 — owner, review-by, internal notes, **and now tags**: `P8-20` gave the panel somewhere to write them, and the box completes against the vocabulary the site already uses rather than inviting a fourth spelling of one label |
 | #30 | Broken-link & orphaned-media reporting | **v2** — nightly jobs in P8/P9, UI deferred | [-] |
+| #31 | Editor-managed site styling | P10-01…P10-12 | [x] 2026-08-20 — validated on write **and** on publish by one parse-based validator that refuses rather than strips, served from a stable URL revalidated by `ETag` rather than fingerprinted (so a publish evicts one response instead of the whole site), and never linked by the backoffice |
 
 ---
 
@@ -4870,3 +5078,4 @@ Carried from [`plan.md` §20](./plan.md#20-risk-register). Update the status col
 | R18 | Full-text index degrades write throughput | Med | 8 | Save latency exceeds NFR-6 | **Mitigated 2026-08-18, still open** — indexing was moved off the save entirely: a write enqueues an id in its own transaction and the outbox rebuilds the document afterwards, so extracting text from every zone is never on the path an editor waits on (`P8-18`). What that buys in latency it pays for in a window where a just-saved page is not yet findable, which the nightly reconcile repairs — and `SearchTests` asserts the reconcile fixes both a lost document and an orphaned one. Kept **open** because the trigger is a **measured** save latency against NFR-6, and the load tests that exist (`P9-13`) generate read traffic only |
 | R19 | Requirements shift mid-build (multi-site, multilingual) | **High** | any | Either raised → stop and re-plan | **Assessed for multi-site 2026-08-18, still open** — [ADR 0025](./docs/adr/0025-single-site-in-v1-no-siteid-discriminator.md) records what the reversal costs and what keeps it affordable, so if the requirement is raised the re-plan starts from a written estimate rather than from a survey. Neither requirement has been raised, which is why the risk stays open rather than closing |
 | R20 | Key-person dependency on Blazor/EF expertise | Med | 1–3 | Either engineer unavailable >1 week | Open |
+| R21 | A published site stylesheet makes the public site unusable | High | 10 | Any occurrence in production, or a contrast regression reaching the public gate | **Open — new 2026-08-20.** CSS cannot throw, so a stylesheet that renders the site unreadable serves `200 OK` and nothing alerts. Every mitigation is therefore recovery rather than prevention: preview against a real page before publishing, revert to any revision or to nothing from a screen the stylesheet cannot affect, and the public axe pass re-run with the published sheet applied. The trigger names production, where nothing has run |

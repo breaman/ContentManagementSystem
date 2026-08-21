@@ -65,6 +65,10 @@ public static class CmsPermissionMap
             [
                 CmsRoles.Administrator, CmsRoles.Developer,
             ],
+            [CmsPermissions.AppearanceEdit] =
+            [
+                CmsRoles.Administrator, CmsRoles.Developer,
+            ],
             [CmsPermissions.UsersManage] =
             [
                 CmsRoles.Administrator,

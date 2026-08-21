@@ -56,6 +56,16 @@ public static class CmsPermissions
     /// <summary>Manage site settings, redirects, and navigation.</summary>
     public const string SettingsEdit = "Settings.Edit";
 
+    /// <summary>Edit and publish the stylesheet the public site is rendered with.</summary>
+    /// <remarks>
+    /// Separate from <see cref="SettingsEdit"/> although the same two roles hold it today.
+    /// Publishing CSS reaches every anonymous visitor immediately — there is no draft state on the
+    /// public side and no approval step in front of it — which is a different kind of act from
+    /// setting a retention window. Keeping it separate is also what lets a future designer role
+    /// exist without being handed workflow mode and retention along with it (spec section 30, D27).
+    /// </remarks>
+    public const string AppearanceEdit = "Appearance.Edit";
+
     /// <summary>Manage users, roles, and ACLs.</summary>
     public const string UsersManage = "Users.Manage";
 

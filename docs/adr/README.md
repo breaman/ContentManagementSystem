@@ -44,3 +44,4 @@ holds, without reading `spec.md` end to end.
 | [0024](0024-mail-is-smtp-configuration-not-a-provider-choice.md) | D24 — Mail is SMTP configuration, not a provider chosen in code | Accepted |
 | [0025](0025-single-site-in-v1-no-siteid-discriminator.md) | D25 — v1 stays single-site; no `SiteId` discriminator, and the migration path if that changes | Accepted |
 | [0026](0026-three-content-security-policies-public-carries-no-nonce.md) | D26 — Three content security policies; the public one carries no nonce | Accepted |
+| [0027](0027-site-stylesheet-is-content-appended-never-replacing.md) | D27 — The site stylesheet is content, appended after the compiled one and never replacing it | Accepted |

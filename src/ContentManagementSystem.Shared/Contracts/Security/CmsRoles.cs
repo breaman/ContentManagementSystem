@@ -56,6 +56,14 @@ public static class CmsRoles
     /// <summary>The roles that may read the audit log. Mirrors <see cref="CmsPermissions.AuditView"/>.</summary>
     public const string AuditViewers = $"{Administrator},{Developer}";
 
+    /// <summary>Roles that may edit and publish the public site's stylesheet (spec section 30).</summary>
+    /// <remarks>
+    /// The same two roles as <see cref="StructureEditors"/> today, and named separately anyway: what
+    /// they are being admitted to is a different thing, and a screen whose <c>Authorize</c> attribute
+    /// says "structure editors" is a screen somebody will widen for the wrong reason.
+    /// </remarks>
+    public const string AppearanceEditors = $"{Administrator},{Developer}";
+
     /// <summary>
     /// The roles that may move content to the recycle bin and restore it. Mirrors
     /// <see cref="CmsPermissions.ContentDelete"/>.

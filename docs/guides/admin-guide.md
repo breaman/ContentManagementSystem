@@ -127,6 +127,55 @@ content, so eventually every save waits for it.
 
 ---
 
+## The site stylesheet
+
+**Appearance → Stylesheet.** This is how the public site's look changes without a developer, a build,
+or a deployment. It is plain CSS, and it is added *after* the stylesheet the application ships, so
+anything you write here wins over the built-in styling without either file knowing about the other.
+
+It works like a page, and that is the point:
+
+| You do | What visitors see |
+|---|---|
+| Save | Nothing. The draft is yours; the site keeps serving what was last published |
+| Preview | Nothing. The preview pane renders a real page of your site against the draft |
+| Publish | The change, on their next request. There is nothing to schedule and no page to republish |
+| Revert | An earlier revision, or nothing at all — "nothing" is the shipped design, unmodified |
+
+**Publish, then look at the site.** CSS cannot fail loudly: a stylesheet that makes the site
+unreadable still returns a perfectly good page, so nothing alerts and no test goes red. Revert is one
+button and it is on a screen this stylesheet cannot touch — the backoffice does not load it, by
+design — so the recovery is always available. Use it early rather than debugging live.
+
+### What it will refuse, and why
+
+The editor refuses the whole save and tells you the line. It never quietly edits what you wrote.
+
+- **`@import`** — fetches another stylesheet from wherever it names, at page-render time, and nobody
+  reviews what arrives. Paste the rules in instead.
+- **`url()` pointing at another site** — including web fonts and background images on a CDN. The
+  site's security policy will not load them anyway, and a stylesheet that can fetch from anywhere can
+  report every visitor to a third party by asking for a background image. Upload the file to the
+  media library and use its `/media/...` URL, which works.
+- **`expression()`, `behavior`, `-moz-binding`, `javascript:`** — script from a stylesheet. No current
+  browser runs them; they are refused regardless.
+- **More than 256 KB.** It is a stylesheet, not a bundle.
+
+### Two things worth knowing
+
+- **Contrast is the failure this makes easy.** A brand colour that looks right on a swatch often is
+  not readable as body text. The accessibility check runs against the published stylesheet, so it will
+  tell you — but it tells you after you publish.
+- **It cannot restyle these screens.** If you want the backoffice to look different, that is a code
+  change, and it is deliberate: a stylesheet that could cover this page could cover the button that
+  reverts it.
+
+What plain CSS cannot do — a new component, a changed grid, a different Bootstrap theme — is still a
+developer editing `styles/site.scss` under review. This narrows how often you need one; it does not
+remove them.
+
+---
+
 ## Redirects and 404s
 
 **Moving or renaming a page creates a redirect automatically.** Internal links do not need one — they
@@ -162,3 +211,6 @@ people, and including them would grow the table without bound and slow every sav
   deliberate choice; the failure mode of all of them is silence. `/health` is what tells you.
 - **Rotating the media signing key without a grace period.** Every image on the site breaks at once.
   [`operations.md §5`](../operations.md#5-secrets) has the procedure.
+- **Publishing a site stylesheet you have not looked at.** It reaches every visitor immediately, it
+  cannot fail in a way anything notices, and `display: none` on the wrong selector is a site with no
+  navigation. Preview first; revert without hesitating.

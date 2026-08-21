@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Claims;
 
+using ContentManagementSystem.Server.Api.Cms.Appearance;
 using ContentManagementSystem.Server.Api.Cms.Auditing;
 using ContentManagementSystem.Server.Api.Cms.Dashboard;
 using ContentManagementSystem.Server.Api.Cms.Media;
@@ -100,6 +101,8 @@ public static class CmsApiEndpoints
         group.MapCommentEndpoints();
         group.MapScheduleEndpoints();
         group.MapNotificationEndpoints();
+
+        group.MapAppearanceEndpoints();
 
         group.MapAuditEndpoints();
 

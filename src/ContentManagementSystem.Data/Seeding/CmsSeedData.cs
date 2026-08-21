@@ -43,6 +43,21 @@ public static class CmsSeedData
     };
 
     /// <summary>
+    /// The one row of the site stylesheet, seeded empty.
+    /// </summary>
+    /// <remarks>
+    /// Empty draft and null published copy is the honest starting state: a deployment that never
+    /// uses the feature serves no extra stylesheet and the public document omits the link entirely
+    /// (spec section 30.2). Seeding placeholder CSS would put bytes on every page of every site to
+    /// demonstrate a feature nobody had asked for.
+    /// </remarks>
+    public static SiteStylesheet SiteStylesheet => new()
+    {
+        Id = Models.Cms.SiteStylesheet.SingletonId,
+        DraftCss = string.Empty,
+    };
+
+    /// <summary>
     /// The built-in block type that holds a single sanitized HTML fragment.
     /// </summary>
     /// <remarks>

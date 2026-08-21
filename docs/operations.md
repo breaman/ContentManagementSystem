@@ -78,6 +78,8 @@ the options class, and every default is the safe reading.
 | `Cms:Search:UseFullText` | *(probe)* | Null asks the server. Set only to force the fallback during a catalog rebuild, or to assert the full-text path in a test. |
 | `Cms:Retention:Enabled` | `true` | The nightly version and audit sweeps. |
 | `Cms:Email:*` | *(none)* | SMTP host and credentials. With nothing configured the deployment logs what it would have sent and reports itself unconfigured ([ADR 0024](adr/0024-mail-is-smtp-configuration-not-a-provider-choice.md)). |
+| `Cms:SiteStylesheet:MaxBytes` | `262144` | Largest stylesheet an administrator may publish ([§30.5](../spec.md#305-what-is-refused-and-why)). Raising it is a decision about what the public page carries; it does not widen what the validator refuses. |
+| `Cms:SiteStylesheet:SharedMaxAgeSeconds` | `300` | How long a CDN may serve `/css/site-custom.css` without revalidating. A publish evicts this instance immediately; this bounds what sits in front of it (**Q6**). |
 
 ### Retention windows
 
@@ -180,6 +182,21 @@ image breaking simultaneously, for as long as the caches take to turn over.
    and moves past it, so a poison message is a log line rather than a stall.
 3. Republishing the page enqueues a fresh invalidation. It does not clear the backlog ahead of it.
 4. Last resort: restart the instance. The outbox is durable and picks up where it stopped.
+
+### "The public site looks wrong, and nothing is failing"
+
+Check **Appearance → Stylesheet** first. An administrator can publish CSS from inside the CMS
+([§30](../spec.md#30-site-stylesheet)), it reaches every visitor on their next request, and it cannot
+fail loudly — a stylesheet that makes the site unreadable still returns `200 OK`, so no health check,
+alert, or test goes red (**R21**).
+
+1. `GET /css/site-custom.css` — a `404` means nothing is published and the cause is elsewhere.
+2. The revision list on that screen says who published what and when. Compare it against when the
+   reports started.
+3. **Revert.** Publishing an earlier revision, or publishing nothing at all, is one button and takes
+   effect on the next request. It leaves the draft alone, so nothing is lost by doing it early.
+4. The backoffice never loads this stylesheet, so the screen you are reverting from cannot be
+   affected by the thing you are reverting.
 
 ### "Every image is broken"
 

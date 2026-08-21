@@ -1,4 +1,5 @@
-// CodeMirror 6 — the Markdown and HTML source surfaces of spec §14.4 (tasks P6-08 and P6-13).
+// CodeMirror 6 — the Markdown, HTML, and CSS source surfaces of spec §14.4 and §30.3
+// (tasks P6-08, P6-13, and P10-10).
 //
 // Its own bundle, separate from the WYSIWYG one, so a page with only plain-text zones downloads
 // neither and a page with only a markdown zone downloads one (ADR-0013).
@@ -8,6 +9,7 @@ import { EditorState } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { markdown } from "@codemirror/lang-markdown";
 import { html as htmlLanguage } from "@codemirror/lang-html";
+import { css as cssLanguage } from "@codemirror/lang-css";
 
 import { cspNonce, register, dispose, find, getValue, setValue } from "./editor-registry.js";
 
@@ -20,7 +22,7 @@ export { dispose, getValue, setValue };
  * @param {HTMLElement} element the container; Blazor renders nothing inside it
  * @param {string} initialValue the document to open with
  * @param {object} dotNetRef DotNetObjectReference used to report changes back
- * @param {string} language either "markdown" or "html"
+ * @param {string} language "markdown", "html", or "css"
  * @param {string} label the editor's accessible name
  */
 export function create(id, element, initialValue, dotNetRef, language, label) {
@@ -37,7 +39,7 @@ export function create(id, element, initialValue, dotNetRef, language, label) {
                 // Tab must still move focus out of the editor unless the author is mid-indent,
                 // or the editor becomes a keyboard trap (spec §28).
                 keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-                language === "html" ? htmlLanguage() : markdown(),
+                languageFor(language),
                 EditorView.lineWrapping,
                 // The load-bearing line. See editor-registry.js.
                 EditorView.cspNonce.of(cspNonce()),
@@ -69,6 +71,29 @@ export function create(id, element, initialValue, dotNetRef, language, label) {
         destroy: () => view.destroy(),
         view,
     });
+}
+
+/**
+ * The language support for a mode name.
+ *
+ * A third mode on this bundle rather than a fourth bundle: the site stylesheet editor is the same
+ * CodeMirror with a different grammar, and splitting it out would download the editor twice for an
+ * administrator who edits a Markdown zone and then the stylesheet (ADR-0013).
+ *
+ * Markdown is the fallback because it is the mode the zone editors open with, and an unrecognised
+ * name is a bug in the caller rather than a reason to render an unusable editor.
+ *
+ * @param {string} language the requested mode
+ */
+function languageFor(language) {
+    switch (language) {
+        case "html":
+            return htmlLanguage();
+        case "css":
+            return cssLanguage();
+        default:
+            return markdown();
+    }
 }
 
 /**

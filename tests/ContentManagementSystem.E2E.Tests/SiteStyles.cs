@@ -67,12 +67,17 @@ internal static class SiteStyles
     /// </summary>
     /// <param name="page">The page to route.</param>
     /// <param name="document">The whole document, <c>&lt;!doctype&gt;</c> and all.</param>
+    /// <param name="customCss">
+    /// What to answer for the administrator-authored stylesheet, or null to answer nothing
+    /// (task P10-17, spec section 30). It is a separate parameter rather than part of the document
+    /// because the whole point of the feature is that it arrives as a second file the page links.
+    /// </param>
     /// <remarks>
     /// For the public gates (tasks P9-07, P9-09), where the shell is part of what is being measured:
     /// its viewport meta tag, its landmarks, and the stylesheet link it writes are all the delivery
     /// document's own, and wrapping them in a test's document would measure the wrapper.
     /// </remarks>
-    public static async Task ServeDocumentAsync(IPage page, string document)
+    public static async Task ServeDocumentAsync(IPage page, string document, string? customCss = null)
     {
         ArgumentNullException.ThrowIfNull(page);
 
@@ -88,6 +93,20 @@ internal static class SiteStyles
                 {
                     ContentType = "text/html; charset=utf-8",
                     Body = document,
+                });
+
+                return;
+            }
+
+            // The administrator's stylesheet, which lives beside the shipped one and is a
+            // different file. Matched first so that renaming either of them cannot quietly make one
+            // shadow the other — the failure would be a gate measuring the wrong CSS and passing.
+            if (path.EndsWith("site-custom.css", StringComparison.Ordinal))
+            {
+                await route.FulfillAsync(new RouteFulfillOptions
+                {
+                    ContentType = "text/css; charset=utf-8",
+                    Body = customCss ?? string.Empty,
                 });
 
                 return;

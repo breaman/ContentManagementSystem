@@ -1,0 +1,254 @@
+@page "/admin/appearance/stylesheet"
+@rendermode InteractiveWebAssembly
+@attribute [Authorize(Roles = CmsRoles.AppearanceEditors)]
+@using ContentManagementSystem.Client.Components.Admin.Fields.Common
+@using ContentManagementSystem.Client.Components.Admin.Structure
+@using ContentManagementSystem.Shared.Contracts.Appearance
+@using ContentManagementSystem.Shared.Contracts.Security
+
+<PageTitle>Site stylesheet</PageTitle>
+
+<h1>Site stylesheet</h1>
+<p class="text-body-secondary">
+    CSS added to every <strong>public</strong> page, after the stylesheet the application ships — so
+    anything here wins over the built-in styling. It is never loaded by these admin screens.
+    Saving changes nothing a visitor sees; publishing reaches every visitor on their next request.
+</p>
+
+<DiagnosticList Diagnostics="Errors" Heading="The stylesheet was not saved" />
+
+@if (Sheet is null)
+{
+    <p role="status">Loading the stylesheet…</p>
+}
+else
+{
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3" role="group" aria-label="Stylesheet actions">
+        <button type="button" class="btn btn-primary" disabled="@(IsBusy || !CanSave)" @onclick="SaveAsync">
+            Save draft
+        </button>
+        <button type="button" class="btn btn-success" disabled="@(IsBusy || !CanPublish)" @onclick="ShowPublishAsync">
+            Publish…
+        </button>
+        <button type="button" class="btn btn-outline-secondary" disabled="@IsBusy" @onclick="ReloadAsync">
+            Discard changes
+        </button>
+
+        <span class="ms-auto small text-body-secondary" aria-live="polite">
+            @Draft.Length.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) characters ·
+            @Sheet.DraftByteLength.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) of
+            @Sheet.MaxBytes.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) bytes stored
+        </span>
+    </div>
+
+    <p class="small" aria-live="polite">
+        @if (Sheet.PublishedCss is null)
+        {
+            <span class="badge text-bg-secondary">Nothing published</span>
+            <span class="text-body-secondary ms-2">The site is using the design it shipped with.</span>
+        }
+        else if (Sheet.HasUnpublishedChanges)
+        {
+            <span class="badge text-bg-warning">Unpublished changes</span>
+            <span class="text-body-secondary ms-2">
+                Visitors are seeing the version published @FormatWhen(Sheet.PublishedOn)@FormatWho(Sheet.PublishedBy).
+            </span>
+        }
+        else
+        {
+            <span class="badge text-bg-success">Published</span>
+            <span class="text-body-secondary ms-2">
+                What you see here is what visitors are getting, since @FormatWhen(Sheet.PublishedOn).
+            </span>
+        }
+    </p>
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-6">
+            <h2 class="h6">CSS</h2>
+            <SourceEditor Language="css"
+                          Label="Site stylesheet CSS"
+                          Text="@Draft"
+                          TextChanged="OnDraftChangedAsync" />
+
+            <h3 class="h6 mt-3">
+                Diagnostics
+                @if (Diagnostics.Count > 0)
+                {
+                    <span class="badge text-bg-danger ms-1">@Diagnostics.Count</span>
+                }
+            </h3>
+
+            @if (Diagnostics.Count == 0)
+            {
+                <p class="small text-body-secondary" role="status">
+                    Nothing refused. This stylesheet can be saved and published.
+                </p>
+            }
+            else
+            {
+                <ul class="list-group" role="status">
+                    @foreach (var diagnostic in Diagnostics)
+                    {
+                        <li class="list-group-item list-group-item-danger">
+                            @if (diagnostic.Line > 0)
+                            {
+                                <strong>Line @diagnostic.Line, column @diagnostic.Column.</strong>
+                            }
+                            @diagnostic.Message
+                            @if (!string.IsNullOrEmpty(diagnostic.Snippet))
+                            {
+                                <code class="d-block mt-1">@diagnostic.Snippet</code>
+                            }
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <h2 class="h6">Preview</h2>
+            <p class="small text-body-secondary">
+                A real page of the site, rendered against the <strong>draft</strong>. Save first — the
+                preview reads what is stored, not what is in the box.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2 align-items-end mb-2">
+                <div class="form-floating flex-grow-1">
+                    <select id="preview-page" class="form-select" value="@PreviewPageId"
+                            @onchange="OnPreviewPageChanged">
+                        @* Not named `page`: a Razor loop variable with that name is read as an
+                           @@page directive and the error blames a directive nobody wrote. *@
+                        @foreach (var candidate in PreviewPages)
+                        {
+                            <option value="@candidate.Id">@candidate.Title</option>
+                        }
+                    </select>
+                    <label for="preview-page">Page to preview</label>
+                </div>
+                <button type="button" class="btn btn-outline-secondary" @onclick="RefreshPreview">
+                    Refresh
+                </button>
+            </div>
+
+            @if (PreviewPageId is { } previewPageId)
+            {
+                <iframe class="cms-stylesheet-preview"
+                        src="@($"/preview/{previewPageId}?v={PreviewNonce}")"
+                        title="Preview of the site with the draft stylesheet"></iframe>
+            }
+            else
+            {
+                <p class="small text-body-secondary">
+                    No published page to preview yet. Publish a page and the preview will have
+                    something to show.
+                </p>
+            }
+        </div>
+    </div>
+
+    <h2 class="h5 mt-4">Published history</h2>
+
+    @if (Revisions.Count == 0)
+    {
+        <p class="text-body-secondary">Nothing has been published yet.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table align-middle">
+                <caption>@Revisions.Count revision(s), newest first</caption>
+                <thead>
+                    <tr>
+                        <th scope="col">Published</th>
+                        <th scope="col">By</th>
+                        <th scope="col">Size</th>
+                        <th scope="col">Note</th>
+                        <th scope="col"><span class="visually-hidden">Actions</span></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var revision in Revisions)
+                    {
+                        <tr>
+                            <th scope="row">
+                                @FormatWhen(revision.CreatedOn)
+                                @if (revision.IsCurrent)
+                                {
+                                    <span class="badge text-bg-success ms-1">Live</span>
+                                }
+                            </th>
+                            <td>@(revision.CreatedBy ?? "—")</td>
+                            <td>@revision.ByteLength.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) bytes</td>
+                            <td>@(revision.Note ?? "—")</td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                        disabled="@IsBusy"
+                                        @onclick="() => LoadIntoDraftAsync(revision)">
+                                    Load into draft
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-warning"
+                                        disabled="@(IsBusy || revision.IsCurrent)"
+                                        @onclick="() => RevertAsync(revision.Id)">
+                                    Publish this
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="border-top pt-3 mt-3">
+        <h2 class="h6">Back to the shipped design</h2>
+        <p class="small text-body-secondary">
+            Publishes nothing at all, so the public site is styled exactly as the deployment ships it.
+            Your draft is left alone. This is the recovery path when a published stylesheet has broken
+            the site.
+        </p>
+        <button type="button" class="btn btn-outline-danger"
+                disabled="@(IsBusy || Sheet.PublishedCss is null)"
+                @onclick="() => RevertAsync(null)">
+            Unpublish the stylesheet
+        </button>
+    </div>
+}
+
+@if (IsPublishOpen && Sheet is not null)
+{
+    <div class="modal d-block" tabindex="-1" role="dialog" aria-modal="true"
+         aria-labelledby="publish-stylesheet-heading">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title h5" id="publish-stylesheet-heading">Publish the stylesheet</h2>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        This reaches <strong>every visitor on their next request</strong>. There is
+                        nothing to schedule and no page to republish.
+                    </p>
+                    <p class="small text-body-secondary">
+                        @Sheet.PublishedByteLength.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) bytes live now →
+                        @Sheet.DraftByteLength.ToString("N0", System.Globalization.CultureInfo.CurrentCulture) bytes after this
+                        (@FormatDelta(Sheet.DraftByteLength - Sheet.PublishedByteLength)).
+                    </p>
+                    <div class="form-floating mb-3">
+                        <input id="publish-note" class="form-control" @bind="PublishNote"
+                               placeholder="What changed" maxlength="1000" />
+                        <label for="publish-note">What changed (optional)</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="ClosePublish">
+                        Cancel
+                    </button>
+                    <button type="button" class="btn btn-success" disabled="@IsBusy" @onclick="PublishAsync">
+                        Publish
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}

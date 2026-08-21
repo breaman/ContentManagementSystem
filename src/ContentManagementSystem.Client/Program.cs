@@ -32,6 +32,7 @@ builder.Services.AddScoped<IShellLayoutStore, BrowserShellLayoutStore>();
 // ServerStructureClient, backs the same screens during pre-render.
 builder.Services.AddScoped<IStructureClient, HttpStructureClient>();
 builder.Services.AddScoped<INavigationClient, HttpNavigationClient>();
+builder.Services.AddScoped<ISiteStylesheetClient, HttpSiteStylesheetClient>();
 builder.Services.AddScoped<ISearchClient, HttpSearchClient>();
 
 // The page admin screens, likewise, with ServerPageClient behind the same interface on the server.

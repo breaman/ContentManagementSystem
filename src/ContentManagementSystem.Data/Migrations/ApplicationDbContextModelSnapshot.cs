@@ -1853,6 +1853,110 @@ namespace ContentManagementSystem.Data.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteStylesheet", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CreatedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("DraftCss")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ModifiedBy")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ModifiedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int?>("PublishedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PublishedCss")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("PublishedHash")
+                        .HasColumnType("binary(32)");
+
+                    b.Property<DateTimeOffset?>("PublishedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<int?>("PublishedRevisionId")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublishedRevisionId");
+
+                    b.ToTable("SiteStylesheets", t =>
+                        {
+                            t.HasCheckConstraint("CK_SiteStylesheet_SingleRow", "[Id] = 1");
+                        });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreatedBy = 0,
+                            DraftCss = "",
+                            ModifiedBy = 0,
+                            RowVersion = new byte[0]
+                        });
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteStylesheetRevision", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ByteLength")
+                        .HasColumnType("int");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset>("CreatedOn")
+                        .HasColumnType("datetimeoffset(7)");
+
+                    b.Property<string>("Css")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<byte[]>("Hash")
+                        .IsRequired()
+                        .HasColumnType("binary(32)");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("SiteStylesheetId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedOn")
+                        .IsDescending();
+
+                    b.HasIndex("SiteStylesheetId");
+
+                    b.ToTable("SiteStylesheetRevisions");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Tag", b =>
                 {
                     b.Property<int>("Id")
@@ -2784,6 +2888,27 @@ namespace ContentManagementSystem.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteStylesheet", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.SiteStylesheetRevision", "PublishedRevision")
+                        .WithMany()
+                        .HasForeignKey("PublishedRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("PublishedRevision");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteStylesheetRevision", b =>
+                {
+                    b.HasOne("ContentManagementSystem.Data.Models.Cms.SiteStylesheet", "SiteStylesheet")
+                        .WithMany("Revisions")
+                        .HasForeignKey("SiteStylesheetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SiteStylesheet");
+                });
+
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.TemplateRevision", b =>
                 {
                     b.HasOne("ContentManagementSystem.Data.Models.Cms.Template", "Template")
@@ -2995,6 +3120,11 @@ namespace ContentManagementSystem.Data.Migrations
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.ReusableContent", b =>
                 {
                     b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.SiteStylesheet", b =>
+                {
+                    b.Navigation("Revisions");
                 });
 
             modelBuilder.Entity("ContentManagementSystem.Data.Models.Cms.Tag", b =>

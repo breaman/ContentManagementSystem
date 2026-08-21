@@ -1,9 +1,11 @@
 using System.Diagnostics;
 
+using ContentManagementSystem.Core.Appearance;
 using ContentManagementSystem.Core.Delivery;
 using ContentManagementSystem.Core.Delivery.Seo;
 using ContentManagementSystem.Core.Telemetry;
 using ContentManagementSystem.Rendering;
+using ContentManagementSystem.Server.Delivery.Appearance;
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -28,6 +30,12 @@ public sealed record RenderedPage(string Html, IReadOnlyList<string> CacheTags);
 /// </param>
 /// <param name="loggerFactory">Passed to the component renderer, which requires one.</param>
 /// <param name="seo">Resolves the document head this page is served with (task P8-01).</param>
+/// <param name="stylesheet">
+/// Answers whether there is an administrator-authored stylesheet to link (task P10-07). Asked for
+/// the entity tag rather than the CSS, because the document needs to know only whether one exists
+/// and reading an <c>nvarchar(max)</c> column to decide that would put the whole stylesheet on the
+/// wire once per render.
+/// </param>
 /// <param name="metrics">Records how long the render took, tagged by template (task P3-28).</param>
 /// <remarks>
 /// <strong>Render to a string, then set headers, then write.</strong> Cache tags accumulate
@@ -47,6 +55,7 @@ public sealed class CmsPageRenderer(
     IServiceProvider services,
     ILoggerFactory loggerFactory,
     ISeoMetadataBuilder seo,
+    IPublishedStylesheetReader stylesheet,
     CmsMetrics metrics)
 {
     /// <summary>
@@ -76,6 +85,18 @@ public sealed class CmsPageRenderer(
         // ancestor trail, and the share image's library record, and a component that queried while
         // rendering would make what the head says depend on when it happened to run.
         var metadata = await seo.BuildAsync(content, context.IsPreview, cancellationToken);
+
+        // Which stylesheet, decided here rather than in the document: a preview frame shows the
+        // draft so a redesign can be judged on real pages, and a live render shows only what has
+        // been published (spec section 30.4). A preview always links it — the draft may be empty,
+        // and an empty preview stylesheet is a cheap 200 rather than a branch that could get the
+        // two modes the wrong way round.
+        var customStylesheet = context.IsPreview
+            ? SiteStylesheetEndpoint.PreviewHref
+            : await stylesheet.GetPublishedETagAsync(cancellationToken) is null
+                ? null
+                : SiteStylesheetEndpoint.Path;
+
         var started = Stopwatch.GetTimestamp();
 
         await using var renderer = new HtmlRenderer(services, loggerFactory);
@@ -86,6 +107,7 @@ public sealed class CmsPageRenderer(
             {
                 [nameof(CmsDeliveryDocument.Context)] = context,
                 [nameof(CmsDeliveryDocument.Seo)] = metadata,
+                [nameof(CmsDeliveryDocument.CustomStylesheetHref)] = customStylesheet,
             });
 
             var output = await renderer.RenderComponentAsync<CmsDeliveryDocument>(parameters);

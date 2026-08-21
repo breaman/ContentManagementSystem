@@ -24,6 +24,7 @@
 12. [Phase 7 — Workflow, permissions, and scheduling](#phase-7--workflow-permissions-and-scheduling)
 13. [Phase 8 — SEO, caching, navigation, and search](#phase-8--seo-caching-navigation-and-search)
 14. [Phase 9 — Hardening, accessibility, and launch](#phase-9--hardening-accessibility-and-launch)
+    - [Phase 10 — Editor-managed site styling](#phase-10--editor-managed-site-styling) — added after the plan was first written; nested here so the numbered sections below keep the numbers other documents cite
 15. [Post-v1 — the v2 backlog](#post-v1--the-v2-backlog)
 16. [Cross-cutting workstreams](#16-cross-cutting-workstreams)
 17. [Database migration sequence](#17-database-migration-sequence)
@@ -129,10 +130,16 @@ Phase                                              ed    Cumulative   Depends on
 7  Workflow, permissions, scheduling             16.0      175.5     2
 8  SEO, caching, navigation, search              14.0      189.5     3
 9  Hardening, accessibility, launch              14.0      203.5     all
+10 Editor-managed site styling                    6.0      209.5     3, 6, 8
 ──────────────────────────────────────────────────────────────────────────────────
-                                     v1 total  203.5 ed  ≈ 20 weeks @ 2 engineers
-                                                         ≈ 23 weeks with contingency
+                                     v1 total  209.5 ed  ≈ 21 weeks @ 2 engineers
+                                                         ≈ 24 weeks with contingency
 ```
+
+Phase 10 was added on **2026-08-20**, after a re-read of `requirements.md` found styling to be the one
+editor-facing capability the plan had left entirely to developers. It is v1 scope rather than backlog:
+a CMS whose appearance takes a deployment to change is one an organisation works around, and the
+workaround — inline `style` attributes typed into content — is worse than the gap.
 
 Dependency graph:
 
@@ -697,6 +704,64 @@ R18 (full-text index maintenance cost).
 
 ---
 
+## Phase 10 — Editor-managed site styling
+
+**Objective:** an administrator changes how the public site looks, from inside the CMS, without a
+developer, a build, or a deployment — and cannot reach the backoffice while doing it.
+
+**Duration:** 6 ed · **Entry criteria:** Phase 3 (delivery and preview), Phase 6 (the CodeMirror
+editor bundle), and Phase 8 (output caching and the outbox) have exited. It is the last phase by
+dependency, not by importance: it needs the public document, the preview frame, the editor, and
+tag-based invalidation, and every one of those arrives earlier.
+
+Specified in [§30]; the shape of the decision is [ADR 0027](./docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md).
+
+| Task | ed |
+|---|---|
+| `SiteStylesheet` (singleton) + `SiteStylesheetRevision` entities, configuration, and migration #11 | 0.5 |
+| `CssValidator` — a parse-based deny list with line/column diagnostics [§30.5], plus its corpus | 1.25 |
+| `SiteStylesheetService` — draft save under `If-Match`, publish (snapshot + revision + `sitecss` eviction enqueued **inside** the transaction), revert, revision history | 1 |
+| Delivery: `GET /css/site-custom.css` and `GET /preview/site-custom.css`, the `<link>` in the public and preview documents, output-cache tag and outbox handler | 0.75 |
+| Management API under `/appearance/stylesheet`, and the `Appearance.Edit` permission | 0.5 |
+| `/admin/appearance/stylesheet`: CSS source pane, live diagnostics, preview against a real page, publish dialog with the delta, revision list and revert | 1.5 |
+| Tests: the draft/published promise over HTTP, the refusal corpus, eviction, authorization, and the public axe pass re-run with a published stylesheet | 0.5 |
+
+### Acceptance criteria
+
+1. **An administrator changes the public site's appearance end to end from the CMS** — writes CSS,
+   previews it against a real page, publishes, and an anonymous request receives it — with no build
+   and no deployment in between.
+2. **Saving the draft does not change what an anonymous visitor receives.** Publishing does, on the
+   next request, on every instance. This is `P2 #4`'s promise restated about styling, and it is tested
+   the same way: over HTTP, against an anonymous client.
+3. **A refused construct is refused on save and on publish**, naming the construct, the line, and the
+   column — `@import`, `expression()`, `behavior`, `-moz-binding`, a `javascript:` value, a `url()`
+   naming another host, and anything over 256 KB — and the previously published stylesheet keeps
+   being served.
+4. **The backoffice document does not link the stylesheet**, asserted against the rendered admin HTML
+   rather than against the source, so it cannot regress silently.
+5. A caller without `Appearance.Edit` is refused at the API, not merely hidden from in the UI.
+6. Revert publishes an earlier revision, and publishing nothing restores the shipped design.
+7. The public accessibility gate passes with a published stylesheet applied, and fails when a
+   deliberately low-contrast one is published — the negative control, without which the gate proves
+   nothing.
+
+### Exit criteria
+
+An administrator with no access to the repository restyles the public site and reverts it, and the
+axe gate and the caching tests are green in CI.
+
+### Risks
+
+- **R21 — a published stylesheet makes the site unusable.** CSS cannot throw, so nothing alerts.
+  Mitigated entirely by recovery: preview before publish, revert from a screen the stylesheet cannot
+  affect, and the contrast gate.
+- **Scope creep into a theme builder.** Colour pickers, font pickers, and a token model are a
+  different feature with a different acceptance test. The line is: this phase ships a CSS file with an
+  editor around it. If tokens are wanted, they are v2 and they are built *on* this.
+
+---
+
 ## Post-v1 — the v2 backlog
 
 Ordered by expected value, not by effort. Each carries a forward reference to its specification.
@@ -752,6 +817,12 @@ Migrations are additive and applied in this order. The existing Aspire `ef-migra
 | 6 | `AddCmsMedia` | 5 | `MediaFolder`, `MediaItem`, `MediaRendition` |
 | 7 | `AddCmsWorkflow` | 7 | `WorkflowTask`, `Comment`, `PageAcl`, `ScheduledJob` |
 | 8 | `AddCmsDelivery` | 8 | `NavigationMenu`, `NavigationItem`, `SearchDocument` (+ full-text catalog), `OutboxMessage`, `Tag`, `PageTag` |
+| 11 | `AddSiteStylesheet` | 10 | `SiteStylesheet` (singleton), `SiteStylesheetRevision` |
+
+Migrations **9** (`AddAuditRetention`) and **10** (`AddNavigationIndex`) were added during Phase 9 and
+are recorded in [`task.md`](./task.md#database-migration-sequence); the numbering here is kept in step
+with that table rather than closed up, because a migration number is how the two documents refer to
+the same file.
 
 Rules:
 
@@ -785,6 +856,9 @@ review.
 | `Directory.Packages.props` | Add HtmlSanitizer, Markdig, **SkiaSharp**, **MetadataExtractor**, HybridCache, rate limiting, Testcontainers, bUnit, Playwright, k6 tooling | 0–5 | Central package management is already enabled. SkiaSharp per Q3; MetadataExtractor for EXIF orientation [§13.9.1] |
 | `Shared/Common/FieldLengths.cs` | Add CMS field length constants | 1 | Keeps validation attributes and column definitions from drifting, per the file's own stated intent |
 | `styles/site.scss` | Add backoffice and content typography layers | 6 | — |
+| `Server/Delivery/CmsDeliveryDocument.razor`, `Delivery/CmsPageRenderer.cs` | Link the administrator's stylesheet after `site.css` — the published one on a live render, the draft on a preview one, and nothing at all when nothing is published. The renderer decides which, so the document has one link and no branch | 10 | [§30.1]. `App.razor` is deliberately **not** in this list |
+| `Server/package.json` | Add `@codemirror/lang-css` to the source-editor bundle | 10 | The stylesheet editor is the same CodeMirror bundle with one more language mode (`D13`) |
+| `Shared/Contracts/Security/CmsPermissions.cs`, `Server/Authorization/CmsPermissionMap.cs` | Add `Appearance.Edit`, held by `Administrator` and `Developer` | 10 | [§21.1]. Separate from `Settings.Edit` because publishing CSS reaches every visitor immediately, with no draft state on the public side |
 | `README.md` | Document CMS setup, template authoring, and the schema sync CLI | 9 | — |
 
 ---
@@ -855,6 +929,7 @@ PR ──► restore ──► build (warnings as errors, already configured)
 | R18 | Full-text index maintenance degrades write throughput | Low | Medium | Asynchronous indexing via the outbox; nightly reconcile | Save latency exceeds NFR-6 |
 | R19 | Requirements shift mid-build (multi-site, or multilingual after all) | Low–Medium | **High** | Q1 answered: no locale in the model, so a reversal is a ~25–35 ed migration, not a config change. Multi-site assessed at Phase 8, before v2 adds tables | Either raised → stop and re-plan; do not absorb into a phase |
 | R20 | Key-person dependency on Blazor/EF expertise | Medium | Medium | Pair on Phases 1–3; ADRs capture reasoning; no single-owner components | Either engineer unavailable for more than a week |
+| R21 | A published site stylesheet makes the public site unusable — unreadable contrast, a covered viewport, a hidden navigation | Medium | High | CSS cannot fail loudly, so the mitigations are all recovery: preview against real pages before publishing, revert to any revision or to nothing from a screen the stylesheet cannot affect, the public axe/contrast gate run **with** the published sheet applied, and a `sitecss` eviction that takes effect on the next request rather than after a TTL | Any occurrence in production, or a contrast regression reaching the public gate |
 
 ---
 
@@ -928,11 +1003,12 @@ is built. This is the checklist for verifying the delivered system against the o
 | R-11 | "image management functionality … upload images" | [§13.3] | 5 | P5 #1–#5 |
 | R-12 | "resize and rotate those images" | [§13.4], [§13.5] | 5 | P5 #6, #7 |
 | R-13 | "'reference' those images inside the pages they are creating" | [§13.6], [§7.1] `media` | 5 | P5 #10 |
-| R-14 | "do plenty of research and add elements that are clearly missing that would prevent this from being a usable system" | [§4.2] — 30 identified gaps | 1–9 | Per-gap, below |
+| R-14 | "do plenty of research and add elements that are clearly missing that would prevent this from being a usable system" | [§4.2] — 31 identified gaps | 1–10 | Per-gap, below |
+| R-15 | "Administrators should be able to change the look and feel of the public site without a developer … a site-wide CSS file they can create and edit from an editor inside the system … public facing pages only" | [§30] | 10 | P10 #1–#4 |
 
 ### 23.1 Gap coverage
 
-The 30 gaps from [§4.2] mapped to their delivery phase. Gaps marked v2 are in the
+The 31 gaps from [§4.2] mapped to their delivery phase. Gaps marked v2 are in the
 [post-v1 backlog](#post-v1--the-v2-backlog) with their spec already written.
 
 | Phase | Gaps closed |
@@ -946,6 +1022,7 @@ The 30 gaps from [§4.2] mapped to their delivery phase. Gaps marked v2 are in t
 | 7 | #6 approval workflow, #5 scheduled publish/unpublish, #7 granular permissions, #20 audit viewer, #28 rate limiting (hardened in P9) |
 | 8 | #3 SEO metadata, #4 sitemap & robots, #17 output caching & invalidation, #19 search index, #24 navigation |
 | 9 | #28 rate limiting hardening; verification of all security and accessibility gaps |
+| 10 | #31 editor-managed site styling |
 | Schema in v1, UI in v2 | #23 localization |
 | v2 backlog | #22 public search, #25 forms, #26 headless API & webhooks, #27 content import/export (structure promotion ships in v1), #30 broken-link & orphan reporting |
 
@@ -965,3 +1042,4 @@ The 30 gaps from [§4.2] mapped to their delivery phase. Gaps marked v2 are in t
 | 7 | P2 exit | Authors cannot publish; ACLs enforced server-side; scheduling fires once |
 | 8 | P3 exit | Publish invalidates exactly the right cache entries; SEO output correct |
 | 9 | All | NFRs met; security and accessibility signed off; runbooks in place |
+| 10 | P3, P6, P8 exit | **An administrator changes the public site's appearance with no developer, no build, and no deployment** — and cannot reach the backoffice with it |

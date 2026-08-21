@@ -48,7 +48,12 @@ public sealed class StubAuthorization(params string[] permissions) : ICmsAuthori
         CmsPermissions.MediaUpload,
         CmsPermissions.MediaDelete,
         CmsPermissions.UsersManage,
-        CmsPermissions.AuditView);
+        CmsPermissions.AuditView,
+
+        // P10's stylesheet service checks this one, and the delivery suite arranges a published
+        // stylesheet through it. `StructureEdit` and `SettingsEdit` are still deliberately absent:
+        // this list is what the suites drive, not the whole vocabulary.
+        CmsPermissions.AppearanceEdit);
 
     /// <summary>
     /// Roles the caller holds, which only the access-rule resolver reads.

@@ -34,6 +34,9 @@
         <AuthorizeView Roles="@CmsRoles.AuditViewers" Context="auditor">
             <li class="nav-item"><NavLink class="nav-link" href="/admin/audit">Audit</NavLink></li>
         </AuthorizeView>
+        <AuthorizeView Roles="@CmsRoles.AppearanceEditors" Context="designer">
+            <li class="nav-item"><NavLink class="nav-link" href="/admin/appearance/stylesheet">Appearance</NavLink></li>
+        </AuthorizeView>
     </ul>
 </nav>
 

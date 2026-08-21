@@ -21,6 +21,16 @@ public static class CacheTags
     /// <summary>The tag every rendered page carries, for a manual purge-all.</summary>
     public const string All = "content";
 
+    /// <summary>
+    /// Tags the site stylesheet response (spec section 30.4).
+    /// </summary>
+    /// <remarks>
+    /// Only the stylesheet response carries it, never a page. The stylesheet's URL is stable and
+    /// revalidated rather than fingerprinted, precisely so that publishing it does not have to evict
+    /// every cached page on the site — see spec section 30.4 for what a hash in the URL would cost.
+    /// </remarks>
+    public const string SiteStylesheet = "sitecss";
+
     /// <summary>Tags a page's own response. Evicted when it is published, moved, or deleted.</summary>
     /// <param name="pageId">The page id.</param>
     /// <returns>The tag.</returns>

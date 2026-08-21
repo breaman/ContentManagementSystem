@@ -3,6 +3,7 @@ The goal here is to create a basic Content Management System. At a minimum the f
 - Specify what type of data can be used in a zone (plain text, reusable content, html/markdown, etc)
 - In zones that are plain text or html/mardown, it should allow for inline editing that would have an "edit/preview" editor experience
 - Reusable content would just be html elements that are specified once but then reused in multiple (things like common footers, image carousels, etc)
+- Administrators should be able to change the look and feel of the public site without a developer being involved. There should be a site-wide CSS file they can create and edit from an editor inside the system, applied on top of the styles the application already ships, and affecting the public facing pages only — not the admin screens
 
 based on the templates that have been created, content editors should be able to create pages from those templates where they would then be able to populate the "placeholder" areas with actual content. Pages at a minimum would need to have a url specified so that end users would be able to navigate to the pages
 

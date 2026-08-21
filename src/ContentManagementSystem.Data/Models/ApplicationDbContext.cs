@@ -59,6 +59,12 @@ public class ApplicationDbContext : AuthDbContext
     /// <summary>The single row of site-wide configuration.</summary>
     public DbSet<SiteSettings> SiteSettings => Set<SiteSettings>();
 
+    /// <summary>The single row holding the administrator-authored public site stylesheet.</summary>
+    public DbSet<SiteStylesheet> SiteStylesheets => Set<SiteStylesheet>();
+
+    /// <summary>One published state of the site stylesheet, cut on every publish.</summary>
+    public DbSet<SiteStylesheetRevision> SiteStylesheetRevisions => Set<SiteStylesheetRevision>();
+
     /// <summary>Nodes of the content tree.</summary>
     public DbSet<Page> Pages => Set<Page>();
 

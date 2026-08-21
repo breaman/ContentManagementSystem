@@ -42,6 +42,21 @@ rest, so a missing bundle fails the build rather than the page — which is the 
 ([ADR 0013](docs/adr/0013-backoffice-editor-bundle-and-style-nonce.md)). During development,
 `npm run sass-dev` watches the stylesheet.
 
+### There is a second stylesheet, and it is not in this repository
+
+`styles/site.scss` is the compiled one, and it styles both front doors. The public document links a
+second file after it — CSS an administrator writes inside the CMS, stored in the database, drafted and
+published like a page, and served from `/css/site-custom.css`
+([§30](spec.md#30-site-stylesheet), [ADR 0027](docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md)).
+
+Two consequences for anyone changing styles here:
+
+- **A production site may not look like your build.** If something is styled differently in an
+  environment, check `Appearance → Stylesheet` before hunting through the Sass.
+- **The backoffice never loads it**, so nothing an administrator writes can reach the screens the CMS
+  is administered from. `App.razor` linking that file would be a security change, and a test asserts
+  it does not.
+
 ---
 
 ## How content is modelled

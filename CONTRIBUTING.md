@@ -177,6 +177,14 @@ These are the ones where a reasonable-looking shortcut causes a real incident:
   `wwwroot` under server-generated keys.
 - Media metadata is stripped after orientation is baked in. GPS coordinates in a published photo are
   a privacy incident.
+- **The site stylesheet is validated, never sanitized, and never loaded by the backoffice**
+  ([ADR 0027](docs/adr/0027-site-stylesheet-is-content-appended-never-replacing.md)). `CssValidator`
+  refuses the whole save rather than editing what an administrator wrote, and its deny list —
+  `@import`, off-origin `url()`, `expression()`, `behavior`, `-moz-binding`, `javascript:` — exists
+  because each entry either fetches from a host the CSP would have to admit or executes script.
+  **Widening it is a CSP change as well as a validator change.** `App.razor` linking
+  `site-custom.css` would hand a stylesheet the run of the screens that revert it; a test asserts it
+  does not.
 
 ## Decisions
 
